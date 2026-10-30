@@ -181,6 +181,55 @@ def seed_test_accounts():
         db.query(PasswordReset).filter(PasswordReset.token_hash == exp_rst_hash).delete()
         db.add(PasswordReset(user_id=admin2.id, token_hash=exp_rst_hash, expires_at=now - timedelta(minutes=30)))
 
+        # Seed Academic Records for Ada Lovelace (s_prof1)
+        from app.models.academic import AttendanceRecord, StudentMark, FeeInvoice
+        db.query(AttendanceRecord).filter(AttendanceRecord.student_id == s_prof1.id).delete()
+        for i in range(1, 21):
+            db.add(AttendanceRecord(
+                student_id=s_prof1.id,
+                date=date(2026, 10, i if i <= 28 else 28),
+                status="excused" if i == 5 else ("absent" if i == 12 else "present"),
+                notes="Dentist appointment" if i == 5 else None,
+            ))
+
+        db.query(StudentMark).filter(StudentMark.student_id == s_prof1.id).delete()
+        marks_data = [
+            ("Mathematics", "MATH-101", 100, 92, "A+", "Pass"),
+            ("Computer Science", "CS-102", 100, 96, "A+", "Pass"),
+            ("Physics", "PHY-103", 100, 84, "A", "Pass"),
+            ("English Communication", "ENG-104", 100, 88, "A", "Pass"),
+            ("Chemistry", "CHEM-105", 100, 78, "B+", "Pass"),
+        ]
+        for subj, code, max_s, obt_s, grd, st in marks_data:
+            db.add(StudentMark(
+                student_id=s_prof1.id,
+                subject=subj,
+                code=code,
+                max_score=max_s,
+                obtained_score=obt_s,
+                grade=grd,
+                status=st,
+                term="Term 1 (2026-2027)",
+            ))
+
+        db.query(FeeInvoice).filter(FeeInvoice.student_id == s_prof1.id).delete()
+        db.add(FeeInvoice(
+            student_id=s_prof1.id,
+            invoice_number="INV-2026-001",
+            description="Term 1 Tuition & Laboratory Fee",
+            amount=1250.00,
+            due_date=date(2026, 9, 15),
+            status="Paid",
+        ))
+        db.add(FeeInvoice(
+            student_id=s_prof1.id,
+            invoice_number="INV-2026-002",
+            description="Term 2 Tuition & Facilities",
+            amount=1250.00,
+            due_date=date(2027, 1, 15),
+            status="Pending",
+        ))
+
         # Sync id_counters so sequence generator avoids colliding with seeded 0001/0002
         from sqlalchemy import text
         db.execute(text('''

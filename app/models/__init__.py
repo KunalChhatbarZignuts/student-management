@@ -1,5 +1,6 @@
 """Import all models so Alembic and relationship lookups can discover them."""
 
+from app.models.academic import AttendanceRecord, FeeInvoice, StudentMark
 from app.models.application import Application
 from app.models.audit_log import AuditLog
 from app.models.id_counter import IdCounter
@@ -13,7 +14,9 @@ from app.models.user import User
 
 __all__ = [
     "Application",
+    "AttendanceRecord",
     "AuditLog",
+    "FeeInvoice",
     "IdCounter",
     "Invite",
     "Parent",
@@ -21,6 +24,7 @@ __all__ = [
     "PasswordReset",
     "RefreshToken",
     "Student",
+    "StudentMark",
     "Teacher",
     "User",
 ]

@@ -28,3 +28,23 @@ class ResendInviteResponse(BaseModel):
 
 class TriggerPasswordResetResponse(BaseModel):
     message: str
+
+
+class AuditLogRead(BaseModel):
+    id: uuid.UUID
+    actor_email: str | None = None
+    action: str
+    entity_type: str
+    entity_id: str | None = None
+    ip: str | None = None
+    metadata: dict | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AuditLogListResponse(BaseModel):
+    items: list[AuditLogRead]
+    total: int
+    skip: int
+    limit: int

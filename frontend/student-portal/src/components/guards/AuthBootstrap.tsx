@@ -99,8 +99,12 @@ export default function AuthBootstrap({ children }: { children: React.ReactNode 
         </Typography>
         <Button
           variant="contained"
-          onClick={() => {
+          onClick={async () => {
+            try {
+              await authApi.logout();
+            } catch {}
             setInitError(null);
+            clearAuth();
             window.location.href = '/login';
           }}
           sx={{ mt: 2 }}
