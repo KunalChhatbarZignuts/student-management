@@ -27,3 +27,33 @@ class ParentLinkResponse(BaseModel):
     message: str
     parent_id: uuid.UUID
     student_id: uuid.UUID
+
+
+class LinkedStudentSummary(BaseModel):
+    id: uuid.UUID
+    student_code: str
+    first_name: str
+    last_name: str
+    class_name: str
+    section: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ParentWithChildrenResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    email: EmailStr
+    first_name: str
+    last_name: str
+    phone: str | None = None
+    children: list[LinkedStudentSummary] = []
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ParentUnlinkResponse(BaseModel):
+    message: str
+    parent_id: uuid.UUID
+    student_id: uuid.UUID

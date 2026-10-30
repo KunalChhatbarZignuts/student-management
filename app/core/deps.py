@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import decode_token
@@ -138,4 +139,47 @@ def require_roles(*allowed_roles: str) -> Callable[[User], User]:
         return current_user
 
     return role_checker
+
+
+def get_current_teacher(
+    current_user: User = Depends(require_roles(UserRole.TEACHER.value)),
+    db: Session = Depends(get_db),
+) -> "Teacher":
+    from app.models.teacher import Teacher
+    teacher = db.execute(
+        select(Teacher).where(Teacher.user_id == current_user.id)
+    ).scalar_one_or_none()
+    if not teacher:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Teacher profile record not found",
+        )
+    return teacher
+
+
+def require_class_access(
+    class_id: uuid.UUID,
+    teacher: "Teacher" = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+) -> "Class":
+    from app.models.classroom import Class, TeacherAssignment
+    assignment = db.execute(
+        select(TeacherAssignment).where(
+            TeacherAssignment.teacher_id == teacher.id,
+            TeacherAssignment.class_id == class_id,
+            TeacherAssignment.status == "active",
+        )
+    ).scalars().first()
+    if not assignment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Class not found or not assigned to teacher",
+        )
+    classroom = db.get(Class, class_id)
+    if not classroom or classroom.status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Class not found or inactive",
+        )
+    return classroom
 

@@ -3,14 +3,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 
 from app.api.v1 import (
+    admin_classes,
     admin_students,
     admin_teachers,
     admin_users,
     applications,
+    audit_logs,
     auth,
     bulk_import,
     parents,
     students,
+    teacher_classes,
+    teacher_attendance,
     teachers,
 )
 from app.core.config import settings
@@ -39,9 +43,13 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(admin_students.router, prefix="/api/v1")
 app.include_router(admin_teachers.router, prefix="/api/v1")
 app.include_router(admin_users.router, prefix="/api/v1")
+app.include_router(admin_classes.router, prefix="/api/v1")
+app.include_router(audit_logs.router, prefix="/api/v1")
 app.include_router(bulk_import.router, prefix="/api/v1")
 app.include_router(parents.router, prefix="/api/v1")
 app.include_router(teachers.router, prefix="/api/v1")
+app.include_router(teacher_classes.router, prefix="/api/v1")
+app.include_router(teacher_attendance.router, prefix="/api/v1")
 app.include_router(students.router, prefix="/api/v1")
 app.include_router(applications.router, prefix="/api/v1")
 

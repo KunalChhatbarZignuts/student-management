@@ -37,6 +37,7 @@ import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ReportProblemIcon from '@mui/icons-material/ReportProblem';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 
 import { useAuth } from '@/features/auth/hooks';
 import { useUiStore } from '@/store/uiStore';
@@ -98,6 +99,12 @@ const navItems: NavItem[] = [
     href: '/my-classes',
     icon: <ClassIcon />,
     roles: [ROLES.TEACHER],
+  },
+  {
+    label: 'Attendance',
+    href: '/attendance',
+    icon: <EventAvailableIcon />,
+    roles: [ROLES.TEACHER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
   {
     label: 'Report Missing Student',

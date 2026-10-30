@@ -73,6 +73,49 @@ def seed_test_accounts():
                 phone="555-0101",
             )
             db.add(t_prof)
+            db.flush()
+
+        # Classes and Subjects
+        from app.models.classroom import Class, Subject, TeacherAssignment
+        cls1 = db.query(Class).filter(Class.name == "Grade 10", Class.section == "A", Class.academic_year == "2026-2027").first()
+        if not cls1:
+            cls1 = Class(name="Grade 10", section="A", academic_year="2026-2027", department="CS")
+            db.add(cls1)
+            db.flush()
+
+        cls2 = db.query(Class).filter(Class.name == "Grade 10", Class.section == "B", Class.academic_year == "2026-2027").first()
+        if not cls2:
+            cls2 = Class(name="Grade 10", section="B", academic_year="2026-2027", department="CS")
+            db.add(cls2)
+            db.flush()
+
+        subj1 = db.query(Subject).filter(Subject.code == "CS-102").first()
+        if not subj1:
+            subj1 = Subject(name="Computer Science", code="CS-102")
+            db.add(subj1)
+            db.flush()
+
+        subj2 = db.query(Subject).filter(Subject.code == "MATH-101").first()
+        if not subj2:
+            subj2 = Subject(name="Mathematics", code="MATH-101")
+            db.add(subj2)
+            db.flush()
+
+        assign1 = db.query(TeacherAssignment).filter(
+            TeacherAssignment.teacher_id == t_prof.id,
+            TeacherAssignment.class_id == cls1.id,
+            TeacherAssignment.subject_id == subj1.id,
+            TeacherAssignment.academic_year == "2026-2027",
+        ).first()
+        if not assign1:
+            assign1 = TeacherAssignment(
+                teacher_id=t_prof.id,
+                class_id=cls1.id,
+                subject_id=subj1.id,
+                is_class_teacher=True,
+                academic_year="2026-2027",
+            )
+            db.add(assign1)
 
         # Student 1
         s_user1 = get_or_create_user("student_test@example.com", UserRole.STUDENT.value, UserStatus.ACTIVE.value, must_change=False)
@@ -180,6 +223,55 @@ def seed_test_accounts():
         exp_rst_hash = hash_token("expired-reset-token-1234567890")
         db.query(PasswordReset).filter(PasswordReset.token_hash == exp_rst_hash).delete()
         db.add(PasswordReset(user_id=admin2.id, token_hash=exp_rst_hash, expires_at=now - timedelta(minutes=30)))
+
+        # Seed Academic Records for Ada Lovelace (s_prof1)
+        from app.models.academic import AttendanceRecord, StudentMark, FeeInvoice
+        db.query(AttendanceRecord).filter(AttendanceRecord.student_id == s_prof1.id).delete()
+        for i in range(1, 21):
+            db.add(AttendanceRecord(
+                student_id=s_prof1.id,
+                date=date(2026, 10, i if i <= 28 else 28),
+                status="excused" if i == 5 else ("absent" if i == 12 else "present"),
+                notes="Dentist appointment" if i == 5 else None,
+            ))
+
+        db.query(StudentMark).filter(StudentMark.student_id == s_prof1.id).delete()
+        marks_data = [
+            ("Mathematics", "MATH-101", 100, 92, "A+", "Pass"),
+            ("Computer Science", "CS-102", 100, 96, "A+", "Pass"),
+            ("Physics", "PHY-103", 100, 84, "A", "Pass"),
+            ("English Communication", "ENG-104", 100, 88, "A", "Pass"),
+            ("Chemistry", "CHEM-105", 100, 78, "B+", "Pass"),
+        ]
+        for subj, code, max_s, obt_s, grd, st in marks_data:
+            db.add(StudentMark(
+                student_id=s_prof1.id,
+                subject=subj,
+                code=code,
+                max_score=max_s,
+                obtained_score=obt_s,
+                grade=grd,
+                status=st,
+                term="Term 1 (2026-2027)",
+            ))
+
+        db.query(FeeInvoice).filter(FeeInvoice.student_id == s_prof1.id).delete()
+        db.add(FeeInvoice(
+            student_id=s_prof1.id,
+            invoice_number="INV-2026-001",
+            description="Term 1 Tuition & Laboratory Fee",
+            amount=1250.00,
+            due_date=date(2026, 9, 15),
+            status="Paid",
+        ))
+        db.add(FeeInvoice(
+            student_id=s_prof1.id,
+            invoice_number="INV-2026-002",
+            description="Term 2 Tuition & Facilities",
+            amount=1250.00,
+            due_date=date(2027, 1, 15),
+            status="Pending",
+        ))
 
         # Sync id_counters so sequence generator avoids colliding with seeded 0001/0002
         from sqlalchemy import text

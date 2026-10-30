@@ -24,6 +24,8 @@ import { useAuth } from '@/features/auth/hooks';
 import { useMyStudentProfile } from '@/features/students/hooks';
 import { useMyChildren } from '@/features/parents/hooks';
 import { ROLES, STUDENT_PORTAL_ALLOWED_ROLES } from '@/lib/constants';
+import { academicApi } from '@/features/academic/api';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 
 export default function DashboardPage() {
@@ -33,6 +35,12 @@ export default function DashboardPage() {
 
   const isStudent = role === ROLES.STUDENT;
   const isParent = role === ROLES.PARENT;
+
+  const { data: attendance } = useQuery({
+    queryKey: ['academic', 'attendance', 'me'],
+    queryFn: academicApi.getMyAttendance,
+    enabled: isStudent,
+  });
 
   return (
     <RequireRole roles={STUDENT_PORTAL_ALLOWED_ROLES}>
@@ -106,7 +114,7 @@ export default function DashboardPage() {
                           ATTENDANCE RATE
                         </Typography>
                         <Typography variant="h6" fontWeight={700}>
-                          96.5%
+                          {attendance ? `${attendance.percentage}%` : 'Loading...'}
                         </Typography>
                         <Typography variant="body2" color="success.main" fontWeight={500}>
                           Good standing

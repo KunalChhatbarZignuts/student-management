@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     # Frontend
     FRONTEND_URL: str = "http://localhost:3000"
 
+    # Attendance
+    ATTENDANCE_EDIT_WINDOW_HOURS: int = 24
+
     # Feature flags
     ENABLE_ONLINE_APPLICATIONS: bool = False
 

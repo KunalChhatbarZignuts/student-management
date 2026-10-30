@@ -404,6 +404,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Audit Logs
+         * @description Retrieve immutable security and admin action audit logs.
+         */
+        get: operations["get_audit_logs_api_v1_admin_audit_logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users/bulk-import": {
         parameters: {
             query?: never;
@@ -431,7 +451,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Parents
+         * @description Admin endpoint to list all parents and their linked children.
+         */
+        get: operations["list_parents_api_v1_admin_parents_get"];
         put?: never;
         /**
          * Create Parent
@@ -458,7 +482,11 @@ export interface paths {
          * @description Admin links a parent to a student.
          */
         post: operations["link_parent_to_student_api_v1_admin_parents__parent_id__link_student__student_id__post"];
-        delete?: never;
+        /**
+         * Unlink Parent Student
+         * @description Admin unlinks a student from a parent.
+         */
+        delete: operations["unlink_parent_student_api_v1_admin_parents__parent_id__link_student__student_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -476,6 +504,66 @@ export interface paths {
          * @description Parent endpoint: strictly returns only the students linked to this parent.
          */
         get: operations["get_my_children_api_v1_parents_me_children_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/parents/me/children/{student_id}/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Child Attendance
+         * @description Parent endpoint: view linked child's attendance record.
+         */
+        get: operations["get_child_attendance_api_v1_parents_me_children__student_id__attendance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/parents/me/children/{student_id}/marks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Child Marks
+         * @description Parent endpoint: view linked child's marks and evaluations.
+         */
+        get: operations["get_child_marks_api_v1_parents_me_children__student_id__marks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/parents/me/children/{student_id}/fees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Child Fees
+         * @description Parent endpoint: view linked child's tuition fees and invoice records.
+         */
+        get: operations["get_child_fees_api_v1_parents_me_children__student_id__fees_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -536,6 +624,66 @@ export interface paths {
          * @description Student endpoint: strictly returns only the authenticated student's own record.
          */
         get: operations["get_student_profile_api_v1_students_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/me/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get My Attendance
+         * @description Student endpoint: returns attendance percentage and daily logs.
+         */
+        get: operations["get_my_attendance_api_v1_students_me_attendance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/me/marks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get My Marks
+         * @description Student endpoint: returns evaluation marks and grades.
+         */
+        get: operations["get_my_marks_api_v1_students_me_marks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/me/fees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get My Fees
+         * @description Student endpoint: returns billing invoices and tuition fee status.
+         */
+        get: operations["get_my_fees_api_v1_students_me_fees_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -760,6 +908,74 @@ export interface components {
              */
             created_at: string;
         };
+        /** AttendanceRecordRead */
+        AttendanceRecordRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Status */
+            status: string;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** AttendanceSummaryResponse */
+        AttendanceSummaryResponse: {
+            /** Total Classes */
+            total_classes: number;
+            /** Attended Classes */
+            attended_classes: number;
+            /** Percentage */
+            percentage: number;
+            /** Excused Absences */
+            excused_absences: number;
+            /** Records */
+            records: components["schemas"]["AttendanceRecordRead"][];
+        };
+        /** AuditLogListResponse */
+        AuditLogListResponse: {
+            /** Items */
+            items: components["schemas"]["AuditLogRead"][];
+            /** Total */
+            total: number;
+            /** Skip */
+            skip: number;
+            /** Limit */
+            limit: number;
+        };
+        /** AuditLogRead */
+        AuditLogRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Actor Email */
+            actor_email?: string | null;
+            /** Action */
+            action: string;
+            /** Entity Type */
+            entity_type: string;
+            /** Entity Id */
+            entity_id?: string | null;
+            /** Ip */
+            ip?: string | null;
+            /** Metadata */
+            metadata?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** Body_bulk_import_users_api_v1_admin_users_bulk_import_post */
         Body_bulk_import_users_api_v1_admin_users_bulk_import_post: {
             /** File */
@@ -771,6 +987,27 @@ export interface components {
             old_password?: string | null;
             /** New Password */
             new_password: string;
+        };
+        /** FeeInvoiceRead */
+        FeeInvoiceRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Invoice Number */
+            invoice_number: string;
+            /** Description */
+            description: string;
+            /** Amount */
+            amount: number;
+            /**
+             * Due Date
+             * Format: date
+             */
+            due_date: string;
+            /** Status */
+            status: string;
         };
         /** ForgotPasswordRequest */
         ForgotPasswordRequest: {
@@ -784,6 +1021,24 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** LinkedStudentSummary */
+        LinkedStudentSummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Student Code */
+            student_code: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Class Name */
+            class_name: string;
+            /** Section */
+            section: string;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -899,6 +1154,55 @@ export interface components {
              */
             created_at: string;
         };
+        /** ParentUnlinkResponse */
+        ParentUnlinkResponse: {
+            /** Message */
+            message: string;
+            /**
+             * Parent Id
+             * Format: uuid
+             */
+            parent_id: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** ParentWithChildrenResponse */
+        ParentWithChildrenResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Phone */
+            phone?: string | null;
+            /**
+             * Children
+             * @default []
+             */
+            children: components["schemas"]["LinkedStudentSummary"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** RefreshTokenRequest */
         RefreshTokenRequest: {
             /** Refresh Token */
@@ -969,6 +1273,28 @@ export interface components {
             invite_expires_at: string;
             /** Invite Token */
             invite_token: string;
+        };
+        /** StudentMarkRead */
+        StudentMarkRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Subject */
+            subject: string;
+            /** Code */
+            code: string;
+            /** Max Score */
+            max_score: number;
+            /** Obtained Score */
+            obtained_score: number;
+            /** Grade */
+            grade: string;
+            /** Status */
+            status: string;
+            /** Term */
+            term: string;
         };
         /** StudentProfile */
         StudentProfile: {
@@ -1883,6 +2209,42 @@ export interface operations {
             };
         };
     };
+    get_audit_logs_api_v1_admin_audit_logs_get: {
+        parameters: {
+            query?: {
+                skip?: number;
+                limit?: number;
+                /** @description Filter by event action */
+                action?: string | null;
+                /** @description Search by actor user email */
+                actor_email?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     bulk_import_users_api_v1_admin_users_bulk_import_post: {
         parameters: {
             query?: {
@@ -1906,6 +2268,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_parents_api_v1_admin_parents_get: {
+        parameters: {
+            query?: {
+                skip?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParentWithChildrenResponse"][];
                 };
             };
             /** @description Validation Error */
@@ -1984,6 +2378,38 @@ export interface operations {
             };
         };
     };
+    unlink_parent_student_api_v1_admin_parents__parent_id__link_student__student_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                parent_id: string;
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParentUnlinkResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_my_children_api_v1_parents_me_children_get: {
         parameters: {
             query?: never;
@@ -2000,6 +2426,99 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentResponse"][];
+                };
+            };
+        };
+    };
+    get_child_attendance_api_v1_parents_me_children__student_id__attendance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceSummaryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_child_marks_api_v1_parents_me_children__student_id__marks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentMarkRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_child_fees_api_v1_parents_me_children__student_id__fees_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeeInvoiceRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2073,6 +2592,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentResponse"];
+                };
+            };
+        };
+    };
+    get_my_attendance_api_v1_students_me_attendance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceSummaryResponse"];
+                };
+            };
+        };
+    };
+    get_my_marks_api_v1_students_me_marks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentMarkRead"][];
+                };
+            };
+        };
+    };
+    get_my_fees_api_v1_students_me_fees_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeeInvoiceRead"][];
                 };
             };
         };
