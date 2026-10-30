@@ -1,32 +1,15 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+"""Root application entrypoint wrapper.
 
-from config import settings
+Re-exports the FastAPI app instance from `app.main` so both commands work:
+    1. uvicorn main:app --reload
+    2. uvicorn app.main:app --reload
+    3. python main.py
+"""
 
-app = FastAPI(
-    title=settings.PROJECT_NAME,
-    description="Student Management API",
-    version="1.0.0",
-)
+from app.main import app
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+if __name__ == "__main__":
+    import uvicorn
 
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
 
-@app.get("/", tags=["Root"])
-def root():
-    return {
-        "message": f"{settings.PROJECT_NAME} is running",
-        "docs_url": "/docs",
-        "redoc_url": "/redoc",
-    }
-
-
-@app.get("/health", tags=["Health"])
-def health_check():
-    return {"status": "ok"}
