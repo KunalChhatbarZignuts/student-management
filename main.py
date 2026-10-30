@@ -2,13 +2,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import Base, engine
-from app.routers import courses, students
+from config import settings
+from database import Base, engine
+import models
+from routers import items, users
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create tables if database connection is available
+    # Ensure tables exist on startup if DB is reached
     try:
         Base.metadata.create_all(bind=engine)
     except Exception as exc:
@@ -17,8 +19,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Student Management API",
-    description="RESTful API for managing students, courses, and enrollments.",
+    title=settings.PROJECT_NAME,
+    description="FastAPI modular backend with JWT auth, SQLAlchemy ORM, and Alembic migrations.",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -31,13 +33,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(students.router)
-app.include_router(courses.router)
+app.include_router(users.router)
+app.include_router(items.router)
 
 
 @app.get("/", tags=["Health"])
 def root():
-    return {"message": "Student Management API is running", "docs_url": "/docs"}
+    return {
+        "message": f"{settings.PROJECT_NAME} is running",
+        "docs_url": "/docs",
+        "redoc_url": "/redoc",
+    }
 
 
 @app.get("/health", tags=["Health"])
