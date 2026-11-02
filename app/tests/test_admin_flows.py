@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
 from app.core.security import create_access_token, hash_password
+from app.models.academic_structure import AcademicYear, Grade, Section
 from app.models.id_counter import IdCounter
 from app.models.student import Student
 from app.models.teacher import Teacher
@@ -56,6 +57,16 @@ def test_admin_create_student_flow(client, db):
     admin_token = create_access_token(admin.id, admin.role)
     headers = {"Authorization": f"Bearer {admin_token}"}
 
+    year = AcademicYear(name="2026-AdminFlows", start_date=date(2026, 1, 1), end_date=date(2026, 12, 31), is_current=True)
+    db.add(year)
+    db.flush()
+    grade = Grade(name="10", code="G10", level=10, academic_year_id=year.id)
+    db.add(grade)
+    db.flush()
+    sec = Section(grade_id=grade.id, name="A", academic_year_id=year.id)
+    db.add(sec)
+    db.commit()
+
     payload = {
         "email": "new.student@school.edu",
         "first_name": "Bob",
@@ -68,6 +79,9 @@ def test_admin_create_student_flow(client, db):
         "guardian_name": "Rita Marley",
         "guardian_phone": "1234567890",
         "guardian_email": "rita@school.edu",
+        "academic_year_id": str(year.id),
+        "grade_id": str(grade.id),
+        "section_id": str(sec.id),
     }
 
     resp = client.post("/api/v1/admin/students", json=payload, headers=headers)

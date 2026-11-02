@@ -8,7 +8,7 @@ export const studentKeys = {
 
 export const studentApi = {
   getMyProfile: async (): Promise<StudentResponse> => {
-    const res = await apiClient.get<StudentResponse>('/students/me');
+    const res = await apiClient.get<StudentResponse>('/student/profile');
     return res.data;
   },
 };

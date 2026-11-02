@@ -1,13 +1,14 @@
+import datetime as dt
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, Index, String, UniqueConstraint, Uuid
+from sqlalchemy import Boolean, Date, ForeignKey, Index, String, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from app.models.academic_structure import ClassGroup
+    from app.models.academic_structure import ClassGroup, Section
     from app.models.teacher import Teacher
 
 
@@ -70,9 +71,16 @@ class TeacherAssignment(TimestampMixin, Base):
     class_group_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("class_groups.id", ondelete="CASCADE"), nullable=True,
     )
-    subject_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False,
+    section_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("sections.id", ondelete="CASCADE"), nullable=True,
     )
+    subject_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=True,
+    )
+    assignment_type: Mapped[str] = mapped_column(String(30), nullable=False, default="CLASS_TEACHER")
+    start_date: Mapped[dt.date] = mapped_column(Date, nullable=False, default=dt.date.today)
+    end_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_class_teacher: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     academic_year: Mapped[str] = mapped_column(String(20), nullable=False, default="2026-2027")
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
@@ -81,7 +89,8 @@ class TeacherAssignment(TimestampMixin, Base):
     teacher: Mapped["Teacher"] = relationship("Teacher")
     classroom: Mapped["Class | None"] = relationship("Class", back_populates="teacher_assignments")
     class_group: Mapped["ClassGroup | None"] = relationship("ClassGroup", back_populates="teacher_assignments")
-    subject: Mapped["Subject"] = relationship("Subject", back_populates="teacher_assignments")
+    section: Mapped["Section | None"] = relationship("Section", back_populates="teacher_assignments")
+    subject: Mapped["Subject | None"] = relationship("Subject", back_populates="teacher_assignments")
 
     __table_args__ = (
         UniqueConstraint(
@@ -90,6 +99,7 @@ class TeacherAssignment(TimestampMixin, Base):
         ),
         Index("ix_teacher_assignments_teacher", "teacher_id"),
         Index("ix_teacher_assignments_class", "class_id"),
+        Index("ix_teacher_assignments_section", "section_id"),
     )
 
     def __repr__(self) -> str:

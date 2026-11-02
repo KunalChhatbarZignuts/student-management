@@ -7,14 +7,92 @@ from app.core.deps import get_client_ip, get_current_teacher, get_current_user, 
 from app.models.teacher import Teacher
 from app.models.user import User, UserRole
 from app.schemas.attendance import (
+    AssignedSectionItem,
     AttendanceBulkCreate,
     AttendanceSessionResponse,
     AttendanceSessionUpdate,
     ClassAttendanceSummaryResponse,
+    SectionAttendanceCreate,
+    SectionRosterStudentItem,
 )
 from app.services import attendance_service
 
 router = APIRouter(prefix="/teacher/attendance", tags=["Teacher - Attendance"])
+
+
+# ==========================================
+# Section-Wise Attendance Endpoints (New)
+# ==========================================
+
+@router.get("/sections", response_model=list[AssignedSectionItem])
+def get_assigned_sections(
+    teacher: Teacher = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    """Retrieve all sections assigned to the logged-in teacher."""
+    return attendance_service.get_teacher_assigned_sections(teacher.id, db)
+
+
+@router.get("/sections/{section_id}/roster", response_model=list[SectionRosterStudentItem])
+def get_section_roster(
+    section_id: uuid.UUID,
+    teacher: Teacher = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    """Retrieve the student roster for an assigned section."""
+    attendance_service.verify_teacher_section_access(teacher.id, section_id, db)
+    return attendance_service.get_section_roster(section_id, db)
+
+
+@router.get("/sections/{section_id}", response_model=AttendanceSessionResponse | None)
+def get_section_attendance_session(
+    section_id: uuid.UUID,
+    target_date: date = Query(..., alias="date", description="Date of attendance session"),
+    period: int = Query(default=1, ge=1, le=15, description="Class period (1 for daily roll-call)"),
+    teacher: Teacher = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    """Retrieve attendance session and records for an assigned section on a specific date."""
+    attendance_service.verify_teacher_section_access(teacher.id, section_id, db)
+    return attendance_service.get_section_attendance(section_id, target_date, period, db)
+
+
+@router.post("/sections/{section_id}", response_model=AttendanceSessionResponse, status_code=status.HTTP_201_CREATED)
+def mark_section_attendance(
+    section_id: uuid.UUID,
+    payload: SectionAttendanceCreate,
+    request: Request,
+    teacher: Teacher = Depends(get_current_teacher),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Record section-wise daily roll call attendance."""
+    ip = get_client_ip(request)
+    return attendance_service.record_section_attendance(
+        section_id=section_id,
+        payload=payload,
+        actor_user_id=current_user.id,
+        teacher=teacher,
+        ip=ip,
+        db=db,
+    )
+
+
+@router.get("/sections/{section_id}/history", response_model=list[AttendanceSessionResponse])
+def get_section_attendance_history(
+    section_id: uuid.UUID,
+    limit: int = Query(default=30, ge=1, le=100),
+    teacher: Teacher = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    """Retrieve recent attendance history for an assigned section."""
+    attendance_service.verify_teacher_section_access(teacher.id, section_id, db)
+    return attendance_service.get_section_attendance_history(section_id, limit, db)
+
+
+# ==========================================
+# Legacy Class Attendance Endpoints
+# ==========================================
 
 
 @router.post("", response_model=AttendanceSessionResponse, status_code=status.HTTP_201_CREATED)

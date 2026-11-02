@@ -42,9 +42,28 @@ import { teacherPortalApi, TeacherAssignment } from '@/features/teacher-portal/a
 
 export default function MyClassesPage() {
   const [selectedClass, setSelectedClass] = React.useState<TeacherAssignment | null>(null);
+  const [selectedSection, setSelectedSection] = React.useState<{
+    section_id: string;
+    section_name: string;
+    grade_name: string;
+    role: string;
+  } | null>(null);
   const [rosterSearch, setRosterSearch] = React.useState('');
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(10);
+
+  // Load Homeroom / Coordinated Sections
+  const { data: mySectionsData } = useQuery({
+    queryKey: ['teacher', 'my-sections'],
+    queryFn: teacherPortalApi.getMySections,
+  });
+
+  // Load Section Students when section is selected
+  const { data: sectionStudentsData, isLoading: loadingSectionStudents } = useQuery({
+    queryKey: ['teacher', 'section-students', selectedSection?.section_id],
+    queryFn: () => teacherPortalApi.getMySectionStudents(selectedSection!.section_id),
+    enabled: Boolean(selectedSection?.section_id),
+  });
 
   const { data: assignments, isLoading, error } = useQuery({
     queryKey: ['teacher', 'assigned-classes'],
@@ -87,6 +106,57 @@ export default function MyClassesPage() {
               Review assigned classes, subjects, and student rosters for the current academic year.
             </Typography>
           </Box>
+
+          {/* Assigned Homeroom & Coordinated Sections */}
+          {mySectionsData?.sections && mySectionsData.sections.length > 0 && (
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <StarIcon color="secondary" />
+                Assigned Homeroom & Coordinated Sections
+              </Typography>
+              <Grid container spacing={3}>
+                {mySectionsData.sections.map((sec) => (
+                  <Grid item xs={12} sm={6} key={sec.section_id}>
+                    <Card sx={{ height: '100%', borderRadius: 3, boxShadow: 2, border: '1px solid', borderColor: 'primary.light' }}>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                          <Typography variant="h6" fontWeight={700}>
+                            {sec.grade_name} - Section {sec.section_name}
+                          </Typography>
+                          <Chip
+                            label={sec.role === 'CLASS_TEACHER' ? 'Class Teacher' : 'Grade Coordinator'}
+                            color={sec.role === 'CLASS_TEACHER' ? 'secondary' : 'primary'}
+                            size="small"
+                          />
+                        </Box>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          Academic Year: {sec.academic_year}
+                        </Typography>
+                        <Typography variant="body2" fontWeight={600} sx={{ mt: 1 }}>
+                          Enrolled Students: {sec.total_students}
+                        </Typography>
+                      </CardContent>
+                      <CardActions sx={{ px: 2, pb: 2 }}>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="secondary"
+                          fullWidth
+                          onClick={() => setSelectedSection(sec)}
+                        >
+                          View Section Roster
+                        </Button>
+                      </CardActions>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          )}
+
+          <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>
+            Subject Teaching Assignments
+          </Typography>
 
           {error && (
             <Alert severity="info" sx={{ mb: 3 }}>
@@ -266,6 +336,75 @@ export default function MyClassesPage() {
             </DialogContent>
             <DialogActions>
               <Button onClick={handleCloseRoster} color="primary">
+                Done
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Section Student Roster Dialog (Class Teacher / Coordinator) */}
+          <Dialog
+            open={Boolean(selectedSection)}
+            onClose={() => setSelectedSection(null)}
+            maxWidth="md"
+            fullWidth
+          >
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box>
+                <Typography variant="h6" fontWeight={700}>
+                  {selectedSection?.grade_name} - Section {selectedSection?.section_name} Student Roster
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Role: {selectedSection?.role === 'CLASS_TEACHER' ? 'Class Teacher' : 'Grade Coordinator'}
+                </Typography>
+              </Box>
+              <Button onClick={() => setSelectedSection(null)} color="inherit" size="small" startIcon={<CloseIcon />}>
+                Close
+              </Button>
+            </DialogTitle>
+            <DialogContent dividers>
+              {loadingSectionStudents ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                  <CircularProgress size={36} />
+                </Box>
+              ) : !sectionStudentsData?.items || sectionStudentsData.items.length === 0 ? (
+                <Alert severity="info">No active students enrolled in this section.</Alert>
+              ) : (
+                <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: 'action.hover' }}>
+                        <TableCell><strong>Roll No</strong></TableCell>
+                        <TableCell><strong>Student Code</strong></TableCell>
+                        <TableCell><strong>Full Name</strong></TableCell>
+                        <TableCell><strong>Enrollment Date</strong></TableCell>
+                        <TableCell><strong>Status</strong></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {sectionStudentsData.items.map((student: any) => (
+                        <TableRow key={student.enrollment_id} hover>
+                          <TableCell>{student.roll_no}</TableCell>
+                          <TableCell sx={{ fontFamily: 'monospace', fontWeight: 600, color: 'primary.main' }}>
+                            {student.student_code}
+                          </TableCell>
+                          <TableCell>{student.first_name} {student.last_name}</TableCell>
+                          <TableCell>{student.enrollment_date}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={student.status}
+                              size="small"
+                              color={student.status === 'ACTIVE' ? 'success' : 'default'}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setSelectedSection(null)} color="primary">
                 Done
               </Button>
             </DialogActions>

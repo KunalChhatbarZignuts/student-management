@@ -13,22 +13,62 @@ import Link from 'next/link';
 import PersonIcon from '@mui/icons-material/Person';
 import LockResetIcon from '@mui/icons-material/LockReset';
 import DevicesOtherIcon from '@mui/icons-material/DevicesOther';
+import EditIcon from '@mui/icons-material/Edit';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import TextField from '@mui/material/TextField';
+import CircularProgress from '@mui/material/CircularProgress';
+
 import AppShell from '@/components/layout/AppShell';
 import RequireRole from '@/components/guards/RequireRole';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useAuth } from '@/features/auth/hooks';
 import { useMyStudentProfile } from '@/features/students/hooks';
+import { useParentProfile, useUpdateParentProfile } from '@/features/parents/hooks';
 import { ROLES, STUDENT_PORTAL_ALLOWED_ROLES } from '@/lib/constants';
 import { useSnackbar } from '@/components/ui/SnackbarProvider';
 
 export default function ProfilePage() {
   const { user, role, logout } = useAuth();
   const { data: student } = useMyStudentProfile();
+  const { data: parentProfile } = useParentProfile();
+  const updateParentMutation = useUpdateParentProfile();
   const { showSnackbar } = useSnackbar();
 
   const [confirmLogoutAll, setConfirmLogoutAll] = React.useState(false);
+  const [openEditParent, setOpenEditParent] = React.useState(false);
+  const [editForm, setEditForm] = React.useState({
+    first_name: '',
+    last_name: '',
+    phone: '',
+    address: '',
+  });
 
   const isStudent = role === ROLES.STUDENT;
+  const isParent = role === ROLES.PARENT;
+
+  React.useEffect(() => {
+    if (parentProfile) {
+      setEditForm({
+        first_name: parentProfile.first_name || '',
+        last_name: parentProfile.last_name || '',
+        phone: parentProfile.phone || '',
+        address: parentProfile.address || '',
+      });
+    }
+  }, [parentProfile]);
+
+  const handleSaveParentProfile = async () => {
+    try {
+      await updateParentMutation.mutateAsync(editForm);
+      showSnackbar('Profile details updated successfully', 'success');
+      setOpenEditParent(false);
+    } catch {
+      showSnackbar('Failed to update profile details', 'error');
+    }
+  };
 
   const handleLogoutAll = async () => {
     setConfirmLogoutAll(false);
@@ -96,22 +136,50 @@ export default function ProfilePage() {
                 <>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="caption" color="text.secondary">
-                      STUDENT ID
+                      ENROLLMENT NUMBER
                     </Typography>
-                    <Typography variant="body1" fontWeight={600} color="primary.main">
+                    <Typography variant="body1" fontWeight={700} color="primary.main">
+                      {student?.enrollment_number || user?.student?.enrollment_number || 'Pending'}
+                    </Typography>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" color="text.secondary">
+                      STUDENT CODE / ID
+                    </Typography>
+                    <Typography variant="body1" fontWeight={500}>
                       {student?.student_code || user?.student?.student_code || 'Pending'}
                     </Typography>
                   </Grid>
 
                   <Grid item xs={12} sm={6}>
                     <Typography variant="caption" color="text.secondary">
-                      CLASS & SECTION
+                      ACADEMIC YEAR
                     </Typography>
                     <Typography variant="body1" fontWeight={500}>
-                      {student?.class_name || user?.student?.class_name || 'N/A'} (
-                      {student?.section || user?.student?.section || 'A'})
+                      {student?.current_academic_year || '2026-2027'}
                     </Typography>
                   </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" color="text.secondary">
+                      GRADE & SECTION
+                    </Typography>
+                    <Typography variant="body1" fontWeight={500}>
+                      {student?.current_grade || student?.class_name || 'N/A'} - Section {student?.current_section || student?.section || 'A'}
+                    </Typography>
+                  </Grid>
+
+                  {student?.class_teacher_name && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">
+                        CLASS TEACHER
+                      </Typography>
+                      <Typography variant="body1" fontWeight={600} color="secondary.main">
+                        {student.class_teacher_name}
+                      </Typography>
+                    </Grid>
+                  )}
 
                   <Grid item xs={12} sm={6}>
                     <Typography variant="caption" color="text.secondary">
@@ -150,7 +218,68 @@ export default function ProfilePage() {
                   </Grid>
                 </>
               )}
+
+              {isParent && (
+                <>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" color="text.secondary">
+                      FIRST NAME
+                    </Typography>
+                    <Typography variant="body1" fontWeight={600}>
+                      {parentProfile?.first_name || user?.parent?.first_name || '-'}
+                    </Typography>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" color="text.secondary">
+                      LAST NAME
+                    </Typography>
+                    <Typography variant="body1" fontWeight={600}>
+                      {parentProfile?.last_name || user?.parent?.last_name || '-'}
+                    </Typography>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" color="text.secondary">
+                      PRIMARY PHONE
+                    </Typography>
+                    <Typography variant="body1" fontWeight={500}>
+                      {parentProfile?.phone || user?.parent?.phone || 'Not provided'}
+                    </Typography>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" color="text.secondary">
+                      TOTAL LINKED CHILDREN
+                    </Typography>
+                    <Typography variant="body1" fontWeight={600} color="primary.main">
+                      {parentProfile?.children_count ?? parentProfile?.children?.length ?? 0}
+                    </Typography>
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Typography variant="caption" color="text.secondary">
+                      RESIDENTIAL ADDRESS
+                    </Typography>
+                    <Typography variant="body1" fontWeight={500}>
+                      {parentProfile?.address || 'Not provided'}
+                    </Typography>
+                  </Grid>
+                </>
+              )}
             </Grid>
+
+            {isParent && (
+              <Box sx={{ mt: 3, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<EditIcon />}
+                  onClick={() => setOpenEditParent(true)}
+                >
+                  Edit Contact Details
+                </Button>
+              </Box>
+            )}
           </Paper>
 
           {/* Security & Password Settings */}
@@ -193,6 +322,65 @@ export default function ProfilePage() {
           onConfirm={handleLogoutAll}
           onClose={() => setConfirmLogoutAll(false)}
         />
+
+        {/* Edit Parent Profile Dialog */}
+        <Dialog open={openEditParent} onClose={() => setOpenEditParent(false)} maxWidth="sm" fullWidth>
+          <DialogTitle fontWeight={700}>Update Guardian Profile</DialogTitle>
+          <DialogContent sx={{ pt: 1 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+              <TextField
+                label="Registered Email"
+                value={user?.email || ''}
+                disabled
+                helperText="Email address cannot be modified directly"
+                fullWidth
+              />
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <TextField
+                  label="First Name"
+                  required
+                  value={editForm.first_name}
+                  onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
+                  fullWidth
+                />
+                <TextField
+                  label="Last Name"
+                  required
+                  value={editForm.last_name}
+                  onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
+                  fullWidth
+                />
+              </Box>
+              <TextField
+                label="Contact Phone"
+                value={editForm.phone}
+                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                placeholder="+1 555-0199"
+                fullWidth
+              />
+              <TextField
+                label="Residential Address"
+                value={editForm.address}
+                onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                placeholder="123 Maple Street, City, State"
+                multiline
+                rows={2}
+                fullWidth
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ p: 2.5 }}>
+            <Button onClick={() => setOpenEditParent(false)}>Cancel</Button>
+            <Button
+              variant="contained"
+              onClick={handleSaveParentProfile}
+              disabled={updateParentMutation.isPending || !editForm.first_name.trim() || !editForm.last_name.trim()}
+              startIcon={updateParentMutation.isPending ? <CircularProgress size={16} color="inherit" /> : null}
+            >
+              {updateParentMutation.isPending ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </AppShell>
     </RequireRole>
   );

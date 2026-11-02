@@ -204,6 +204,29 @@ export const teacherPortalApi = {
     const res = await apiClient.post('/teachers/missing-student-request', payload);
     return res.data;
   },
+
+  getMySections: async (): Promise<{
+    teacher_id: string;
+    teacher_name: string;
+    sections: Array<{
+      section_id: string;
+      section_name: string;
+      section_code?: string | null;
+      grade_id: string;
+      grade_name: string;
+      academic_year: string;
+      total_students: number;
+      role: string;
+    }>;
+  }> => {
+    const res = await apiClient.get('/teacher/my-sections');
+    return res.data;
+  },
+
+  getMySectionStudents: async (sectionId: string) => {
+    const res = await apiClient.get(`/teacher/sections/${sectionId}/students`);
+    return res.data;
+  },
 };
 
 

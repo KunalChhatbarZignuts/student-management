@@ -147,12 +147,13 @@ export default function LoginPage() {
               margin="normal"
               fullWidth
               id="identifier"
-              label="Email, Student ID, or Employee ID"
+              label="Email, Student ID, or Parent Phone"
+              placeholder="e.g. STU-2026-00001 or parent@example.com"
               autoComplete="username"
               autoFocus
               disabled={isSubmitting}
               error={!!errors.identifier}
-              helperText={errors.identifier?.message}
+              helperText={errors.identifier?.message || "Students: Sign in with Enrollment No, Student Code, or Email. Parents: Sign in with Email or Phone."}
               {...register('identifier')}
             />
 

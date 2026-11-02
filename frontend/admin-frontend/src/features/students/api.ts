@@ -27,6 +27,16 @@ export const adminStudentApi = {
     return res.data;
   },
 
+  getStudentProfile: async (studentId: string) => {
+    const res = await apiClient.get(`/admin/students/${studentId}/profile`);
+    return res.data;
+  },
+
+  updateStudent: async (studentId: string, payload: any) => {
+    const res = await apiClient.patch(`/admin/students/${studentId}`, payload);
+    return res.data;
+  },
+
   suspendUser: async (userId: string) => {
     const res = await apiClient.patch(`/admin/users/${userId}/suspend`);
     return res.data;

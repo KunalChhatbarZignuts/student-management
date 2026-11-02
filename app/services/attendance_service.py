@@ -3,10 +3,11 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.models.academic_structure import AcademicYear, Grade, Section, StudentEnrollment
 from app.models.attendance import AttendanceRecord, AttendanceSession, AttendanceStatus
 from app.models.classroom import Class, Subject, TeacherAssignment
 from app.models.student import Student
@@ -62,7 +63,24 @@ def create_bulk_attendance(
     if not subject or subject.status != "active":
         raise HTTPException(status_code=404, detail="Subject not found or inactive")
 
-    # 3. Rule: cannot mark a future date
+    # 3. Rule: cannot mark on a holiday or non-working day
+    ay_record = db.execute(select(AcademicYear).where(AcademicYear.is_current.is_(True))).scalars().first()
+    if ay_record:
+        from app.services.calendar_service import check_date_working_status
+        status_info = check_date_working_status(
+            target_date=payload.date,
+            academic_year_id=ay_record.id,
+            grade_id=None,
+            section_id=None,
+            db=db,
+        )
+        if not status_info.is_working_day:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot mark attendance on a non-working day or holiday ({status_info.reason})",
+            )
+
+    # 4. Rule: cannot mark a future date
     today = datetime.now(timezone.utc).date()
     if payload.date > today:
         raise HTTPException(
@@ -494,4 +512,779 @@ def get_student_self_attendance(
         excused_absences=excused_count,
         records=me_records,
     )
+
+
+# ==========================================
+# Grade & Section-Wise Attendance Services
+# ==========================================
+
+from app.models.academic_structure import AcademicYear, Grade, Section, StudentEnrollment
+from app.models.attendance import AttendanceAuditHistory
+from app.schemas.attendance import (
+    AdminAttendanceOverviewResponse,
+    AdminAttendanceRecordUpdate,
+    AssignedSectionItem,
+    AttendanceAuditItemResponse,
+    SectionAttendanceCreate,
+    SectionDailyOverviewItem,
+    StudentAttendanceHistoryRecord,
+    StudentAttendanceHistoryResponse,
+)
+
+
+def get_teacher_assigned_sections(teacher_id: uuid.UUID, db: Session) -> list[AssignedSectionItem]:
+    """Retrieve all sections where this teacher is assigned (or is grade coordinator)."""
+    assignments = db.execute(
+        select(TeacherAssignment).where(
+            TeacherAssignment.teacher_id == teacher_id,
+            TeacherAssignment.is_active == True,
+        )
+    ).scalars().all()
+
+    section_roles: dict[uuid.UUID, str] = {}
+    for a in assignments:
+        section_roles[a.section_id] = a.assignment_type or "Class Teacher"
+
+    coords = db.execute(
+        select(Grade).where(Grade.coordinator_teacher_id == teacher_id, Grade.status == "active")
+    ).scalars().all()
+    for g in coords:
+        for s in g.sections:
+            if s.status == "active" and s.id not in section_roles:
+                section_roles[s.id] = "Grade Coordinator"
+
+    section_ids = list(section_roles.keys())
+    if not section_ids:
+        return []
+
+    sections = db.execute(
+        select(Section).where(Section.id.in_(section_ids), Section.status == "active")
+    ).scalars().all()
+
+    results: list[AssignedSectionItem] = []
+    for sec in sections:
+        stu_count = db.execute(
+            select(func.count(StudentEnrollment.id)).where(
+                StudentEnrollment.section_id == sec.id,
+                StudentEnrollment.status == "ACTIVE",
+            )
+        ).scalar_one()
+
+        results.append(
+            AssignedSectionItem(
+                section_id=sec.id,
+                section_name=sec.name,
+                grade_id=sec.grade_id,
+                grade_name=sec.grade.name if sec.grade else "Grade",
+                academic_year_id=sec.academic_year_id,
+                role=section_roles.get(sec.id, "Teacher"),
+                enrolled_students_count=stu_count,
+            )
+        )
+    results.sort(key=lambda x: (x.grade_name, x.section_name))
+    return results
+
+
+def verify_teacher_section_access(teacher_id: uuid.UUID, section_id: uuid.UUID, db: Session) -> Section:
+    """Verifies that the teacher is actively assigned to this section or is its Grade Coordinator."""
+    section = db.get(Section, section_id)
+    if not section or section.status != "active":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found or inactive")
+
+    assignment = db.execute(
+        select(TeacherAssignment).where(
+            TeacherAssignment.teacher_id == teacher_id,
+            TeacherAssignment.section_id == section.id,
+            TeacherAssignment.is_active == True,
+        )
+    ).scalars().first()
+
+    grade = db.get(Grade, section.grade_id)
+    is_coord = grade and grade.coordinator_teacher_id == teacher_id
+
+    if not assignment and not is_coord:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operation forbidden: you are not assigned as a teacher for this section",
+        )
+    return section
+
+
+def get_section_roster(section_id: uuid.UUID, db: Session) -> list[dict]:
+    """Retrieve enrolled student roster for a section."""
+    section = db.get(Section, section_id)
+    if not section:
+        raise HTTPException(status_code=404, detail="Section not found")
+
+    enrollments = db.execute(
+        select(StudentEnrollment)
+        .where(
+            StudentEnrollment.section_id == section.id,
+            StudentEnrollment.status == "ACTIVE",
+        )
+        .order_by(StudentEnrollment.roll_no.asc())
+    ).scalars().all()
+
+    roster = []
+    for enr in enrollments:
+        stu = enr.student
+        if not stu:
+            continue
+        roster.append({
+            "student_id": stu.id,
+            "enrollment_id": enr.id,
+            "roll_no": enr.roll_no,
+            "first_name": stu.first_name,
+            "last_name": stu.last_name,
+            "student_name": f"{stu.first_name} {stu.last_name}",
+            "student_code": stu.student_code,
+            "enrollment_number": stu.enrollment_number or stu.student_code,
+            "gender": stu.gender,
+        })
+    return roster
+
+
+def record_section_attendance(
+    section_id: uuid.UUID,
+    payload: SectionAttendanceCreate,
+    actor_user_id: uuid.UUID,
+    teacher: Teacher | None,
+    ip: str | None,
+    db: Session,
+) -> AttendanceSessionResponse:
+    # 1. Permission check
+    section = db.get(Section, section_id)
+    if not section or section.status != "active":
+        raise HTTPException(status_code=404, detail="Section not found or inactive")
+
+    if teacher:
+        verify_teacher_section_access(teacher.id, section_id, db)
+
+    # 2. Rule: Cannot mark attendance on a holiday or non-working day
+    ay_id = section.academic_year_id
+    if not ay_id:
+        ay_record = db.execute(select(AcademicYear).where(AcademicYear.is_current.is_(True))).scalars().first()
+        if ay_record:
+            ay_id = ay_record.id
+
+    if ay_id:
+        from app.services.calendar_service import check_date_working_status
+        status_info = check_date_working_status(
+            target_date=payload.date,
+            academic_year_id=ay_id,
+            grade_id=section.grade_id,
+            section_id=section.id,
+            db=db,
+        )
+        if not status_info.is_working_day:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot mark attendance on a non-working day or holiday ({status_info.reason})",
+            )
+
+    # 3. Prevent future date
+    today = datetime.now(timezone.utc).date()
+    if payload.date > today:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot mark attendance for a future date",
+        )
+
+    # 4. Strictly Daily Attendance: Prevent duplicate session for same section and date
+    existing = db.execute(
+        select(AttendanceSession).where(
+            AttendanceSession.section_id == section.id,
+            AttendanceSession.date == payload.date,
+        )
+    ).scalar_one_or_none()
+
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Daily attendance session already exists for Section {section.name} on {payload.date}",
+        )
+
+    # 4. Fetch enrolled students
+    enrollments = db.execute(
+        select(StudentEnrollment).where(
+            StudentEnrollment.section_id == section.id,
+            StudentEnrollment.status == "ACTIVE",
+        )
+    ).scalars().all()
+
+    enrollment_map = {e.student_id: e for e in enrollments}
+
+    # 5. Create Attendance Session
+    session = AttendanceSession(
+        academic_year_id=section.academic_year_id,
+        grade_id=section.grade_id,
+        section_id=section.id,
+        date=payload.date,
+        period=payload.period,
+        submission_status="submitted",
+        taken_by_teacher_id=teacher.id if teacher else None,
+        marked_by_user_id=actor_user_id,
+        locked_at=None,
+    )
+    db.add(session)
+    db.flush()
+
+    present_count = 0
+    absent_count = 0
+    late_count = 0
+    excused_count = 0
+    records_out = []
+
+    for item in payload.records:
+        if item.student_id not in enrollment_map:
+            continue
+
+        enr = enrollment_map[item.student_id]
+        stu = enr.student
+
+        st_val = item.status.value.upper()
+        if st_val == "PRESENT":
+            present_count += 1
+        elif st_val == "ABSENT":
+            absent_count += 1
+        elif st_val == "LATE":
+            late_count += 1
+        elif st_val == "EXCUSED":
+            excused_count += 1
+
+        rec = AttendanceRecord(
+            session_id=session.id,
+            student_id=item.student_id,
+            enrollment_id=enr.id,
+            status=st_val,
+            remark=item.remark.strip() if item.remark else None,
+            marked_by_user_id=actor_user_id,
+            date=payload.date,
+        )
+        db.add(rec)
+        db.flush()
+
+        records_out.append(
+            AttendanceRecordResponse(
+                id=rec.id,
+                session_id=session.id,
+                student_id=item.student_id,
+                enrollment_id=enr.id,
+                status=st_val,
+                remark=rec.remark,
+                student_name=f"{stu.first_name} {stu.last_name}" if stu else None,
+                student_code=stu.student_code if stu else None,
+                enrollment_number=stu.enrollment_number if stu else None,
+                roll_no=enr.roll_no,
+            )
+        )
+
+    db.commit()
+    db.refresh(session)
+
+    # Log action
+    log_action(
+        db,
+        actor_user_id=actor_user_id,
+        action="section_attendance_marked",
+        entity_type="attendance_session",
+        entity_id=str(session.id),
+        metadata={
+            "section_id": str(section.id),
+            "date": str(payload.date),
+            "total_marked": len(records_out),
+            "present": present_count,
+            "absent": absent_count,
+        },
+        ip=ip,
+    )
+
+    grade = db.get(Grade, section.grade_id)
+    return AttendanceSessionResponse(
+        id=session.id,
+        academic_year_id=session.academic_year_id,
+        grade_id=session.grade_id,
+        grade_name=grade.name if grade else None,
+        section_id=session.section_id,
+        section_name=section.name,
+        date=session.date,
+        period=session.period,
+        submission_status=session.submission_status,
+        taken_by_teacher_id=session.taken_by_teacher_id,
+        teacher_name=f"{teacher.first_name} {teacher.last_name}" if teacher else None,
+        total_students=len(records_out),
+        present_count=present_count,
+        absent_count=absent_count,
+        late_count=late_count,
+        excused_count=excused_count,
+        created_at=session.created_at,
+        updated_at=session.updated_at,
+        records=records_out,
+    )
+
+
+def get_section_attendance(
+    section_id: uuid.UUID,
+    target_date: date,
+    period: int,
+    db: Session,
+) -> AttendanceSessionResponse | None:
+    session = db.execute(
+        select(AttendanceSession).where(
+            AttendanceSession.section_id == section_id,
+            AttendanceSession.date == target_date,
+            AttendanceSession.period == period,
+        )
+    ).scalar_one_or_none()
+
+    if not session:
+        return None
+
+    section = db.get(Section, session.section_id)
+    grade = db.get(Grade, session.grade_id)
+    teacher = db.get(Teacher, session.taken_by_teacher_id) if session.taken_by_teacher_id else None
+
+    records_out = []
+    p_cnt = a_cnt = l_cnt = e_cnt = 0
+
+    for rec in session.records:
+        stu = rec.student
+        enr = rec.enrollment
+        st_val = rec.status.upper()
+        if st_val == "PRESENT":
+            p_cnt += 1
+        elif st_val == "ABSENT":
+            a_cnt += 1
+        elif st_val == "LATE":
+            l_cnt += 1
+        elif st_val == "EXCUSED":
+            e_cnt += 1
+
+        records_out.append(
+            AttendanceRecordResponse(
+                id=rec.id,
+                session_id=session.id,
+                student_id=rec.student_id,
+                enrollment_id=rec.enrollment_id,
+                status=st_val,
+                remark=rec.remark,
+                student_name=f"{stu.first_name} {stu.last_name}" if stu else None,
+                student_code=stu.student_code if stu else None,
+                enrollment_number=stu.enrollment_number if stu else None,
+                roll_no=enr.roll_no if enr else None,
+            )
+        )
+
+    return AttendanceSessionResponse(
+        id=session.id,
+        academic_year_id=session.academic_year_id,
+        grade_id=session.grade_id,
+        grade_name=grade.name if grade else None,
+        section_id=session.section_id,
+        section_name=section.name if section else None,
+        date=session.date,
+        period=session.period,
+        submission_status=session.submission_status,
+        taken_by_teacher_id=session.taken_by_teacher_id,
+        teacher_name=f"{teacher.first_name} {teacher.last_name}" if teacher else None,
+        total_students=len(records_out),
+        present_count=p_cnt,
+        absent_count=a_cnt,
+        late_count=l_cnt,
+        excused_count=e_cnt,
+        created_at=session.created_at,
+        updated_at=session.updated_at,
+        records=records_out,
+    )
+
+
+def get_section_attendance_history(
+    section_id: uuid.UUID,
+    limit: int = 30,
+    db: Session = None,
+) -> list[AttendanceSessionResponse]:
+    sessions = db.execute(
+        select(AttendanceSession)
+        .where(AttendanceSession.section_id == section_id)
+        .order_by(AttendanceSession.date.desc(), AttendanceSession.period.desc())
+        .limit(limit)
+    ).scalars().all()
+
+    results = []
+    for s in sessions:
+        sec = s.section
+        grd = s.grade
+        tch = s.teacher
+        p = a = l = e = 0
+        records_out = []
+        for r in s.records:
+            st = r.status.upper()
+            if st == "PRESENT":
+                p += 1
+            elif st == "ABSENT":
+                a += 1
+            elif st == "LATE":
+                l += 1
+            elif st == "EXCUSED":
+                e += 1
+            stu = r.student
+            enr = r.enrollment
+            records_out.append(
+                AttendanceRecordResponse(
+                    id=r.id,
+                    session_id=s.id,
+                    student_id=r.student_id,
+                    enrollment_id=r.enrollment_id,
+                    status=st,
+                    remark=r.remark,
+                    student_name=f"{stu.first_name} {stu.last_name}" if stu else None,
+                    student_code=stu.student_code if stu else None,
+                    enrollment_number=stu.enrollment_number if stu else None,
+                    roll_no=enr.roll_no if enr else None,
+                )
+            )
+        results.append(
+            AttendanceSessionResponse(
+                id=s.id,
+                academic_year_id=s.academic_year_id,
+                grade_id=s.grade_id,
+                grade_name=grd.name if grd else None,
+                section_id=s.section_id,
+                section_name=sec.name if sec else None,
+                date=s.date,
+                period=s.period,
+                submission_status=s.submission_status,
+                taken_by_teacher_id=s.taken_by_teacher_id,
+                teacher_name=f"{tch.first_name} {tch.last_name}" if tch else None,
+                total_students=len(records_out),
+                present_count=p,
+                absent_count=a,
+                late_count=l,
+                excused_count=e,
+                created_at=s.created_at,
+                updated_at=s.updated_at,
+                records=records_out,
+            )
+        )
+    return results
+
+
+def edit_attendance_record(
+    record_id: uuid.UUID,
+    payload: AdminAttendanceRecordUpdate,
+    actor_user_id: uuid.UUID,
+    is_admin: bool,
+    teacher: Teacher | None,
+    ip: str | None,
+    db: Session,
+) -> AttendanceRecordResponse:
+    rec = db.get(AttendanceRecord, record_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="Attendance record not found")
+
+    session = rec.session
+    if not session:
+        raise HTTPException(status_code=400, detail="Orphaned attendance record")
+
+    # If teacher, verify authorization to section and 24h window
+    if not is_admin:
+        if not teacher:
+            raise HTTPException(status_code=403, detail="Not authorized")
+        verify_teacher_section_access(teacher.id, session.section_id, db)
+        session_dt = datetime.combine(session.date, datetime.min.time(), tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        if (now - session_dt) > timedelta(hours=24):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Teachers can only edit attendance within 24 hours of the session. Contact admin for older records.",
+            )
+
+    prev_status = rec.status
+    new_status = payload.status.value.upper()
+
+    if prev_status != new_status or payload.remark is not None:
+        # Create audit entry
+        audit_entry = AttendanceAuditHistory(
+            record_id=rec.id,
+            session_id=session.id,
+            student_id=rec.student_id,
+            previous_status=prev_status,
+            new_status=new_status,
+            reason=payload.reason.strip(),
+            modified_by_user_id=actor_user_id,
+        )
+        db.add(audit_entry)
+
+        rec.status = new_status
+        if payload.remark is not None:
+            rec.remark = payload.remark.strip() if payload.remark else None
+
+        db.commit()
+        db.refresh(rec)
+
+        log_action(
+            db,
+            actor_user_id=actor_user_id,
+            action="attendance_record_corrected",
+            entity_type="attendance_record",
+            entity_id=str(rec.id),
+            metadata={
+                "previous_status": prev_status,
+                "new_status": new_status,
+                "reason": payload.reason,
+            },
+            ip=ip,
+        )
+
+    stu = rec.student
+    enr = rec.enrollment
+    return AttendanceRecordResponse(
+        id=rec.id,
+        session_id=session.id,
+        student_id=rec.student_id,
+        enrollment_id=rec.enrollment_id,
+        status=rec.status,
+        remark=rec.remark,
+        student_name=f"{stu.first_name} {stu.last_name}" if stu else None,
+        student_code=stu.student_code if stu else None,
+        enrollment_number=stu.enrollment_number if stu else None,
+        roll_no=enr.roll_no if enr else None,
+    )
+
+
+def get_admin_attendance_overview(
+    target_date: date,
+    academic_year_id: uuid.UUID | None = None,
+    grade_id: uuid.UUID | None = None,
+    search: str | None = None,
+    db: Session = None,
+) -> AdminAttendanceOverviewResponse:
+    """Institutional overview across all grades and sections for a specific date."""
+    # Find active academic year if not provided
+    if not academic_year_id:
+        ay = db.execute(select(AcademicYear).where(AcademicYear.is_current == True)).scalars().first()
+        academic_year_id = ay.id if ay else None
+
+    sec_stmt = select(Section).join(Grade, Section.grade_id == Grade.id)
+    if academic_year_id:
+        sec_stmt = sec_stmt.where(Section.academic_year_id == academic_year_id)
+    if grade_id:
+        sec_stmt = sec_stmt.where(Section.grade_id == grade_id)
+    if search:
+        pattern = f"%{search.strip()}%"
+        sec_stmt = sec_stmt.where(or_(Grade.name.ilike(pattern), Section.name.ilike(pattern)))
+
+    sections = db.execute(sec_stmt.order_by(Grade.level.asc(), Section.name.asc())).scalars().all()
+
+    section_items: list[SectionDailyOverviewItem] = []
+    tot_students = 0
+    tot_p = tot_a = tot_l = tot_e = 0
+    marked_sections_count = 0
+
+    for sec in sections:
+        stu_count = db.execute(
+            select(func.count(StudentEnrollment.id)).where(
+                StudentEnrollment.section_id == sec.id,
+                StudentEnrollment.status == "ACTIVE",
+            )
+        ).scalar_one()
+
+        tot_students += stu_count
+
+        session = db.execute(
+            select(AttendanceSession).where(
+                AttendanceSession.section_id == sec.id,
+                AttendanceSession.date == target_date,
+            )
+        ).scalars().first()
+
+        p = a = l = e = 0
+        marked_by_name = None
+        marked_at = None
+        status_label = "Unmarked"
+
+        if session:
+            status_label = "Marked"
+            marked_sections_count += 1
+            marked_at = session.created_at
+            if session.teacher:
+                marked_by_name = f"{session.teacher.first_name} {session.teacher.last_name}"
+            elif session.marked_by:
+                marked_by_name = session.marked_by.email
+
+            for r in session.records:
+                st = r.status.upper()
+                if st == "PRESENT":
+                    p += 1
+                elif st == "ABSENT":
+                    a += 1
+                elif st == "LATE":
+                    l += 1
+                elif st == "EXCUSED":
+                    e += 1
+
+            tot_p += p
+            tot_a += a
+            tot_l += l
+            tot_e += e
+
+        denom = max(1, p + a + l)
+        pct = round(((p + l) / denom * 100), 1) if session else 0.0
+
+        section_items.append(
+            SectionDailyOverviewItem(
+                grade_id=sec.grade_id,
+                grade_name=sec.grade.name if sec.grade else "Grade",
+                section_id=sec.id,
+                section_name=sec.name,
+                session_id=session.id if session else None,
+                status=status_label,
+                total_students=stu_count,
+                present=p,
+                absent=a,
+                late=l,
+                excused=e,
+                attendance_percentage=pct,
+                marked_by=marked_by_name,
+                marked_at=marked_at,
+            )
+        )
+
+    overall_denom = max(1, tot_p + tot_a + tot_l)
+    overall_pct = round(((tot_p + tot_l) / overall_denom * 100), 1) if marked_sections_count > 0 else 0.0
+
+    return AdminAttendanceOverviewResponse(
+        date=target_date,
+        total_sections=len(sections),
+        marked_sections=marked_sections_count,
+        total_students=tot_students,
+        total_present=tot_p,
+        total_absent=tot_a,
+        total_late=tot_l,
+        total_excused=tot_e,
+        overall_percentage=overall_pct,
+        sections=section_items,
+    )
+
+
+def get_student_attendance_history(
+    student_id: uuid.UUID,
+    academic_year_id: uuid.UUID | None,
+    db: Session,
+) -> StudentAttendanceHistoryResponse:
+    student = db.get(Student, student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    enrollment = db.execute(
+        select(StudentEnrollment).where(
+            StudentEnrollment.student_id == student.id,
+            StudentEnrollment.status == "ACTIVE",
+        )
+    ).scalars().first()
+
+    stmt = select(AttendanceRecord).where(AttendanceRecord.student_id == student.id)
+    records = db.execute(stmt.order_by(AttendanceRecord.created_at.desc())).scalars().all()
+
+    present_days = 0
+    absent_days = 0
+    late_days = 0
+    excused_days = 0
+    rec_items = []
+
+    for r in records:
+        st_val = r.status.upper()
+        if st_val == "PRESENT":
+            present_days += 1
+        elif st_val == "ABSENT":
+            absent_days += 1
+        elif st_val == "LATE":
+            late_days += 1
+        elif st_val == "EXCUSED":
+            excused_days += 1
+
+        r_date = r.date
+        period = 1
+        g_name = student.class_name
+        s_name = student.section
+        marked_by = None
+
+        if r.session:
+            r_date = r.session.date
+            period = r.session.period
+            if r.session.grade:
+                g_name = r.session.grade.name
+            if r.session.section:
+                s_name = r.session.section.name
+            if r.session.teacher:
+                marked_by = f"{r.session.teacher.first_name} {r.session.teacher.last_name}"
+
+        rec_items.append(
+            StudentAttendanceHistoryRecord(
+                date=r_date or datetime.now(timezone.utc).date(),
+                period=period,
+                status=st_val,
+                remark=r.remark or r.notes,
+                grade_name=g_name,
+                section_name=s_name,
+                marked_by=marked_by,
+            )
+        )
+
+    working_days = len(rec_items)
+    effective_working = max(1, working_days - excused_days)
+    pct = round(((present_days + late_days) / effective_working * 100), 1) if working_days > 0 else 100.0
+
+    return StudentAttendanceHistoryResponse(
+        student_id=student.id,
+        student_name=f"{student.first_name} {student.last_name}",
+        enrollment_number=student.enrollment_number,
+        student_code=student.student_code,
+        grade_name=enrollment.grade.name if (enrollment and enrollment.grade) else student.class_name,
+        section_name=enrollment.section.name if (enrollment and enrollment.section) else student.section,
+        total_working_days=working_days,
+        present_days=present_days,
+        absent_days=absent_days,
+        late_days=late_days,
+        excused_days=excused_days,
+        attendance_percentage=pct,
+        records=rec_items,
+    )
+
+
+def get_attendance_audit_history(
+    section_id: uuid.UUID | None,
+    target_date: date | None,
+    db: Session,
+) -> list[AttendanceAuditItemResponse]:
+    stmt = (
+        select(AttendanceAuditHistory)
+        .outerjoin(AttendanceSession, AttendanceAuditHistory.session_id == AttendanceSession.id)
+    )
+    if section_id:
+        stmt = stmt.where(AttendanceSession.section_id == section_id)
+    if target_date:
+        stmt = stmt.where(AttendanceSession.date == target_date)
+
+    audits = db.execute(stmt.order_by(AttendanceAuditHistory.created_at.desc()).limit(100)).scalars().all()
+
+    results = []
+    for a in audits:
+        stu = a.student
+        results.append(
+            AttendanceAuditItemResponse(
+                id=a.id,
+                record_id=a.record_id,
+                session_id=a.session_id,
+                student_id=a.student_id,
+                student_name=f"{stu.first_name} {stu.last_name}" if stu else "Student",
+                enrollment_number=stu.enrollment_number if stu else None,
+                previous_status=a.previous_status,
+                new_status=a.new_status,
+                reason=a.reason,
+                modified_by_name=a.modified_by.email if a.modified_by else None,
+                created_at=a.created_at,
+            )
+        )
+    return results
 

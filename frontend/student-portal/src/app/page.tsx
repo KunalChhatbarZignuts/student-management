@@ -17,12 +17,14 @@ import GradeIcon from '@mui/icons-material/Grade';
 import FamilyRestroomIcon from '@mui/icons-material/FamilyRestroom';
 import PersonIcon from '@mui/icons-material/Person';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import CampaignIcon from '@mui/icons-material/Campaign';
+import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 
 import RequireRole from '@/components/guards/RequireRole';
 import AppShell from '@/components/layout/AppShell';
 import { useAuth } from '@/features/auth/hooks';
 import { useMyStudentProfile } from '@/features/students/hooks';
-import { useMyChildren } from '@/features/parents/hooks';
+import { useMyChildren, useParentNotifications } from '@/features/parents/hooks';
 import { ROLES, STUDENT_PORTAL_ALLOWED_ROLES } from '@/lib/constants';
 import { academicApi } from '@/features/academic/api';
 import { useQuery } from '@tanstack/react-query';
@@ -32,6 +34,7 @@ export default function DashboardPage() {
   const { user, role } = useAuth();
   const { data: student, isLoading: loadingStudent, error: studentError } = useMyStudentProfile();
   const { data: children, isLoading: loadingChildren, error: childrenError } = useMyChildren();
+  const { data: notifications } = useParentNotifications();
 
   const isStudent = role === ROLES.STUDENT;
   const isParent = role === ROLES.PARENT;
@@ -90,14 +93,19 @@ export default function DashboardPage() {
                       </Box>
                       <Box>
                         <Typography variant="caption" color="text.secondary" fontWeight={500}>
-                          STUDENT ID & CLASS
+                          ENROLLMENT & CLASS
                         </Typography>
                         <Typography variant="h6" fontWeight={700}>
-                          {student?.student_code || 'N/A'}
+                          {student?.enrollment_number || student?.student_code || 'N/A'}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Class: {student?.class_name || 'Assigned'} ({student?.section || 'A'})
+                          {student?.current_grade || student?.class_name || 'Assigned'} - Section {student?.current_section || student?.section || 'A'}
                         </Typography>
+                        {student?.class_teacher_name && (
+                          <Typography variant="caption" color="primary.main" display="block">
+                            Class Teacher: {student.class_teacher_name}
+                          </Typography>
+                        )}
                       </Box>
                     </CardContent>
                   </Card>
@@ -151,9 +159,15 @@ export default function DashboardPage() {
 
         {isParent && (
           <Box sx={{ mb: 4 }}>
-            <Typography variant="h6" fontWeight={700} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <FamilyRestroomIcon color="primary" /> Linked Children
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Typography variant="h6" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <FamilyRestroomIcon color="primary" /> Linked Children ({children?.length || 0})
+              </Typography>
+              <Button component={Link} href="/children" variant="text" size="small">
+                Manage & View All Details →
+              </Button>
+            </Box>
+
             {loadingChildren ? (
               <Skeleton variant="rounded" height={140} />
             ) : childrenError ? (
@@ -167,34 +181,56 @@ export default function DashboardPage() {
             ) : (
               <Grid container spacing={3}>
                 {children.map((child) => (
-                  <Grid item xs={12} sm={6} md={4} key={child.id}>
-                    <Card>
-                      <CardContent>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                          <Typography variant="h6" fontWeight={700}>
-                            {child.first_name} {child.last_name}
-                          </Typography>
-                          <Chip label={child.status} color="success" size="small" />
+                  <Grid item xs={12} sm={6} md={4} key={child.student_id || child.id}>
+                    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                      <CardContent sx={{ flexGrow: 1 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+                          <Box>
+                            <Typography variant="h6" fontWeight={700}>
+                              {child.first_name} {child.last_name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Code: {child.student_code}
+                            </Typography>
+                          </Box>
+                          <Chip
+                            label={child.status || 'Active'}
+                            color={child.status === 'active' ? 'success' : 'default'}
+                            size="small"
+                          />
                         </Box>
-                        <Typography variant="body2" color="text.secondary">
-                          Student Code: <strong>{child.student_code}</strong>
+
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', my: 1 }}>
+                          {child.is_primary_guardian && (
+                            <Chip icon={<VerifiedUserIcon />} label="Primary" size="small" color="primary" variant="outlined" />
+                          )}
+                          <Chip label={child.relationship_type || 'Guardian'} size="small" variant="outlined" />
+                        </Box>
+
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                          Class & Section: <strong>{child.class_name} - {child.section}</strong>
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Class: {child.class_name} ({child.section})
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Department: {child.department}
-                        </Typography>
+                        {child.academic_year && (
+                          <Typography variant="body2" color="text.secondary">
+                            Academic Year: <strong>{child.academic_year}</strong>
+                          </Typography>
+                        )}
+                        {child.class_teacher_name && (
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                            Class Teacher: {child.class_teacher_name}
+                          </Typography>
+                        )}
+
                         <Box sx={{ mt: 2 }}>
                           <Button
                             component={Link}
-                            href={`/children`}
+                            href="/children"
                             variant="outlined"
                             size="small"
                             fullWidth
                             endIcon={<ArrowForwardIcon />}
                           >
-                            View Child Details
+                            View Child Records
                           </Button>
                         </Box>
                       </CardContent>
@@ -202,6 +238,37 @@ export default function DashboardPage() {
                   </Grid>
                 ))}
               </Grid>
+            )}
+
+            {/* School Announcements & Notifications */}
+            {notifications && notifications.length > 0 && (
+              <Box sx={{ mt: 4 }}>
+                <Typography variant="h6" fontWeight={700} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <CampaignIcon color="secondary" /> Recent Announcements & Notifications
+                </Typography>
+                <Grid container spacing={2}>
+                  {notifications.map((notif) => (
+                    <Grid item xs={12} md={4} key={notif.id}>
+                      <Card variant="outlined" sx={{ height: '100%', borderRadius: 2 }}>
+                        <CardContent>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                            <Chip label={notif.category} size="small" color="secondary" variant="outlined" />
+                            <Typography variant="caption" color="text.secondary">
+                              {new Date(notif.created_at).toLocaleDateString()}
+                            </Typography>
+                          </Box>
+                          <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                            {notif.title}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {notif.message}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
             )}
           </Box>
         )}

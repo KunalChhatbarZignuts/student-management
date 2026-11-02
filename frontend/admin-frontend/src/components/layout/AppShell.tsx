@@ -38,6 +38,9 @@ import Brightness7Icon from '@mui/icons-material/Brightness7';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import HowToRegIcon from '@mui/icons-material/HowToReg';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 
 import { useAuth } from '@/features/auth/hooks';
 import { useUiStore } from '@/store/uiStore';
@@ -59,6 +62,12 @@ const navItems: NavItem[] = [
     icon: <DashboardIcon />,
   },
   {
+    label: 'New Admission',
+    href: '/admissions/create',
+    icon: <HowToRegIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
     label: 'Students',
     href: '/students',
     icon: <SchoolIcon />,
@@ -68,6 +77,18 @@ const navItems: NavItem[] = [
     label: 'Teachers',
     href: '/teachers',
     icon: <PeopleIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
+    label: 'Grades & Sections',
+    href: '/grades',
+    icon: <ClassIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
+    label: 'Fee Management',
+    href: '/fees',
+    icon: <AccountBalanceWalletIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
   },
   {
@@ -89,8 +110,8 @@ const navItems: NavItem[] = [
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
   },
   {
-    label: 'Parent Linking',
-    href: '/parent-linking',
+    label: 'Parents & Guardians',
+    href: '/parents',
     icon: <FamilyRestroomIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
   },
@@ -104,6 +125,12 @@ const navItems: NavItem[] = [
     label: 'Attendance',
     href: '/attendance',
     icon: <EventAvailableIcon />,
+    roles: [ROLES.TEACHER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
+  },
+  {
+    label: 'School Calendar',
+    href: '/calendar',
+    icon: <CalendarMonthIcon />,
     roles: [ROLES.TEACHER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
   {

@@ -20,6 +20,7 @@ import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ClassIcon from '@mui/icons-material/Class';
 import ReportProblemIcon from '@mui/icons-material/ReportProblem';
+import HowToRegIcon from '@mui/icons-material/HowToReg';
 
 import RequireRole from '@/components/guards/RequireRole';
 import AppShell from '@/components/layout/AppShell';
@@ -213,14 +214,40 @@ export default function AdminDashboardPage() {
               Administrative Actions
             </Typography>
             <Grid container spacing={3}>
-              <Grid item xs={12} sm={6} md={4}>
+              <Grid item xs={12} sm={6} md={6}>
+                <Card sx={{ height: '100%', borderColor: 'primary.main', borderWidth: 1, borderStyle: 'solid', bgcolor: 'action.hover' }}>
+                  <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                      <Box sx={{ p: 1, borderRadius: 1.5, bgcolor: 'primary.main', color: '#fff' }}>
+                        <HowToRegIcon fontSize="small" />
+                      </Box>
+                      <Typography variant="subtitle1" fontWeight={700}>
+                        Create New Admission
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1, mb: 2 }}>
+                      Register a new student, manage parent information, assign academic details, and configure student and parent accounts in a single guided wizard.
+                    </Typography>
+                    <Button component={Link} href="/admissions/create" variant="contained" endIcon={<ArrowForwardIcon />}>
+                      Start Admission Wizard
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={6}>
                 <Card sx={{ height: '100%' }}>
                   <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                    <Typography variant="subtitle1" fontWeight={700} gutterBottom>
-                      Student Directory
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                      <Box sx={{ p: 1, borderRadius: 1.5, bgcolor: 'secondary.main', color: '#fff' }}>
+                        <SchoolIcon fontSize="small" />
+                      </Box>
+                      <Typography variant="subtitle1" fontWeight={700}>
+                        Student Directory
+                      </Typography>
+                    </Box>
                     <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1, mb: 2 }}>
-                      Create new students, assign classes, and manage suspension or password resets.
+                      View all registered students, check enrollment status, inspect linked parents, and manage account credentials.
                     </Typography>
                     <Button component={Link} href="/students" variant="outlined" endIcon={<ArrowForwardIcon />}>
                       Go to Students

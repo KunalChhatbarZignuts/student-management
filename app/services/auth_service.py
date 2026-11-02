@@ -15,6 +15,7 @@ from app.core.security import (
     validate_password_strength,
     verify_password,
 )
+from app.models.parent import Parent
 from app.models.refresh_token import RefreshToken
 from app.models.student import Student
 from app.models.teacher import Teacher
@@ -26,7 +27,7 @@ LOCKOUT_DURATION_MINUTES = 15
 
 
 def find_user_by_identifier(db: Session, identifier: str) -> User | None:
-    """Find a user by email, student_code, or employee_code."""
+    """Find a user by email, student_code, enrollment_number, or employee_code."""
     ident = identifier.strip()
 
     # 1. Try finding by email (case-insensitive)
@@ -36,19 +37,33 @@ def find_user_by_identifier(db: Session, identifier: str) -> User | None:
     if user:
         return user
 
-    # 2. Try finding by student_code
+    # 2. Try finding by student enrollment_number (case-insensitive)
+    student_by_enrollment = db.execute(
+        select(Student).where(func.lower(Student.enrollment_number) == ident.lower())
+    ).scalar_one_or_none()
+    if student_by_enrollment:
+        return db.get(User, student_by_enrollment.user_id)
+
+    # 3. Try finding by student_code
     student = db.execute(
         select(Student).where(Student.student_code == ident)
     ).scalar_one_or_none()
     if student:
         return db.get(User, student.user_id)
 
-    # 3. Try finding by employee_code
+    # 4. Try finding by employee_code
     teacher = db.execute(
         select(Teacher).where(Teacher.employee_code == ident)
     ).scalar_one_or_none()
     if teacher:
         return db.get(User, teacher.user_id)
+
+    # 5. Try finding by parent phone
+    parent = db.execute(
+        select(Parent).where(Parent.phone == ident)
+    ).scalar_one_or_none()
+    if parent:
+        return db.get(User, parent.user_id)
 
     return None
 

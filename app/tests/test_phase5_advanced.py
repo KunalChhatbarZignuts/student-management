@@ -6,6 +6,7 @@ import pyotp
 import pytest
 
 from app.core.security import create_access_token, hash_password
+from app.models.academic_structure import AcademicYear, Grade, Section
 from app.models.parent import Parent, ParentStudentLink
 from app.models.student import Student
 from app.models.teacher import Teacher
@@ -133,7 +134,18 @@ def test_parent_linking_and_ownership(client, db):
     assert parent_resp.status_code == 201
     parent_id = parent_resp.json()["id"]
 
-    # 2. Create two students (one will be linked, one will not)
+    # 2. Create academic structure and two students (one will be linked, one will not)
+    year = AcademicYear(name="2026-Phase5Year", start_date=date(2026, 1, 1), end_date=date(2026, 12, 31), is_current=True)
+    db.add(year)
+    db.flush()
+    grade = Grade(name="8", code="G8", level=8, academic_year_id=year.id)
+    db.add(grade)
+    db.flush()
+    sec_a = Section(grade_id=grade.id, name="A", academic_year_id=year.id)
+    sec_b = Section(grade_id=grade.id, name="B", academic_year_id=year.id)
+    db.add_all([sec_a, sec_b])
+    db.commit()
+
     s1_resp = client.post(
         "/api/v1/admin/students",
         json={
@@ -145,6 +157,9 @@ def test_parent_linking_and_ownership(client, db):
             "section": "A",
             "department": "Science",
             "admission_date": "2026-08-01",
+            "academic_year_id": str(year.id),
+            "grade_id": str(grade.id),
+            "section_id": str(sec_a.id),
         },
         headers=admin_headers,
     )
@@ -162,6 +177,9 @@ def test_parent_linking_and_ownership(client, db):
             "section": "B",
             "department": "Science",
             "admission_date": "2026-08-01",
+            "academic_year_id": str(year.id),
+            "grade_id": str(grade.id),
+            "section_id": str(sec_b.id),
         },
         headers=admin_headers,
     )

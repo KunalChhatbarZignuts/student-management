@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr
 class StudentProfile(BaseModel):
     id: uuid.UUID
     student_code: str
+    enrollment_number: str | None = None
     first_name: str
     last_name: str
     dob: date

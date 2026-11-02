@@ -3,6 +3,7 @@ import { UserRole } from '@/lib/constants';
 export interface StudentProfileData {
   id: string;
   student_code: string;
+  enrollment_number?: string | null;
   first_name: string;
   last_name: string;
   dob: string;
