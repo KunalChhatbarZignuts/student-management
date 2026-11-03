@@ -43,6 +43,7 @@ import { StudentCreatePayload } from '@/features/students/types';
 import { adminGradeApi, gradeKeys } from '@/features/grades/api';
 import { useSnackbar } from '@/components/ui/SnackbarProvider';
 import { formatErrorMessage } from '@/lib/errorMapper';
+import AppDatePicker from '@/components/ui/AppDatePicker';
 
 const createStudentSchema = z.object({
   email: z.string().email('Valid email is required').trim().toLowerCase(),
@@ -109,6 +110,8 @@ export default function StudentsManagementPage() {
     register: registerEdit,
     handleSubmit: handleSubmitEdit,
     reset: resetEdit,
+    setValue: setValueEdit,
+    watch: watchEdit,
     formState: { errors: errorsEdit, isSubmitting: isUpdating },
   } = useForm<EditStudentFormData>({
     resolver: zodResolver(editStudentSchema),
@@ -242,6 +245,7 @@ export default function StudentsManagementPage() {
     handleSubmit,
     reset,
     setValue,
+    watch,
     formState: { errors, isSubmitting: isCreating },
   } = useForm<CreateStudentFormData>({
     resolver: zodResolver(createStudentSchema),
@@ -676,25 +680,23 @@ export default function StudentsManagementPage() {
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
+                  <AppDatePicker
                     label="Date of Birth"
-                    type="date"
-                    InputLabelProps={{ shrink: true }}
+                    value={watch('dob')}
+                    onChange={(val) => setValue('dob', val, { shouldValidate: true })}
                     error={!!errors.dob}
                     helperText={errors.dob?.message}
-                    {...register('dob')}
+                    required
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
+                  <AppDatePicker
                     label="Admission Date"
-                    type="date"
-                    InputLabelProps={{ shrink: true }}
+                    value={watch('admission_date')}
+                    onChange={(val) => setValue('admission_date', val, { shouldValidate: true })}
                     error={!!errors.admission_date}
                     helperText={errors.admission_date?.message}
-                    {...register('admission_date')}
+                    required
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -888,14 +890,13 @@ export default function StudentsManagementPage() {
                     />
                   </Grid>
                   <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
+                    <AppDatePicker
                       label="Date of Birth"
-                      type="date"
-                      InputLabelProps={{ shrink: true }}
+                      value={watchEdit('dob')}
+                      onChange={(val) => setValueEdit('dob', val, { shouldValidate: true })}
                       error={!!errorsEdit.dob}
                       helperText={errorsEdit.dob?.message}
-                      {...registerEdit('dob')}
+                      required
                     />
                   </Grid>
                   <Grid item xs={12} sm={6}>

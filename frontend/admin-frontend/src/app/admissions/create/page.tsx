@@ -33,6 +33,7 @@ import Paper from '@mui/material/Paper';
 import Autocomplete from '@mui/material/Autocomplete';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
+import AppDatePicker from '@/components/ui/AppDatePicker';
 import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
@@ -764,14 +765,11 @@ export default function StudentAdmissionWizardPage() {
                 </Grid>
 
                 <Grid item xs={12} sm={6}>
-                  <TextField
+                  <AppDatePicker
                     label="Date of Birth"
-                    type="date"
                     required
-                    fullWidth
-                    InputLabelProps={{ shrink: true }}
                     value={studentData.dob}
-                    onChange={(e) => setStudentData({ ...studentData, dob: e.target.value })}
+                    onChange={(val) => setStudentData({ ...studentData, dob: val })}
                   />
                 </Grid>
 
@@ -1180,14 +1178,11 @@ export default function StudentAdmissionWizardPage() {
                 </Grid>
 
                 <Grid item xs={12} sm={6}>
-                  <TextField
+                  <AppDatePicker
                     label="Official Admission Date"
-                    type="date"
                     required
-                    fullWidth
-                    InputLabelProps={{ shrink: true }}
                     value={admissionDate}
-                    onChange={(e) => setAdmissionDate(e.target.value)}
+                    onChange={(val) => setAdmissionDate(val)}
                   />
                 </Grid>
 

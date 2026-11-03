@@ -3,6 +3,14 @@ import { withWorkflow } from 'workflow/next';
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    optimizePackageImports: [
+      '@mui/material',
+      '@mui/icons-material',
+      '@mui/x-data-grid',
+      '@mui/x-date-pickers',
+    ],
+  },
   async rewrites() {
     const defaultApiUrl = process.env.NODE_ENV === 'production'
       ? 'https://dollhouse-festival-unwilling.ngrok-free.dev'

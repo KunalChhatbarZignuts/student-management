@@ -62,6 +62,112 @@ import {
   MonthlyCalendarDay,
 } from '@/features/calendar/types';
 import { adminGradeApi } from '@/features/grades/api';
+import dayjs, { Dayjs } from 'dayjs';
+import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
+import { PickersDay, PickersDayProps } from '@mui/x-date-pickers/PickersDay';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { DayCalendarSkeleton } from '@mui/x-date-pickers/DayCalendarSkeleton';
+import Badge from '@mui/material/Badge';
+import Divider from '@mui/material/Divider';
+
+interface CustomDayProps extends PickersDayProps<Dayjs> {
+  daysMap?: Record<string, MonthlyCalendarDay>;
+}
+
+function CustomCalendarDay(props: CustomDayProps) {
+  const { daysMap = {}, day, outsideCurrentMonth, ...other } = props;
+  const dateStr = day.format('YYYY-MM-DD');
+  const dayInfo = daysMap[dateStr];
+
+  const isHoliday = dayInfo?.day_type === 'holiday';
+  const isWeeklyOff = dayInfo?.day_type === 'weekly_off';
+  const isSpecial = dayInfo?.day_type === 'special_working_day';
+
+  return (
+    <Tooltip
+      title={
+        dayInfo && !outsideCurrentMonth
+          ? `${dayInfo.date} (${dayInfo.day_name}): ${
+              isHoliday
+                ? dayInfo.label || 'Holiday'
+                : isWeeklyOff
+                  ? 'Weekly Off'
+                  : isSpecial
+                    ? dayInfo.label || 'Compensatory Working Day'
+                    : 'Normal Working Day'
+            }`
+          : ''
+      }
+      arrow
+      disableHoverListener={outsideCurrentMonth}
+    >
+      <Badge
+        key={day.toString()}
+        overlap="circular"
+        badgeContent={
+          outsideCurrentMonth ? undefined : isHoliday ? (
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                bgcolor: 'error.main',
+                border: '1.5px solid #fff',
+              }}
+            />
+          ) : isSpecial ? (
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                bgcolor: 'warning.main',
+                border: '1.5px solid #fff',
+              }}
+            />
+          ) : isWeeklyOff ? (
+            <Box
+              sx={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                bgcolor: 'text.disabled',
+                border: '1.5px solid #fff',
+              }}
+            />
+          ) : undefined
+        }
+      >
+        <PickersDay
+          {...other}
+          outsideCurrentMonth={outsideCurrentMonth}
+          day={day}
+          sx={{
+            fontWeight: isHoliday || isSpecial ? 700 : 500,
+            ...(isHoliday && !outsideCurrentMonth && {
+              color: 'error.main',
+              bgcolor: 'rgba(211, 47, 47, 0.08)',
+              '&:hover': {
+                bgcolor: 'rgba(211, 47, 47, 0.18)',
+              },
+            }),
+            ...(isWeeklyOff && !outsideCurrentMonth && {
+              color: 'text.secondary',
+              bgcolor: 'rgba(0, 0, 0, 0.03)',
+            }),
+            ...(isSpecial && !outsideCurrentMonth && {
+              color: 'warning.dark',
+              bgcolor: 'rgba(237, 108, 2, 0.12)',
+              '&:hover': {
+                bgcolor: 'rgba(237, 108, 2, 0.22)',
+              },
+            }),
+          }}
+        />
+      </Badge>
+    </Tooltip>
+  );
+}
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -79,9 +185,10 @@ export default function SchoolCalendarPage() {
   // Tab State
   const [currentTab, setCurrentTab] = useState(0);
 
-  // Month & Year state (default to November 2026 as per workspace current date)
-  const [selectedYear, setSelectedYear] = useState<number>(2026);
-  const [selectedMonth, setSelectedMonth] = useState<number>(11); // 1-12
+  // Selected Date state (defaults to November 2026 as per workspace current date)
+  const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs('2026-11-03'));
+  const selectedYear = selectedDate.year();
+  const selectedMonth = selectedDate.month() + 1; // 1-12
 
   // Filter state for Holiday list
   const [searchQuery, setSearchQuery] = useState('');
@@ -269,21 +376,11 @@ export default function SchoolCalendarPage() {
   };
 
   const handlePrevMonth = () => {
-    if (selectedMonth === 1) {
-      setSelectedMonth(12);
-      setSelectedYear((prev) => prev - 1);
-    } else {
-      setSelectedMonth((prev) => prev - 1);
-    }
+    setSelectedDate((prev) => prev.subtract(1, 'month'));
   };
 
   const handleNextMonth = () => {
-    if (selectedMonth === 12) {
-      setSelectedMonth(1);
-      setSelectedYear((prev) => prev + 1);
-    } else {
-      setSelectedMonth((prev) => prev + 1);
-    }
+    setSelectedDate((prev) => prev.add(1, 'month'));
   };
 
   // Filtered Holidays List
@@ -298,13 +395,24 @@ export default function SchoolCalendarPage() {
     });
   }, [holidays, searchQuery, selectedCategoryFilter, selectedStatusFilter]);
 
-  // Calendar day cells with leading offset
-  const calendarGridDays = useMemo(() => {
-    if (!monthCalendar || !monthCalendar.days || monthCalendar.days.length === 0) return [];
-    const firstDayWeekday = monthCalendar.days[0].day_of_week; // 0=Mon, 6=Sun
-    const emptyLeadingDays = Array.from({ length: firstDayWeekday }, (_, i) => null);
-    return [...emptyLeadingDays, ...monthCalendar.days];
+  // Map of days for fast lookup
+  const daysMap = useMemo(() => {
+    const map: Record<string, MonthlyCalendarDay> = {};
+    if (monthCalendar?.days) {
+      for (const d of monthCalendar.days) {
+        map[d.date] = d;
+      }
+    }
+    return map;
   }, [monthCalendar]);
+
+  // Keep selectedDayDetails updated when month data loads
+  React.useEffect(() => {
+    const curDateStr = selectedDate.format('YYYY-MM-DD');
+    if (daysMap[curDateStr]) {
+      setSelectedDayDetails(daysMap[curDateStr]);
+    }
+  }, [daysMap, selectedDate]);
 
   return (
     <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
@@ -361,175 +469,248 @@ export default function SchoolCalendarPage() {
       {/* TAB 0: MONTHLY CALENDAR VIEW */}
       {currentTab === 0 && (
         <Box>
-          {/* Month Selector Bar & Summary Stats */}
+          {/* Summary KPIs */}
           <Paper sx={{ p: 2, mb: 3, borderRadius: 2 }}>
-            <Grid container alignItems="center" spacing={2}>
-              <Grid item xs={12} md={4} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <IconButton onClick={handlePrevMonth} size="small" sx={{ border: '1px solid #e0e0e0' }}>
-                  <ChevronLeft />
-                </IconButton>
-                <Typography variant="h6" fontWeight={700} sx={{ minWidth: 180, textAlign: 'center' }}>
-                  {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
-                </Typography>
-                <IconButton onClick={handleNextMonth} size="small" sx={{ border: '1px solid #e0e0e0' }}>
-                  <ChevronRight />
-                </IconButton>
-              </Grid>
-
-              {/* Month KPI Badges */}
-              <Grid item xs={12} md={8}>
-                <Box sx={{ display: 'flex', gap: 2, justifyContent: { xs: 'flex-start', md: 'flex-end' }, flexWrap: 'wrap' }}>
-                  <Chip
-                    icon={<WorkOutline />}
-                    label={`Working Days: ${monthCalendar?.working_days ?? 0}`}
-                    color="success"
-                    variant="outlined"
-                    sx={{ fontWeight: 600 }}
-                  />
-                  <Chip
-                    icon={<EventBusy />}
-                    label={`Holidays: ${monthCalendar?.holidays ?? 0}`}
-                    color="error"
-                    variant="outlined"
-                    sx={{ fontWeight: 600 }}
-                  />
-                  <Chip
-                    icon={<Weekend />}
-                    label={`Weekly Offs: ${monthCalendar?.weekly_offs ?? 0}`}
-                    variant="outlined"
-                    sx={{ fontWeight: 600 }}
-                  />
-                  <Chip
-                    label={`Total Days: ${monthCalendar?.total_days ?? 0}`}
-                    sx={{ fontWeight: 600 }}
-                  />
-                </Box>
-              </Grid>
-            </Grid>
+            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+              <Typography variant="h6" fontWeight={700}>
+                {selectedDate.format('MMMM YYYY')}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                <Chip
+                  icon={<WorkOutline />}
+                  label={`Working Days: ${monthCalendar?.working_days ?? 0}`}
+                  color="success"
+                  variant="outlined"
+                  sx={{ fontWeight: 600 }}
+                />
+                <Chip
+                  icon={<EventBusy />}
+                  label={`Holidays: ${monthCalendar?.holidays ?? 0}`}
+                  color="error"
+                  variant="outlined"
+                  sx={{ fontWeight: 600 }}
+                />
+                <Chip
+                  icon={<Weekend />}
+                  label={`Weekly Offs: ${monthCalendar?.weekly_offs ?? 0}`}
+                  variant="outlined"
+                  sx={{ fontWeight: 600 }}
+                />
+                <Chip
+                  label={`Total Days: ${monthCalendar?.total_days ?? 0}`}
+                  sx={{ fontWeight: 600 }}
+                />
+              </Box>
+            </Box>
           </Paper>
 
-          {/* Calendar Grid */}
-          {isLoadingCalendar ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 8 }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <Paper sx={{ borderRadius: 2, overflow: 'hidden', border: '1px solid #e0e0e0' }}>
-              {/* Day-of-week headers */}
-              <Grid container sx={{ bgcolor: 'action.hover', borderBottom: '1px solid #e0e0e0' }}>
-                {WEEKDAY_HEADERS.map((dayName, idx) => (
-                  <Grid
-                    key={dayName}
-                    item
-                    xs={12 / 7}
-                    sx={{
-                      py: 1.5,
-                      textAlign: 'center',
-                      fontWeight: 700,
-                      color: idx >= 5 ? 'error.main' : 'text.primary',
-                      borderRight: idx < 6 ? '1px solid #e0e0e0' : 'none',
-                    }}
-                  >
-                    {dayName}
-                  </Grid>
-                ))}
-              </Grid>
+          {/* MUI DateCalendar & Day Details */}
+          <Grid container spacing={3}>
+            {/* Left: Official MUI DateCalendar */}
+            <Grid item xs={12} md={7} lg={7}>
+              <Paper sx={{ p: 2.5, borderRadius: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <DateCalendar
+                  value={selectedDate}
+                  onChange={(newVal) => {
+                    if (newVal) {
+                      setSelectedDate(newVal);
+                      const dateStr = newVal.format('YYYY-MM-DD');
+                      const dayInfo = daysMap[dateStr];
+                      if (dayInfo) {
+                        setSelectedDayDetails(dayInfo);
+                      }
+                    }
+                  }}
+                  onMonthChange={(newMonth) => {
+                    setSelectedDate(newMonth);
+                  }}
+                  loading={isLoadingCalendar}
+                  renderLoading={() => <DayCalendarSkeleton />}
+                  slots={{
+                    day: CustomCalendarDay,
+                  }}
+                  slotProps={{
+                    day: {
+                      daysMap,
+                    } as any,
+                  }}
+                  sx={{
+                    width: '100%',
+                    maxWidth: 500,
+                    '& .MuiPickersCalendarHeader-root': {
+                      px: 2,
+                    },
+                    '& .MuiDayCalendar-header': {
+                      justifyContent: 'space-around',
+                    },
+                    '& .MuiDayCalendar-weekContainer': {
+                      justifyContent: 'space-around',
+                      my: 0.5,
+                    },
+                    '& .MuiPickersDay-root': {
+                      width: 44,
+                      height: 44,
+                      fontSize: '0.95rem',
+                    },
+                  }}
+                />
 
-              {/* Calendar Days Matrix */}
-              <Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
-                {calendarGridDays.map((dayItem, idx) => {
-                  if (!dayItem) {
-                    return (
-                      <Box
-                        key={`empty-${idx}`}
-                        sx={{
-                          width: `${100 / 7}%`,
-                          minHeight: 110,
-                          bgcolor: 'action.disabledBackground',
-                          borderRight: (idx + 1) % 7 !== 0 ? '1px solid #e0e0e0' : 'none',
-                          borderBottom: '1px solid #e0e0e0',
-                        }}
+                {/* Legend */}
+                <Divider sx={{ width: '100%', my: 2 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3, flexWrap: 'wrap', pb: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'error.main' }} />
+                    <Typography variant="caption" fontWeight={600} color="text.secondary">
+                      Holiday / Vacation
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'warning.main' }} />
+                    <Typography variant="caption" fontWeight={600} color="text.secondary">
+                      Compensatory Day
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'text.disabled' }} />
+                    <Typography variant="caption" fontWeight={600} color="text.secondary">
+                      Weekly Off
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'success.main' }} />
+                    <Typography variant="caption" fontWeight={600} color="text.secondary">
+                      Working Day
+                    </Typography>
+                  </Box>
+                </Box>
+              </Paper>
+            </Grid>
+
+            {/* Right: Selected Day Details & Quick Actions */}
+            <Grid item xs={12} md={5} lg={5}>
+              <Paper sx={{ p: 3, borderRadius: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <Typography variant="h6" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <InfoOutlined color="primary" />
+                  Day Information
+                </Typography>
+
+                <Box sx={{ mb: 2.5, p: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
+                  <Typography variant="subtitle1" fontWeight={700}>
+                    {selectedDate.format('dddd, D MMMM YYYY')}
+                  </Typography>
+                  <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    <Chip
+                      size="small"
+                      label={
+                        selectedDayDetails?.day_type === 'holiday'
+                          ? 'Official Holiday / Vacation'
+                          : selectedDayDetails?.day_type === 'weekly_off'
+                            ? 'Weekly Off'
+                            : selectedDayDetails?.day_type === 'special_working_day'
+                              ? 'Compensatory Working Day'
+                              : 'Normal Working Day'
+                      }
+                      color={
+                        selectedDayDetails?.day_type === 'holiday'
+                          ? 'error'
+                          : selectedDayDetails?.day_type === 'special_working_day'
+                            ? 'warning'
+                            : selectedDayDetails?.day_type === 'working_day'
+                              ? 'success'
+                              : 'default'
+                      }
+                      sx={{ fontWeight: 600 }}
+                    />
+                    {selectedDayDetails?.category_name && (
+                      <Chip size="small" variant="outlined" label={selectedDayDetails.category_name} />
+                    )}
+                  </Box>
+                </Box>
+
+                {selectedDayDetails?.label && (
+                  <Box sx={{ mb: 2.5 }}>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                      TITLE / EVENT REASON
+                    </Typography>
+                    <Typography variant="body1" fontWeight={600} sx={{ mt: 0.5 }}>
+                      {selectedDayDetails.label}
+                    </Typography>
+                    {!selectedDayDetails.is_school_wide && (
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        label="Specific Grades Only"
+                        sx={{ mt: 0.5 }}
                       />
-                    );
-                  }
+                    )}
+                  </Box>
+                )}
 
-                  const isHoliday = dayItem.day_type === 'holiday';
-                  const isWeeklyOff = dayItem.day_type === 'weekly_off';
-                  const isSpecial = dayItem.day_type === 'special_working_day';
-                  const dayDateNum = parseInt(dayItem.date.split('-')[2], 10);
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                    ATTENDANCE RECORDING
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    fontWeight={600}
+                    color={selectedDayDetails?.is_working_day ? 'success.main' : 'error.main'}
+                    sx={{ mt: 0.5 }}
+                  >
+                    {selectedDayDetails?.is_working_day
+                      ? '✓ Enabled — Regular class attendance is recorded.'
+                      : '✗ Disabled — Non-working day (excluded from student attendance calculations).'}
+                  </Typography>
+                </Box>
 
-                  return (
-                    <Box
-                      key={dayItem.date}
-                      onClick={() => {
-                        setSelectedDayDetails(dayItem);
-                      }}
-                      sx={{
-                        width: `${100 / 7}%`,
-                        minHeight: 110,
-                        p: 1,
-                        boxSizing: 'border-box',
-                        cursor: 'pointer',
-                        transition: 'background-color 0.2s',
-                        bgcolor: isHoliday
-                          ? 'error.lighter'
-                          : isWeeklyOff
-                            ? 'action.hover'
-                            : isSpecial
-                              ? 'warning.lighter'
-                              : 'background.paper',
-                        borderRight: (idx + 1) % 7 !== 0 ? '1px solid #e0e0e0' : 'none',
-                        borderBottom: '1px solid #e0e0e0',
-                        '&:hover': {
-                          bgcolor: 'action.selected',
-                        },
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography
-                          variant="body2"
-                          fontWeight={700}
-                          color={isHoliday ? 'error.main' : isWeeklyOff ? 'text.secondary' : 'text.primary'}
-                        >
-                          {dayDateNum}
-                        </Typography>
-                        {isHoliday && <Chip size="small" label="Holiday" color="error" sx={{ height: 18, fontSize: '0.65rem' }} />}
-                        {isWeeklyOff && <Chip size="small" label="Off" sx={{ height: 18, fontSize: '0.65rem' }} />}
-                        {isSpecial && <Chip size="small" label="Special" color="warning" sx={{ height: 18, fontSize: '0.65rem' }} />}
-                      </Box>
-
-                      {/* Label details */}
-                      {dayItem.label && dayItem.day_type !== 'working_day' && (
-                        <Box sx={{ mt: 1 }}>
-                          <Typography
-                            variant="caption"
-                            fontWeight={600}
-                            sx={{
-                              display: '-webkit-box',
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden',
-                              color: isHoliday ? 'error.dark' : 'text.secondary',
-                            }}
-                          >
-                            {dayItem.label}
-                          </Typography>
-                          {!dayItem.is_school_wide && (
-                            <Chip
-                              size="small"
-                              variant="outlined"
-                              label="Specific Grades"
-                              sx={{ mt: 0.5, height: 16, fontSize: '0.6rem' }}
-                            />
-                          )}
-                        </Box>
-                      )}
-                    </Box>
-                  );
-                })}
-              </Box>
-            </Paper>
-          )}
+                {isAdmin && (
+                  <Box sx={{ mt: 'auto', pt: 2, borderTop: 1, borderColor: 'divider', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    {selectedDayDetails?.is_working_day && (
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        color="error"
+                        startIcon={<EventBusy />}
+                        onClick={() => handleOpenAddHoliday(selectedDate.format('YYYY-MM-DD'))}
+                      >
+                        Declare Holiday on this Date
+                      </Button>
+                    )}
+                    {selectedDayDetails?.day_type === 'weekly_off' && (
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        color="warning"
+                        startIcon={<Weekend />}
+                        onClick={() => {
+                          setSpecialDate(selectedDate.format('YYYY-MM-DD'));
+                          setOpenSpecialModal(true);
+                        }}
+                      >
+                        Set as Compensatory Working Day
+                      </Button>
+                    )}
+                    {selectedDayDetails?.day_type === 'holiday' && (
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        color="error"
+                        startIcon={<CancelOutlined />}
+                        onClick={() => {
+                          const h = holidays.find((item) => item.name === selectedDayDetails.label);
+                          if (h) {
+                            setHolidayToCancel(h);
+                            setOpenCancelModal(true);
+                          }
+                        }}
+                      >
+                        Cancel Holiday
+                      </Button>
+                    )}
+                  </Box>
+                )}
+              </Paper>
+            </Grid>
+          </Grid>
         </Box>
       )}
 
@@ -856,25 +1037,19 @@ export default function SchoolCalendarPage() {
             </Grid>
 
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                type="date"
+              <DatePicker
                 label="Start Date"
-                InputLabelProps={{ shrink: true }}
-                value={holidayStartDate}
-                onChange={(e) => setHolidayStartDate(e.target.value)}
-                required
+                value={holidayStartDate ? dayjs(holidayStartDate) : null}
+                onChange={(newVal) => setHolidayStartDate(newVal ? newVal.format('YYYY-MM-DD') : '')}
+                slotProps={{ textField: { fullWidth: true, required: true } }}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                type="date"
+              <DatePicker
                 label="End Date"
-                InputLabelProps={{ shrink: true }}
-                value={holidayEndDate}
-                onChange={(e) => setHolidayEndDate(e.target.value)}
-                required
+                value={holidayEndDate ? dayjs(holidayEndDate) : null}
+                onChange={(newVal) => setHolidayEndDate(newVal ? newVal.format('YYYY-MM-DD') : '')}
+                slotProps={{ textField: { fullWidth: true, required: true } }}
               />
             </Grid>
 
@@ -996,15 +1171,12 @@ export default function SchoolCalendarPage() {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Declaring a weekend as working enables attendance roll-calls on that day.
           </Typography>
-          <TextField
-            fullWidth
-            type="date"
+          <DatePicker
             label="Date"
-            InputLabelProps={{ shrink: true }}
-            value={specialDate}
-            onChange={(e) => setSpecialDate(e.target.value)}
-            sx={{ mb: 2 }}
-            required
+            value={specialDate ? dayjs(specialDate) : null}
+            onChange={(newVal) => setSpecialDate(newVal ? newVal.format('YYYY-MM-DD') : '')}
+            sx={{ mb: 2, width: '100%' }}
+            slotProps={{ textField: { fullWidth: true, required: true } }}
           />
           <TextField
             fullWidth
@@ -1033,84 +1205,6 @@ export default function SchoolCalendarPage() {
             }}
           >
             Add Working Day
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* MODAL: DAY INSPECTOR DIALOG */}
-      <Dialog open={Boolean(selectedDayDetails)} onClose={() => setSelectedDayDetails(null)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <InfoOutlined color="primary" />
-          {selectedDayDetails?.date} ({selectedDayDetails?.day_name})
-        </DialogTitle>
-        <DialogContent dividers>
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="caption" color="text.secondary">
-              Day Status:
-            </Typography>
-            <Box sx={{ mt: 0.5 }}>
-              <Chip
-                label={
-                  selectedDayDetails?.day_type === 'holiday'
-                    ? 'Official Holiday / Vacation'
-                    : selectedDayDetails?.day_type === 'weekly_off'
-                      ? 'Weekly Off'
-                      : selectedDayDetails?.day_type === 'special_working_day'
-                        ? 'Compensatory Working Day'
-                        : 'Normal School Working Day'
-                }
-                color={
-                  selectedDayDetails?.day_type === 'holiday'
-                    ? 'error'
-                    : selectedDayDetails?.day_type === 'special_working_day'
-                      ? 'warning'
-                      : selectedDayDetails?.day_type === 'working_day'
-                        ? 'success'
-                        : 'default'
-                }
-              />
-            </Box>
-          </Box>
-
-          {selectedDayDetails?.label && (
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="caption" color="text.secondary">
-                Title / Reason:
-              </Typography>
-              <Typography variant="body1" fontWeight={600}>
-                {selectedDayDetails.label}
-              </Typography>
-              {selectedDayDetails.category_name && (
-                <Chip size="small" label={selectedDayDetails.category_name} variant="outlined" sx={{ mt: 0.5 }} />
-              )}
-            </Box>
-          )}
-
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="caption" color="text.secondary">
-              Attendance Marking:
-            </Typography>
-            <Typography variant="body2" fontWeight={600} color={selectedDayDetails?.is_working_day ? 'success.main' : 'error.main'}>
-              {selectedDayDetails?.is_working_day ? '✓ Enabled (Working Day)' : '✗ Disabled (Non-working day / Holiday)'}
-            </Typography>
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          {isAdmin && selectedDayDetails?.is_working_day && (
-            <Button
-              size="small"
-              color="error"
-              onClick={() => {
-                const date = selectedDayDetails.date;
-                setSelectedDayDetails(null);
-                handleOpenAddHoliday(date);
-              }}
-            >
-              Declare Holiday
-            </Button>
-          )}
-          <Button onClick={() => setSelectedDayDetails(null)} color="inherit">
-            Close
           </Button>
         </DialogActions>
       </Dialog>

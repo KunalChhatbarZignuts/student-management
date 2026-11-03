@@ -13,13 +13,13 @@ export default function Loading() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: '100vh',
+        minHeight: 'calc(100vh - 160px)',
+        py: 8,
         gap: 2,
-        bgcolor: 'background.default',
       }}
     >
-      <CircularProgress color="primary" size={48} />
-      <Typography variant="body1" color="text.secondary">
+      <CircularProgress color="primary" size={40} thickness={4} />
+      <Typography variant="body2" color="text.secondary" fontWeight={500}>
         Loading...
       </Typography>
     </Box>

@@ -152,7 +152,14 @@ const navItems: NavItem[] = [
   },
 ];
 
+const AppShellContext = React.createContext(false);
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  const isNested = React.useContext(AppShellContext);
+  if (isNested) {
+    return <>{children}</>;
+  }
+
   const pathname = usePathname();
   const router = useRouter();
   const { user, role, logout } = useAuth();
@@ -270,7 +277,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+    <AppShellContext.Provider value={true}>
+      <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
       <AppBar
         position="fixed"
         sx={{
@@ -411,6 +419,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </Box>
     </Box>
+    </AppShellContext.Provider>
   );
 }
 

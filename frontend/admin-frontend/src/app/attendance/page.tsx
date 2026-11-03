@@ -33,6 +33,7 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
+import AppDatePicker from '@/components/ui/AppDatePicker';
 import IconButton from '@mui/material/IconButton';
 import Drawer from '@mui/material/Drawer';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -559,15 +560,12 @@ export default function AttendancePage() {
                   </Grid>
 
                   <Grid item xs={12} sm={6} md={3}>
-                    <TextField
-                      fullWidth
+                    <AppDatePicker
                       size="small"
-                      type="date"
                       label="Attendance Date"
-                      InputLabelProps={{ shrink: true }}
-                      inputProps={{ max: todayStr }}
                       value={selectedDate}
-                      onChange={(e) => setSelectedDate(e.target.value)}
+                      onChange={setSelectedDate}
+                      maxDate={todayStr}
                     />
                   </Grid>
 
@@ -1068,14 +1066,11 @@ export default function AttendancePage() {
               <Paper sx={{ p: 2.5, mb: 3, borderRadius: 3 }}>
                 <Grid container spacing={2} alignItems="center">
                   <Grid item xs={12} sm={6} md={3}>
-                    <TextField
-                      fullWidth
+                    <AppDatePicker
                       size="small"
-                      type="date"
                       label="Select Overview Date"
-                      InputLabelProps={{ shrink: true }}
                       value={selectedDate}
-                      onChange={(e) => setSelectedDate(e.target.value)}
+                      onChange={setSelectedDate}
                     />
                   </Grid>
                   <Grid item xs={12} sm={6} md={3}>
