@@ -2,7 +2,10 @@
 const nextConfig = {
   reactStrictMode: true,
   async rewrites() {
-    const apiUrl = process.env.API_URL || 'http://localhost:8000';
+    const defaultApiUrl = process.env.NODE_ENV === 'production'
+      ? 'https://dollhouse-festival-unwilling.ngrok-free.dev'
+      : 'http://localhost:8000';
+    const apiUrl = process.env.API_URL || defaultApiUrl;
     return [
       {
         source: '/api/:path*',
@@ -39,7 +42,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com data:",
               "img-src 'self' data: blob:",
-              "connect-src 'self' http://localhost:8000",
+              "connect-src 'self' http://localhost:8000 https://dollhouse-festival-unwilling.ngrok-free.dev https://*.ngrok-free.dev https://*.ngrok-free.app",
               "frame-ancestors 'none'",
             ].join('; '),
           },

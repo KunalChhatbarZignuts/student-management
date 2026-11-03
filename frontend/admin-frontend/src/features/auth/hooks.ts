@@ -81,6 +81,12 @@ export function useAuth() {
       }
 
       setAccessToken(res.access_token);
+
+      if (res.must_change_password) {
+        router.push('/change-password');
+        return { success: true, mustChangePassword: true };
+      }
+
       const userProfile = await authApi.getMe();
 
       // STRICT PORTAL ROLE CHECK:
@@ -94,7 +100,7 @@ export function useAuth() {
 
       setAuth(res.access_token, userProfile);
 
-      if (res.must_change_password || userProfile.must_change_password) {
+      if (userProfile.must_change_password) {
         router.push('/change-password');
         return { success: true, mustChangePassword: true };
       }
@@ -114,6 +120,11 @@ export function useAuth() {
       const res = await authApi.verify2FA({ code, temp_token: tempToken });
       setAccessToken(res.access_token);
 
+      if (res.must_change_password) {
+        router.push('/change-password');
+        return { success: true, mustChangePassword: true };
+      }
+
       const userProfile = await authApi.getMe();
 
       if (!ADMIN_ALLOWED_ROLES.includes(userProfile.role)) {
@@ -125,7 +136,7 @@ export function useAuth() {
 
       setAuth(res.access_token, userProfile);
 
-      if (res.must_change_password || userProfile.must_change_password) {
+      if (userProfile.must_change_password) {
         router.push('/change-password');
         return { success: true, mustChangePassword: true };
       }

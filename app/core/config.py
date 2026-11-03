@@ -35,7 +35,10 @@ class Settings(BaseSettings):
     ENABLE_ONLINE_APPLICATIONS: bool = False
 
     # CORS
-    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "https://student-management-6mcq.vercel.app",
+    ]
 
     # Seed super admin (used by seed script only)
     SEED_SUPER_ADMIN_EMAIL: str = "admin@school.local"
