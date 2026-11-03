@@ -8,6 +8,7 @@ export const apiClient = axios.create({
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   },
 });
 
@@ -32,8 +33,11 @@ const processQueue = (error: unknown, token: string | null = null) => {
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = useAuthStore.getState().accessToken;
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (config.headers) {
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      config.headers['ngrok-skip-browser-warning'] = 'true';
     }
     return config;
   },
@@ -78,7 +82,10 @@ apiClient.interceptors.response.use(
         const response = await axios.post<TokenResponse>(
           `${API_BASE_URL}/auth/refresh`,
           {},
-          { withCredentials: true }
+          {
+            withCredentials: true,
+            headers: { 'ngrok-skip-browser-warning': 'true' },
+          }
         );
 
         const newAccessToken = response.data.access_token;
