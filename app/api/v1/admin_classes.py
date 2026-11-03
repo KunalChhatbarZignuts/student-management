@@ -63,6 +63,17 @@ def list_subjects_endpoint(
     return assignment_service.list_subjects(db, page, size)
 
 
+@router.delete("/subjects/{subject_id}")
+def delete_subject_endpoint(
+    subject_id: uuid.UUID,
+    request: Request,
+    current_user: User = Depends(require_roles(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value)),
+    db: Session = Depends(get_db),
+):
+    ip = get_client_ip(request)
+    return assignment_service.delete_subject(subject_id, current_user.id, ip, db)
+
+
 @router.post("/teacher-assignments", response_model=TeacherAssignmentResponse, status_code=status.HTTP_201_CREATED)
 def assign_teacher_endpoint(
     request: Request,

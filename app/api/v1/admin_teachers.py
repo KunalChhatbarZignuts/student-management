@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -8,11 +9,14 @@ from app.core.config import settings
 from app.core.deps import get_client_ip, get_db, require_roles
 from app.core.email import send_invite_email
 from app.core.security import generate_secure_token, hash_token
+from app.models.academic_structure import TeacherSubject
+from app.models.classroom import TeacherAssignment
 from app.models.invite import Invite
 from app.models.teacher import Teacher
 from app.models.user import User, UserRole, UserStatus
 from app.schemas.teacher import TeacherCreate, TeacherCreateResponse, TeacherResponse
 from app.services.audit_service import log_action
+from app.services.auth_service import revoke_all_user_tokens
 from app.services.id_generator import generate_employee_code
 
 router = APIRouter(prefix="/admin/teachers", tags=["Admin - Teachers"])
@@ -93,3 +97,70 @@ def create_teacher(
         invite_expires_at=invite_expires_at,
         invite_token=raw_invite_token,
     )
+
+
+@router.delete("/{teacher_id}")
+def delete_or_deactivate_teacher(
+    teacher_id: uuid.UUID,
+    request: Request,
+    current_user: User = Depends(require_roles(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value)),
+    db: Session = Depends(get_db),
+):
+    """Deactivate a teacher, suspend linked user account, and deactivate active class & subject assignments."""
+    teacher = db.get(Teacher, teacher_id)
+    if not teacher:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Teacher not found",
+        )
+
+    # Suspend user account and revoke tokens
+    if teacher.user_id:
+        user = db.get(User, teacher.user_id)
+        if user:
+            user.status = UserStatus.SUSPENDED.value
+            revoke_all_user_tokens(db, user.id)
+
+    # Deactivate active TeacherAssignment records
+    active_ta = db.execute(
+        select(TeacherAssignment).where(
+            TeacherAssignment.teacher_id == teacher.id,
+            TeacherAssignment.is_active == True,
+        )
+    ).scalars().all()
+    for ta in active_ta:
+        ta.is_active = False
+        ta.status = "inactive"
+
+    # Deactivate active TeacherSubject assignments
+    active_ts = db.execute(
+        select(TeacherSubject).where(
+            TeacherSubject.teacher_id == teacher.id,
+            TeacherSubject.status == "active",
+        )
+    ).scalars().all()
+    for ts in active_ts:
+        ts.status = "inactive"
+
+    db.commit()
+
+    ip = get_client_ip(request)
+    log_action(
+        db,
+        actor_user_id=current_user.id,
+        action="teacher_deactivated",
+        entity_type="teacher",
+        entity_id=str(teacher.id),
+        metadata={
+            "employee_code": teacher.employee_code,
+            "name": f"{teacher.first_name} {teacher.last_name}",
+            "deactivated_class_assignments": len(active_ta),
+            "deactivated_subject_assignments": len(active_ts),
+        },
+        ip=ip,
+    )
+
+    return {
+        "message": f"Teacher '{teacher.first_name} {teacher.last_name}' ({teacher.employee_code}) has been deactivated successfully",
+        "id": str(teacher.id),
+    }

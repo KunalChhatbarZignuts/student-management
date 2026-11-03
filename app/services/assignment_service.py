@@ -6,6 +6,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.classroom import Class, Subject, TeacherAssignment
+from app.models.academic_structure import TeacherSubject
 from app.models.student import Student
 from app.models.teacher import Teacher
 from app.schemas.classroom import (
@@ -116,6 +117,7 @@ def create_subject(
     subject = Subject(
         name=payload.name.strip(),
         code=payload.code.strip(),
+        department=payload.department.strip() if payload.department else None,
         status="active",
     )
     db.add(subject)
@@ -128,7 +130,11 @@ def create_subject(
         entity_type="subject",
         actor_user_id=actor_user_id,
         entity_id=str(subject.id),
-        metadata={"name": subject.name, "code": subject.code},
+        metadata={
+            "name": subject.name,
+            "code": subject.code,
+            "department": subject.department,
+        },
         ip=ip,
     )
     return SubjectResponse.model_validate(subject)
@@ -156,6 +162,65 @@ def list_subjects(
         page=page,
         size=size,
     )
+
+
+def delete_subject(
+    subject_id: uuid.UUID,
+    actor_user_id: uuid.UUID,
+    ip: str | None,
+    db: Session,
+) -> dict:
+    subject = db.get(Subject, subject_id)
+    if not subject:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Subject not found",
+        )
+
+    # Deactivate active TeacherSubject assignments
+    active_ts = db.execute(
+        select(TeacherSubject).where(
+            TeacherSubject.subject_id == subject_id,
+            TeacherSubject.status == "active",
+        )
+    ).scalars().all()
+    for ts in active_ts:
+        ts.status = "inactive"
+
+    # Deactivate active TeacherAssignment records
+    active_ta = db.execute(
+        select(TeacherAssignment).where(
+            TeacherAssignment.subject_id == subject_id,
+            TeacherAssignment.is_active == True,
+        )
+    ).scalars().all()
+    for ta in active_ta:
+        ta.is_active = False
+        ta.status = "inactive"
+
+    # Soft deactivate subject
+    subject.status = "inactive"
+    db.commit()
+
+    log_action(
+        db,
+        action="subject_deactivated",
+        entity_type="subject",
+        actor_user_id=actor_user_id,
+        entity_id=str(subject.id),
+        metadata={
+            "name": subject.name,
+            "code": subject.code,
+            "deactivated_teacher_subjects_count": len(active_ts),
+            "deactivated_teacher_assignments_count": len(active_ta),
+        },
+        ip=ip,
+    )
+
+    return {
+        "message": f"Subject '{subject.name}' ({subject.code}) has been deactivated successfully",
+        "id": str(subject.id),
+    }
 
 
 def assign_teacher_to_class(

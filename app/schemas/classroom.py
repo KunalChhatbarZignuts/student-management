@@ -32,12 +32,14 @@ class ClassListResponse(BaseModel):
 class SubjectCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     code: str = Field(..., min_length=1, max_length=20)
+    department: str | None = Field(None, max_length=50)
 
 
 class SubjectResponse(BaseModel):
     id: uuid.UUID
     name: str
     code: str
+    department: str | None = None
     status: str
     created_at: datetime
 

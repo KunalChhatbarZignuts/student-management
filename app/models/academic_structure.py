@@ -286,18 +286,40 @@ class TeacherSubject(TimestampMixin, Base):
     subject_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False,
     )
+    academic_year_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("academic_years.id", ondelete="RESTRICT"), nullable=True,
+    )
+    grade_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("grades.id", ondelete="SET NULL"), nullable=True,
+    )
+    section_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("sections.id", ondelete="SET NULL"), nullable=True,
+    )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
 
     # Relationships
     teacher: Mapped["Teacher"] = relationship("Teacher")
     subject: Mapped["Subject"] = relationship("Subject")
+    academic_year: Mapped["AcademicYear | None"] = relationship("AcademicYear")
+    grade: Mapped["Grade | None"] = relationship("Grade")
+    section: Mapped["Section | None"] = relationship("Section")
 
     __table_args__ = (
-        UniqueConstraint("teacher_id", "subject_id", name="uq_teacher_subject"),
+        UniqueConstraint(
+            "teacher_id",
+            "subject_id",
+            "academic_year_id",
+            "grade_id",
+            "section_id",
+            name="uq_teacher_subject_academic_scope",
+        ),
         Index("ix_teacher_subjects_teacher", "teacher_id"),
         Index("ix_teacher_subjects_subject", "subject_id"),
+        Index("ix_teacher_subjects_academic_year", "academic_year_id"),
+        Index("ix_teacher_subjects_grade", "grade_id"),
+        Index("ix_teacher_subjects_section", "section_id"),
     )
 
     def __repr__(self) -> str:
-        return f"<TeacherSubject teacher={self.teacher_id} subject={self.subject_id}>"
+        return f"<TeacherSubject teacher={self.teacher_id} subject={self.subject_id} grade={self.grade_id} section={self.section_id}>"
 

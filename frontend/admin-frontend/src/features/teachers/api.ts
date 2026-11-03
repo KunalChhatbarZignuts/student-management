@@ -27,5 +27,10 @@ export const adminTeacherApi = {
     const res = await apiClient.post('/admin/teachers', payload);
     return res.data;
   },
+
+  deleteTeacher: async (teacherId: string): Promise<{ message: string; id: string }> => {
+    const res = await apiClient.delete<{ message: string; id: string }>(`/admin/teachers/${teacherId}`);
+    return res.data;
+  },
 };
 

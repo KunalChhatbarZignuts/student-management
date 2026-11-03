@@ -9,6 +9,7 @@ from app.api.v1 import (
     admin_sections,
     admin_students,
     admin_teachers,
+    admin_teacher_subjects,
     admin_users,
     admissions,
     applications,
@@ -22,6 +23,7 @@ from app.api.v1 import (
     teacher_classes,
     teacher_attendance,
     teacher_sections,
+    teacher_subjects,
     teachers,
 )
 from app.core.config import settings
@@ -50,6 +52,7 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(admin_students.router, prefix="/api/v1")
 app.include_router(admissions.router, prefix="/api/v1")
 app.include_router(admin_teachers.router, prefix="/api/v1")
+app.include_router(admin_teacher_subjects.router, prefix="/api/v1")
 app.include_router(admin_users.router, prefix="/api/v1")
 app.include_router(admin_classes.router, prefix="/api/v1")
 app.include_router(admin_grades.router, prefix="/api/v1")
@@ -64,6 +67,7 @@ app.include_router(teachers.router, prefix="/api/v1")
 app.include_router(teacher_classes.router, prefix="/api/v1")
 app.include_router(teacher_attendance.router, prefix="/api/v1")
 app.include_router(teacher_sections.router, prefix="/api/v1")
+app.include_router(teacher_subjects.router, prefix="/api/v1")
 app.include_router(students.router, prefix="/api/v1")
 app.include_router(applications.router, prefix="/api/v1")
 

@@ -39,6 +39,7 @@ import AppShell from '@/components/layout/AppShell';
 import RequireRole from '@/components/guards/RequireRole';
 import { ROLES } from '@/lib/constants';
 import { teacherPortalApi, TeacherAssignment } from '@/features/teacher-portal/api';
+import { teacherSubjectApi, teacherSubjectKeys } from '@/features/teachers/subjectApi';
 
 export default function MyClassesPage() {
   const [selectedClass, setSelectedClass] = React.useState<TeacherAssignment | null>(null);
@@ -56,6 +57,12 @@ export default function MyClassesPage() {
   const { data: mySectionsData } = useQuery({
     queryKey: ['teacher', 'my-sections'],
     queryFn: teacherPortalApi.getMySections,
+  });
+
+  // Load Assigned Subjects
+  const { data: mySubjects, isLoading: loadingMySubjects } = useQuery({
+    queryKey: teacherSubjectKeys.mySubjects(),
+    queryFn: () => teacherSubjectApi.getMySubjects(),
   });
 
   // Load Section Students when section is selected
@@ -153,6 +160,52 @@ export default function MyClassesPage() {
               </Grid>
             </Box>
           )}
+
+          {/* Assigned Subjects from TeacherSubject */}
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <MenuBookIcon color="primary" />
+              My Assigned Subjects & Scope
+            </Typography>
+            {loadingMySubjects ? (
+              <Skeleton variant="rounded" height={100} />
+            ) : !mySubjects || mySubjects.length === 0 ? (
+              <Alert severity="info">No subjects currently assigned to you.</Alert>
+            ) : (
+              <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 1 }}>
+                <Table size="small">
+                  <TableHead sx={{ bgcolor: 'action.hover' }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }}>Subject</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Code</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Grade</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Section</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Academic Year</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {mySubjects.map((sub) => (
+                      <TableRow key={sub.id}>
+                        <TableCell sx={{ fontWeight: 600 }}>{sub.subject_name || '-'}</TableCell>
+                        <TableCell>{sub.subject_code || '-'}</TableCell>
+                        <TableCell>{sub.grade_name || 'All Grades'}</TableCell>
+                        <TableCell>{sub.section_name ? `Section ${sub.section_name}` : 'All Sections'}</TableCell>
+                        <TableCell>{sub.academic_year_name || 'All Terms'}</TableCell>
+                        <TableCell>
+                          <Chip
+                            size="small"
+                            label={sub.status}
+                            color={sub.status === 'active' ? 'success' : 'default'}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Box>
 
           <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>
             Subject Teaching Assignments

@@ -16,6 +16,8 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Grid from '@mui/material/Grid';
 import CircularProgress from '@mui/material/CircularProgress';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
 import { DataGrid, GridColDef, GridPaginationModel } from '@mui/x-data-grid';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -27,6 +29,11 @@ import SendIcon from '@mui/icons-material/Send';
 import BlockIcon from '@mui/icons-material/Block';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import LockResetIcon from '@mui/icons-material/LockReset';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import PeopleIcon from '@mui/icons-material/People';
+import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
 import AppShell from '@/components/layout/AppShell';
 import RequireRole from '@/components/guards/RequireRole';
@@ -37,6 +44,10 @@ import { adminStudentApi } from '@/features/students/api';
 import { TeacherCreatePayload } from '@/features/teachers/types';
 import { useSnackbar } from '@/components/ui/SnackbarProvider';
 import { formatErrorMessage } from '@/lib/errorMapper';
+import SubjectAssignmentsTab from '@/features/teachers/components/SubjectAssignmentsTab';
+import AssignSubjectDialog from '@/features/teachers/components/AssignSubjectDialog';
+import TeacherProfileDialog from '@/features/teachers/components/TeacherProfileDialog';
+import SubjectsTab from '@/features/teachers/components/SubjectsTab';
 
 const createTeacherSchema = z.object({
   email: z.string().email('Valid email is required').trim().toLowerCase(),
@@ -61,6 +72,14 @@ export default function TeachersManagementPage() {
   });
 
   const [openCreateDialog, setOpenCreateDialog] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState(0);
+  const [selectedTeacherIdForSubject, setSelectedTeacherIdForSubject] = React.useState<string | null>(null);
+  const [selectedTeacherIdForProfile, setSelectedTeacherIdForProfile] = React.useState<string | null>(null);
+  const [teacherToDelete, setTeacherToDelete] = React.useState<{
+    id: string;
+    name: string;
+    employee_code?: string;
+  } | null>(null);
   const [confirmAction, setConfirmAction] = React.useState<{
     type: 'suspend' | 'activate' | 'resend-invite' | 'password-reset';
     userId: string;
@@ -144,6 +163,18 @@ export default function TeachersManagementPage() {
     },
   });
 
+  const deleteTeacherMutation = useMutation({
+    mutationFn: (teacherId: string) => adminTeacherApi.deleteTeacher(teacherId),
+    onSuccess: () => {
+      showSnackbar('Faculty member and active assignments deactivated successfully', 'success');
+      queryClient.invalidateQueries({ queryKey: teacherKeys.all });
+      setTeacherToDelete(null);
+    },
+    onError: (err) => {
+      showSnackbar(formatErrorMessage(err, 'Failed to deactivate teacher'), 'error');
+    },
+  });
+
   const columns: GridColDef[] = [
     {
       field: 'employee_code',
@@ -198,7 +229,7 @@ export default function TeachersManagementPage() {
     {
       field: 'actions',
       headerName: 'Row Actions',
-      width: 180,
+      width: 290,
       sortable: false,
       renderCell: (params) => {
         const u = params.row;
@@ -207,7 +238,30 @@ export default function TeachersManagementPage() {
           : u.email;
 
         return (
-          <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+            {u.teacher && (
+              <>
+                <Tooltip title="View Profile & Subjects">
+                  <IconButton
+                    size="small"
+                    color="info"
+                    onClick={() => setSelectedTeacherIdForProfile(u.teacher.id)}
+                  >
+                    <AccountCircleIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Assign Subject(s)">
+                  <IconButton
+                    size="small"
+                    color="secondary"
+                    onClick={() => setSelectedTeacherIdForSubject(u.teacher.id)}
+                  >
+                    <MenuBookIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </>
+            )}
+
             {u.status === 'invited' && (
               <Tooltip title="Resend Invite">
                 <IconButton
@@ -275,6 +329,24 @@ export default function TeachersManagementPage() {
                 <LockResetIcon fontSize="small" />
               </IconButton>
             </Tooltip>
+
+            {u.teacher && (
+              <Tooltip title="Deactivate Faculty & Assignments">
+                <IconButton
+                  size="small"
+                  color="error"
+                  onClick={() =>
+                    setTeacherToDelete({
+                      id: u.teacher.id,
+                      name: teacherName,
+                      employee_code: u.teacher.employee_code,
+                    })
+                  }
+                >
+                  <DeleteOutlineIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
           </Box>
         );
       },
@@ -284,70 +356,90 @@ export default function TeachersManagementPage() {
   return (
     <RequireRole roles={[ROLES.SUPER_ADMIN, ROLES.ADMIN]}>
       <AppShell>
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-          <Box>
-            <Typography variant="h4" fontWeight={700} gutterBottom>
-              Faculty & Teachers Directory
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Manage instructors, server-generated employee codes, and assign department roles.
-            </Typography>
-          </Box>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setOpenCreateDialog(true)}
+        <Box sx={{ mb: 3 }}>
+          <Tabs
+            value={activeTab}
+            onChange={(_, val) => setActiveTab(val)}
+            sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}
           >
-            Create Teacher
-          </Button>
+            <Tab icon={<PeopleIcon />} iconPosition="start" label="Faculty Directory" />
+            <Tab icon={<MenuBookIcon />} iconPosition="start" label="Subject Assignments Matrix" />
+            <Tab icon={<LibraryBooksIcon />} iconPosition="start" label="Curriculum Subjects" />
+          </Tabs>
+
+          {activeTab === 0 ? (
+            <>
+              <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                <Box>
+                  <Typography variant="h4" fontWeight={700} gutterBottom>
+                    Faculty & Teachers Directory
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Manage instructors, server-generated employee codes, and assign department roles.
+                  </Typography>
+                </Box>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => setOpenCreateDialog(true)}
+                >
+                  Create Teacher
+                </Button>
+              </Box>
+
+              <Paper sx={{ p: 2, mb: 3, borderRadius: 2 }}>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} sm={6} md={4}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      placeholder="Search teacher email..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <TextField
+                      select
+                      fullWidth
+                      size="small"
+                      label="Status Filter"
+                      value={statusFilter}
+                      onChange={(e) => {
+                        setStatusFilter(e.target.value);
+                        setPaginationModel((prev) => ({ ...prev, page: 0 }));
+                      }}
+                    >
+                      <MenuItem value="">All Statuses</MenuItem>
+                      <MenuItem value="active">Active</MenuItem>
+                      <MenuItem value="invited">Invited</MenuItem>
+                      <MenuItem value="suspended">Suspended</MenuItem>
+                    </TextField>
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              <Paper sx={{ height: 520, width: '100%', borderRadius: 3 }}>
+                <DataGrid
+                  rows={data?.items || []}
+                  columns={columns}
+                  loading={isLoading}
+                  paginationMode="server"
+                  rowCount={data?.total || 0}
+                  paginationModel={paginationModel}
+                  onPaginationModelChange={setPaginationModel}
+                  pageSizeOptions={[10, 20, 50]}
+                  disableRowSelectionOnClick
+                  sx={{ border: 0 }}
+                />
+              </Paper>
+            </>
+          ) : activeTab === 1 ? (
+            <SubjectAssignmentsTab />
+          ) : (
+            <SubjectsTab />
+          )}
         </Box>
-
-        <Paper sx={{ p: 2, mb: 3, borderRadius: 2 }}>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} sm={6} md={4}>
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="Search teacher email..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                label="Status Filter"
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setPaginationModel((prev) => ({ ...prev, page: 0 }));
-                }}
-              >
-                <MenuItem value="">All Statuses</MenuItem>
-                <MenuItem value="active">Active</MenuItem>
-                <MenuItem value="invited">Invited</MenuItem>
-                <MenuItem value="suspended">Suspended</MenuItem>
-              </TextField>
-            </Grid>
-          </Grid>
-        </Paper>
-
-        <Paper sx={{ height: 520, width: '100%', borderRadius: 3 }}>
-          <DataGrid
-            rows={data?.items || []}
-            columns={columns}
-            loading={isLoading}
-            paginationMode="server"
-            rowCount={data?.total || 0}
-            paginationModel={paginationModel}
-            onPaginationModelChange={setPaginationModel}
-            pageSizeOptions={[10, 20, 50]}
-            disableRowSelectionOnClick
-            sx={{ border: 0 }}
-          />
-        </Paper>
 
         {/* Create Teacher Dialog */}
         <Dialog open={openCreateDialog} onClose={() => setOpenCreateDialog(false)} maxWidth="sm" fullWidth>
@@ -434,6 +526,40 @@ export default function TeachersManagementPage() {
             onClose={() => setConfirmAction(null)}
           />
         )}
+
+        {/* Deactivate Faculty Member Confirmation */}
+        <ConfirmDialog
+          open={Boolean(teacherToDelete)}
+          title="Deactivate Faculty Member"
+          description={
+            teacherToDelete
+              ? `Are you sure you want to deactivate faculty member "${teacherToDelete.name}" (${teacherToDelete.employee_code || '-'})? This will suspend their account and deactivate active classroom and subject assignments while safely preserving all historical attendance and marks.`
+              : ''
+          }
+          confirmLabel="Deactivate Faculty"
+          confirmColor="error"
+          loading={deleteTeacherMutation.isPending}
+          onConfirm={() => {
+            if (teacherToDelete) {
+              deleteTeacherMutation.mutate(teacherToDelete.id);
+            }
+          }}
+          onClose={() => setTeacherToDelete(null)}
+        />
+
+        {/* Assign Subject Dialog */}
+        <AssignSubjectDialog
+          open={Boolean(selectedTeacherIdForSubject)}
+          onClose={() => setSelectedTeacherIdForSubject(null)}
+          initialTeacherId={selectedTeacherIdForSubject || undefined}
+        />
+
+        {/* Teacher Profile Dialog */}
+        <TeacherProfileDialog
+          open={Boolean(selectedTeacherIdForProfile)}
+          onClose={() => setSelectedTeacherIdForProfile(null)}
+          teacherId={selectedTeacherIdForProfile}
+        />
       </AppShell>
     </RequireRole>
   );
