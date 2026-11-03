@@ -101,3 +101,15 @@ export interface LinkedParentDetail {
   linked_at: string;
 }
 
+export interface AvailableStudentOption {
+  id: string;
+  student_code: string;
+  enrollment_number: string;
+  first_name: string;
+  last_name: string;
+  class_name: string;
+  section: string;
+  label: string;
+}
+
+

@@ -159,39 +159,45 @@ def test_parent_student_relationship_management(client, db):
     )
     assert link2_res.status_code == 200
 
-    # 4. Link Mother to Leo as well (One Student -> Multiple Parents/Guardians)
+    # 4. Attempt to link Mother to Leo as well -> Rejected (409 Conflict: One Student -> One Parent Profile Rule)
     link3_res = client.post(
         f"/api/v1/admin/parents/{p2.id}/children",
         json={"student_id": str(s1.id), "relationship_type": "Mother", "is_primary_guardian": False},
         headers=headers,
     )
-    assert link3_res.status_code == 200
+    assert link3_res.status_code == 409
+    assert "already actively linked" in link3_res.json()["detail"]
 
-    # 5. Check Leo's parents list
+    # 5. Check Available Students API (Leo and Maya are linked, so they should not appear)
+    avail_res = client.get("/api/v1/admin/parents/available-students", headers=headers)
+    assert avail_res.status_code == 200
+    avail_ids = [s["id"] for s in avail_res.json()]
+    assert str(s1.id) not in avail_ids
+    assert str(s2.id) not in avail_ids
+
+    # 6. Check Leo's parents list
     leo_parents_res = client.get(f"/api/v1/admin/students/{s1.id}/parents", headers=headers)
     assert leo_parents_res.status_code == 200
     leo_parents = leo_parents_res.json()
-    assert len(leo_parents) == 2
-    types = [p["relationship_type"] for p in leo_parents]
-    assert "Father" in types
-    assert "Mother" in types
+    assert len(leo_parents) == 1
+    assert leo_parents[0]["relationship_type"] == "Father"
 
-    # 6. Check Father's children list
+    # 7. Check Father's children list
     p1_children_res = client.get(f"/api/v1/admin/parents/{p1.id}/children", headers=headers)
     assert p1_children_res.status_code == 200
     p1_children = p1_children_res.json()
     assert len(p1_children) == 2
 
-    # 7. Update relationship metadata
+    # 8. Update relationship metadata
     update_rel = client.put(
-        f"/api/v1/admin/parents/{p2.id}/children/{s1.id}",
-        json={"relationship_type": "Legal Mother", "is_primary_guardian": True},
+        f"/api/v1/admin/parents/{p1.id}/children/{s1.id}",
+        json={"relationship_type": "Legal Father", "is_primary_guardian": True},
         headers=headers,
     )
     assert update_rel.status_code == 200
-    assert update_rel.json()["relationship_type"] == "Legal Mother"
+    assert update_rel.json()["relationship_type"] == "Legal Father"
 
-    # 8. Soft-unlink Maya from Father
+    # 9. Soft-unlink Maya from Father
     unlink_res = client.delete(f"/api/v1/admin/parents/{p1.id}/children/{s2.id}", headers=headers)
     assert unlink_res.status_code == 200
 
@@ -199,6 +205,14 @@ def test_parent_student_relationship_management(client, db):
     p1_children_after = client.get(f"/api/v1/admin/parents/{p1.id}/children", headers=headers).json()
     assert len(p1_children_after) == 1
     assert p1_children_after[0]["student_id"] == str(s1.id)
+
+    # Now that Maya is unlinked, Maya can be linked to Mother
+    link_maya_mother = client.post(
+        f"/api/v1/admin/parents/{p2.id}/children",
+        json={"student_id": str(s2.id), "relationship_type": "Mother", "is_primary_guardian": True},
+        headers=headers,
+    )
+    assert link_maya_mother.status_code == 200
 
 
 def test_parent_portal_authenticated_access_and_security(client, db):

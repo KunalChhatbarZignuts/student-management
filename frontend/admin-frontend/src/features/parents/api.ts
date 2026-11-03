@@ -9,6 +9,7 @@ import {
   ParentWithChildren,
   LinkChildPayload,
   UpdateRelationshipPayload,
+  AvailableStudentOption,
 } from './types';
 
 export * from './types';
@@ -99,6 +100,13 @@ export const adminParentApi = {
 
   getStudentParents: async (studentId: string): Promise<LinkedParentDetail[]> => {
     const res = await apiClient.get<LinkedParentDetail[]>(`/admin/students/${studentId}/parents`);
+    return res.data;
+  },
+
+  getAvailableStudents: async (search?: string): Promise<AvailableStudentOption[]> => {
+    const res = await apiClient.get<AvailableStudentOption[]>('/admin/parents/available-students', {
+      params: search ? { search } : undefined,
+    });
     return res.data;
   },
 };

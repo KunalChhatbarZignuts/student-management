@@ -287,6 +287,59 @@ def create_parent(
     )
 
 
+@router.get("/admin/parents/available-students")
+def get_available_students_for_linking(
+    search: str | None = None,
+    current_user: User = Depends(require_roles(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value)),
+    db: Session = Depends(get_db),
+):
+    """Admin endpoint to retrieve enrolled students who are not yet linked to any active parent profile."""
+    linked_subquery = select(ParentStudentLink.student_id).where(ParentStudentLink.status == "active")
+
+    query = select(Student).where(Student.id.not_in(linked_subquery))
+    if search and search.strip():
+        s = f"%{search.strip().lower()}%"
+        query = query.where(
+            (Student.first_name.ilike(s))
+            | (Student.last_name.ilike(s))
+            | (Student.student_code.ilike(s))
+            | (Student.enrollment_number.ilike(s))
+        )
+    students = db.execute(query.order_by(Student.first_name.asc())).scalars().all()
+
+    items = []
+    for st in students:
+        class_name = st.class_name
+        sec_name = st.section
+        active_enr = db.execute(
+            select(StudentEnrollment).where(
+                StudentEnrollment.student_id == st.id,
+                StudentEnrollment.status == "ACTIVE",
+            ).order_by(StudentEnrollment.created_at.desc())
+        ).scalars().first()
+        if active_enr:
+            if active_enr.grade_id:
+                g = db.get(Grade, active_enr.grade_id)
+                if g:
+                    class_name = g.name
+            if active_enr.section_id:
+                s = db.get(Section, active_enr.section_id)
+                if s:
+                    sec_name = s.name
+
+        items.append({
+            "id": str(st.id),
+            "student_code": st.student_code,
+            "enrollment_number": st.enrollment_number or st.student_code,
+            "first_name": st.first_name,
+            "last_name": st.last_name,
+            "class_name": class_name or "Class",
+            "section": sec_name or "A",
+            "label": f"{st.first_name} {st.last_name} ({st.enrollment_number or st.student_code}) - {class_name or 'Class'} ({sec_name or 'A'})",
+        })
+    return items
+
+
 @router.get("/admin/parents/{parent_id}", response_model=ParentWithChildrenResponse)
 def get_parent_detail(
     parent_id: uuid.UUID,
@@ -556,6 +609,25 @@ def _do_link_parent_student(
     student = db.get(Student, student_id)
     if not student:
         raise HTTPException(status_code=404, detail="Student record not found")
+
+    # Enforce strict 1-parent-profile per student rule across the institution
+    other_active_link = db.execute(
+        select(ParentStudentLink).where(
+            ParentStudentLink.student_id == student_id,
+            ParentStudentLink.parent_id != parent_id,
+            ParentStudentLink.status == "active",
+        )
+    ).scalar_one_or_none()
+
+    if other_active_link:
+        other_parent = db.get(Parent, other_active_link.parent_id)
+        other_parent_user = db.get(User, other_parent.user_id) if other_parent else None
+        other_name = f"{other_parent.first_name} {other_parent.last_name}" if other_parent else "Another parent"
+        other_email = f" ({other_parent_user.email})" if other_parent_user and other_parent_user.email else ""
+        raise HTTPException(
+            status_code=409,
+            detail=f"Student is already actively linked to parent profile '{other_name}'{other_email}. Please unlink the student from that profile before reassigning.",
+        )
 
     existing_link = db.execute(
         select(ParentStudentLink).where(

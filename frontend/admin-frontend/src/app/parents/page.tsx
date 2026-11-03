@@ -131,19 +131,17 @@ export default function ParentsPage() {
     placeholderData: keepPreviousData,
   });
 
-  // Query students for linking
-  const { data: studentList } = useQuery({
-    queryKey: ['students', 'autocomplete-list'],
-    queryFn: () => adminStudentApi.listStudents({ limit: 100 }),
+  // Query unlinked students available for linking (enforcing 1-parent per student profile)
+  const { data: availableStudents = [], isLoading: isLoadingStudents } = useQuery({
+    queryKey: ['parents', 'available-students'],
+    queryFn: () => adminParentApi.getAvailableStudents(),
     enabled: Boolean(linkingParent),
   });
 
-  const studentOptions = (studentList?.items || [])
-    .filter((u) => u.student)
-    .map((u) => ({
-      id: u.student!.id,
-      label: `${u.student!.first_name} ${u.student!.last_name} (${u.student!.enrollment_number || u.student!.student_code}) - ${u.student!.class_name || 'Class'} (${u.student!.section || 'A'})`,
-    }));
+  const studentOptions = availableStudents.map((s) => ({
+    id: s.id,
+    label: s.label || `${s.first_name} ${s.last_name} (${s.enrollment_number || s.student_code}) - ${s.class_name || 'Class'} (${s.section || 'A'})`,
+  }));
 
   const [createdCredentials, setCreatedCredentials] = React.useState<{
     name: string;
@@ -855,43 +853,53 @@ export default function ParentsPage() {
                   Linking to: <strong>{linkingParent.first_name} {linkingParent.last_name}</strong> ({linkingParent.email})
                 </Alert>
 
-                <Autocomplete
-                  options={studentOptions}
-                  getOptionLabel={(opt) => opt.label}
-                  value={selectedStudent}
-                  onChange={(_, val) => setSelectedStudent(val)}
-                  renderInput={(params) => (
+                {studentOptions.length === 0 && !isLoadingStudents ? (
+                  <Alert severity="warning">
+                    All enrolled students currently have an active parent profile. Each student can be linked to only one parent profile. To link a student here, unlink them from their existing parent first.
+                  </Alert>
+                ) : (
+                  <>
+                    <Autocomplete
+                      options={studentOptions}
+                      getOptionLabel={(opt) => opt.label}
+                      value={selectedStudent}
+                      loading={isLoadingStudents}
+                      onChange={(_, val) => setSelectedStudent(val)}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Search Enrolled Student *"
+                          placeholder="Type student name or ID..."
+                          helperText="Only displaying unlinked students (1 parent profile per student rule)."
+                        />
+                      )}
+                    />
+
                     <TextField
-                      {...params}
-                      label="Search Enrolled Student *"
-                      placeholder="Type student name or ID..."
-                    />
-                  )}
-                />
+                      select
+                      fullWidth
+                      label="Relationship Type *"
+                      value={relationshipType}
+                      onChange={(e) => setRelationshipType(e.target.value)}
+                    >
+                      <MenuItem value="Father">Father</MenuItem>
+                      <MenuItem value="Mother">Mother</MenuItem>
+                      <MenuItem value="Guardian">Legal Guardian</MenuItem>
+                      <MenuItem value="Other">Other</MenuItem>
+                    </TextField>
 
-                <TextField
-                  select
-                  fullWidth
-                  label="Relationship Type *"
-                  value={relationshipType}
-                  onChange={(e) => setRelationshipType(e.target.value)}
-                >
-                  <MenuItem value="Father">Father</MenuItem>
-                  <MenuItem value="Mother">Mother</MenuItem>
-                  <MenuItem value="Guardian">Legal Guardian</MenuItem>
-                  <MenuItem value="Other">Other</MenuItem>
-                </TextField>
-
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={isPrimaryGuardian}
-                      onChange={(e) => setIsPrimaryGuardian(e.target.checked)}
-                      color="primary"
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={isPrimaryGuardian}
+                          onChange={(e) => setIsPrimaryGuardian(e.target.checked)}
+                          color="primary"
+                        />
+                      }
+                      label="Designate as Primary Guardian (Syncs contact info to student profile)"
                     />
-                  }
-                  label="Designate as Primary Guardian (Syncs contact info to student profile)"
-                />
+                  </>
+                )}
               </Box>
             )}
           </DialogContent>
