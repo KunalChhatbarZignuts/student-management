@@ -19,6 +19,8 @@ import PersonIcon from '@mui/icons-material/Person';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
+import PaymentsIcon from '@mui/icons-material/Payments';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 
 import RequireRole from '@/components/guards/RequireRole';
 import AppShell from '@/components/layout/AppShell';
@@ -328,22 +330,41 @@ export default function DashboardPage() {
             </Card>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ height: '100%' }}>
-              <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 1 }}>
-                <SchoolIcon color="primary" sx={{ fontSize: 32 }} />
-                <Typography variant="subtitle1" fontWeight={700}>
-                  Fees & Invoices
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
-                  Inspect tuition fee schedules, payment receipts, and balance dues.
-                </Typography>
-                <Button component={Link} href="/fees" size="small" variant="text" sx={{ alignSelf: 'flex-start' }}>
-                  Check Fees →
-                </Button>
-              </CardContent>
-            </Card>
-          </Grid>
+          {isParent ? (
+            <Grid item xs={12} sm={6} md={3}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 1 }}>
+                  <PaymentsIcon color="primary" sx={{ fontSize: 32 }} />
+                  <Typography variant="subtitle1" fontWeight={700}>
+                    Fees & Invoices
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
+                    Inspect tuition fee schedules, payment receipts, and balance dues.
+                  </Typography>
+                  <Button component={Link} href="/fees" size="small" variant="text" sx={{ alignSelf: 'flex-start' }}>
+                    Check Fees →
+                  </Button>
+                </CardContent>
+              </Card>
+            </Grid>
+          ) : (
+            <Grid item xs={12} sm={6} md={3}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 1 }}>
+                  <ScheduleIcon color="primary" sx={{ fontSize: 32 }} />
+                  <Typography variant="subtitle1" fontWeight={700}>
+                    Class Timetable
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
+                    Review weekly class schedules, timings, and teachers.
+                  </Typography>
+                  <Button component={Link} href="/timetable" size="small" variant="text" sx={{ alignSelf: 'flex-start' }}>
+                    View Timetable →
+                  </Button>
+                </CardContent>
+              </Card>
+            </Grid>
+          )}
         </Grid>
       </AppShell>
     </RequireRole>

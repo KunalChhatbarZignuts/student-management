@@ -25,6 +25,7 @@ from app.api.v1 import (
     teacher_sections,
     teacher_subjects,
     teachers,
+    timetables,
 )
 from app.core.config import settings
 from app.core.rate_limit import _rate_limit_exceeded_handler, limiter
@@ -71,6 +72,7 @@ app.include_router(teacher_sections.router, prefix="/api/v1")
 app.include_router(teacher_subjects.router, prefix="/api/v1")
 app.include_router(students.router, prefix="/api/v1")
 app.include_router(applications.router, prefix="/api/v1")
+app.include_router(timetables.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Root"])

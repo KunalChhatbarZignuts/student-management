@@ -171,6 +171,9 @@ class StudentFeeAssignment(TimestampMixin, Base):
     installments: Mapped[list["FeeInstallment"]] = relationship(
         "FeeInstallment", back_populates="assignment", cascade="all, delete-orphan"
     )
+    payments: Mapped[list["FeePayment"]] = relationship(
+        "FeePayment", back_populates="assignment"
+    )
 
     __table_args__ = (
         Index("ix_student_fee_assignments_student", "student_id"),
@@ -250,10 +253,121 @@ class FeeInstallment(TimestampMixin, Base):
 
     # Relationships
     assignment: Mapped["StudentFeeAssignment"] = relationship("StudentFeeAssignment", back_populates="installments")
+    payments: Mapped[list["FeePayment"]] = relationship("FeePayment", back_populates="installment")
+    transactions: Mapped[list["PaymentTransaction"]] = relationship("PaymentTransaction", back_populates="installment")
 
     __table_args__ = (
         Index("ix_fee_installments_assignment", "assignment_id"),
         Index("ix_fee_installments_status", "status"),
         Index("ix_fee_installments_due_date", "due_date"),
     )
+
+
+class PaymentTransaction(TimestampMixin, Base):
+    __tablename__ = "payment_transactions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    installment_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("fee_installments.id", ondelete="RESTRICT"), nullable=False
+    )
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("students.id", ondelete="RESTRICT"), nullable=False
+    )
+    gateway_provider: Mapped[str] = mapped_column(String(50), nullable=False, default="razorpay")
+    gateway_order_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    gateway_payment_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    gateway_signature: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    currency: Mapped[str] = mapped_column(String(10), nullable=False, default="INR")
+    status: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="created"
+    )  # created, authorized, captured, failed, refunded
+    error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    error_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Relationships
+    installment: Mapped["FeeInstallment"] = relationship("FeeInstallment", back_populates="transactions")
+    student: Mapped["Student"] = relationship("Student")
+    payments: Mapped[list["FeePayment"]] = relationship("FeePayment", back_populates="transaction")
+
+    __table_args__ = (
+        Index("ix_payment_transactions_order", "gateway_order_id"),
+        Index("ix_payment_transactions_payment", "gateway_payment_id"),
+        Index("ix_payment_transactions_status", "status"),
+        Index("ix_payment_transactions_installment", "installment_id"),
+        Index("ix_payment_transactions_student", "student_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<PaymentTransaction order={self.gateway_order_id} status={self.status} amt={self.amount}>"
+
+
+class FeePayment(TimestampMixin, Base):
+    __tablename__ = "fee_payments"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    installment_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("fee_installments.id", ondelete="RESTRICT"), nullable=False
+    )
+    assignment_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("student_fee_assignments.id", ondelete="RESTRICT"), nullable=False
+    )
+    transaction_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("payment_transactions.id", ondelete="SET NULL"), nullable=True
+    )
+    receipt_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    payment_method: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="online_gateway"
+    )  # online_gateway, cash, cheque, bank_transfer, demand_draft
+    payment_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="completed")  # completed, refunded, cancelled
+    reference_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    recorded_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+    # Relationships
+    installment: Mapped["FeeInstallment"] = relationship("FeeInstallment", back_populates="payments")
+    assignment: Mapped["StudentFeeAssignment"] = relationship("StudentFeeAssignment", back_populates="payments")
+    transaction: Mapped["PaymentTransaction | None"] = relationship("PaymentTransaction", back_populates="payments")
+    recorded_by: Mapped["User | None"] = relationship("User")
+
+    __table_args__ = (
+        Index("ix_fee_payments_receipt", "receipt_number"),
+        Index("ix_fee_payments_installment", "installment_id"),
+        Index("ix_fee_payments_assignment", "assignment_id"),
+        Index("ix_fee_payments_payment_date", "payment_date"),
+        Index("ix_fee_payments_status", "status"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<FeePayment receipt={self.receipt_number} amt={self.amount} method={self.payment_method}>"
+
+
+class PaymentWebhookEvent(TimestampMixin, Base):
+    __tablename__ = "payment_webhook_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    event_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    gateway_provider: Mapped[str] = mapped_column(String(50), nullable=False, default="razorpay")
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    raw_payload: Mapped[str] = mapped_column(Text, nullable=False)
+    processing_status: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="received"
+    )  # received, processed, failed, ignored
+    failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    processed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("ix_payment_webhook_events_event_id", "event_id"),
+        Index("ix_payment_webhook_events_status", "processing_status"),
+        Index("ix_payment_webhook_events_type", "event_type"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<PaymentWebhookEvent {self.event_id} ({self.event_type}) status={self.processing_status}>"
+
 

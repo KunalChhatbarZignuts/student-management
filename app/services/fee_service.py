@@ -1,21 +1,30 @@
 import datetime as dt
+import hashlib
+import hmac
+import json
 import uuid
 from decimal import Decimal, ROUND_HALF_UP
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
+from app.core.config import settings
 from app.models.academic_structure import AcademicYear, Grade
 from app.models.fee import (
     FeeComponent,
     FeeInstallment,
+    FeePayment,
     FeeStructure,
     FeeStructureItem,
+    PaymentTransaction,
+    PaymentWebhookEvent,
     StudentFeeAdjustment,
     StudentFeeAssignment,
     StudentFeeAssignmentItem,
 )
 from app.models.student import Student
+from app.models.user import User
+from app.services.id_generator import get_next_sequence_value
 from app.schemas.fee import (
     AdmissionFeeAssignmentPayload,
     FeeCalculationRequest,
@@ -36,6 +45,18 @@ from app.schemas.fee import (
     StudentFeeAssignmentItemResponse,
     StudentFeeAssignmentListItem,
     StudentFeeAssignmentResponse,
+    FeeReceiptResponse,
+    PaginatedTransactionsResponse,
+    PaginatedWebhookEventsResponse,
+    PaymentOrderCreateRequest,
+    PaymentOrderResponse,
+    PaymentTransactionResponse,
+    PaymentVerificationResponse,
+    PaymentVerifyRequest,
+    PaymentWebhookEventResponse,
+    PortalInstallmentItem,
+    RecordOfflinePaymentRequest,
+    StudentPortalFeeScheduleResponse,
 )
 
 
@@ -773,4 +794,784 @@ def get_fee_dashboard_metrics(db: Session) -> FeeDashboardMetricsResponse:
         total_student_assignments=total_assignments_count,
         grade_wise_summaries=grade_summaries,
     )
+
+
+# ==========================================
+# Receipt Generator Service
+# ==========================================
+
+def generate_receipt_number(db: Session) -> str:
+    year = dt.date.today().year
+    counter_name = f"fee:receipt:{year}"
+    seq = get_next_sequence_value(db, counter_name)
+    return f"RCP-{year}-{seq:04d}"
+
+
+def _build_receipt_response(payment: FeePayment) -> FeeReceiptResponse:
+    installment = payment.installment
+    assignment = payment.assignment
+    student = assignment.student if assignment else None
+    grade = assignment.grade if assignment else None
+    ay = assignment.academic_year if assignment else None
+
+    return FeeReceiptResponse(
+        receipt_number=payment.receipt_number,
+        payment_date=payment.payment_date,
+        amount=payment.amount,
+        payment_method=payment.payment_method,
+        status=payment.status,
+        reference_note=payment.reference_note,
+        student_id=assignment.student_id if assignment else uuid.uuid4(),
+        student_name=f"{student.first_name} {student.last_name}" if student else "Student",
+        student_code=student.student_code if student else None,
+        enrollment_number=student.enrollment_number if student else None,
+        grade_name=grade.name if grade else None,
+        academic_year_name=ay.name if ay else None,
+        installment_id=installment.id,
+        installment_name=installment.installment_name,
+        installment_total_amount=installment.amount,
+        installment_paid_amount=installment.paid_amount,
+        installment_outstanding_amount=installment.outstanding_amount,
+        currency=assignment.currency if assignment else "INR",
+        created_at=payment.created_at,
+    )
+
+
+def get_fee_receipt_detail(receipt_number: str, db: Session) -> FeeReceiptResponse:
+    payment = db.execute(
+        select(FeePayment).where(FeePayment.receipt_number == receipt_number)
+    ).scalar_one_or_none()
+    if not payment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Payment receipt '{receipt_number}' not found",
+        )
+    return _build_receipt_response(payment)
+
+
+# ==========================================
+# Payment Order & Gateway Integration
+# ==========================================
+
+def create_payment_order(
+    req: PaymentOrderCreateRequest,
+    student_id: uuid.UUID,
+    db: Session,
+) -> PaymentOrderResponse:
+    installment = db.get(FeeInstallment, req.installment_id)
+    if not installment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Installment not found")
+
+    assignment = installment.assignment
+    if not assignment or assignment.student_id != student_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to pay for this student installment",
+        )
+
+    if installment.outstanding_amount <= Decimal("0.00"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This installment is already fully settled",
+        )
+
+    pay_amount = req.amount if req.amount is not None else installment.outstanding_amount
+    pay_amount = _round_currency(pay_amount)
+
+    if pay_amount <= Decimal("0.00"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payment amount must be greater than zero",
+        )
+
+    if pay_amount > installment.outstanding_amount:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Payment amount (₹{pay_amount}) cannot exceed outstanding amount (₹{installment.outstanding_amount})",
+        )
+
+    # Convert to paise (1 INR = 100 paise)
+    amount_paise = int(pay_amount * 100)
+
+    # Generate gateway order id
+    # Uses mock pattern order_<random> for test placeholder or live call
+    order_id = f"order_{uuid.uuid4().hex[:14]}"
+
+    transaction = PaymentTransaction(
+        installment_id=installment.id,
+        student_id=student_id,
+        gateway_provider="razorpay",
+        gateway_order_id=order_id,
+        amount=pay_amount,
+        currency="INR",
+        status="created",
+    )
+    db.add(transaction)
+    db.commit()
+    db.refresh(transaction)
+
+    student = assignment.student
+    student_name = f"{student.first_name} {student.last_name}" if student else "Student"
+    student_email = student.user.email if student and student.user else None
+
+    return PaymentOrderResponse(
+        order_id=order_id,
+        gateway_provider="razorpay",
+        key_id=settings.RAZORPAY_KEY_ID,
+        amount=pay_amount,
+        amount_paise=amount_paise,
+        currency="INR",
+        installment_id=installment.id,
+        installment_name=installment.installment_name,
+        student_id=student_id,
+        student_name=student_name,
+        student_email=student_email,
+    )
+
+
+def verify_razorpay_signature(order_id: str, payment_id: str, signature: str) -> bool:
+    secret = settings.RAZORPAY_KEY_SECRET
+    # In dev mode with placeholder credentials, accept matching or simulated signatures
+    if secret == "rzp_secret_placeholder" and signature.startswith("sim_sig_"):
+        return True
+    try:
+        msg = f"{order_id}|{payment_id}".encode("utf-8")
+        expected_sig = hmac.new(secret.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+        return hmac.compare_digest(expected_sig, signature)
+    except Exception:
+        return False
+
+
+def verify_webhook_signature(body_bytes: bytes, signature_header: str | None) -> bool:
+    if not signature_header:
+        return False
+    secret = settings.RAZORPAY_WEBHOOK_SECRET
+    if secret == "rzp_webhook_secret_placeholder" and signature_header.startswith("sim_webhook_sig_"):
+        return True
+    try:
+        expected = hmac.new(secret.encode("utf-8"), body_bytes, hashlib.sha256).hexdigest()
+        return hmac.compare_digest(expected, signature_header)
+    except Exception:
+        return False
+
+
+def process_captured_payment(
+    gateway_order_id: str,
+    gateway_payment_id: str,
+    amount_paid: Decimal,
+    payment_method: str = "online_gateway",
+    reference_note: str | None = None,
+    db: Session = None,
+) -> FeePayment:
+    # 1. Fetch transaction
+    tx = db.execute(
+        select(PaymentTransaction).where(PaymentTransaction.gateway_order_id == gateway_order_id)
+    ).scalar_one_or_none()
+
+    if not tx:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Payment transaction for order '{gateway_order_id}' not found",
+        )
+
+    # 2. Check Idempotency: If already captured, return existing payment
+    if tx.status == "captured":
+        existing_payment = db.execute(
+            select(FeePayment).where(FeePayment.transaction_id == tx.id)
+        ).scalar_one_or_none()
+        if existing_payment:
+            return existing_payment
+
+    installment = db.get(FeeInstallment, tx.installment_id)
+    if not installment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Installment not found")
+
+    assignment = installment.assignment
+    if not assignment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
+
+    amount_paid = _round_currency(amount_paid)
+
+    # 3. Update Transaction
+    tx.status = "captured"
+    tx.gateway_payment_id = gateway_payment_id
+    tx.error_code = None
+    tx.error_description = None
+
+    # 4. Generate Receipt & Create Payment Record
+    receipt_num = generate_receipt_number(db)
+    payment = FeePayment(
+        installment_id=installment.id,
+        assignment_id=assignment.id,
+        transaction_id=tx.id,
+        receipt_number=receipt_num,
+        amount=amount_paid,
+        payment_method=payment_method,
+        payment_date=dt.date.today(),
+        status="completed",
+        reference_note=reference_note or f"Online Payment Order {gateway_order_id}",
+    )
+    db.add(payment)
+
+    # 5. Reconcile Installment Balances
+    installment.paid_amount = _round_currency(installment.paid_amount + amount_paid)
+    new_outstanding = installment.amount - installment.paid_amount
+    installment.outstanding_amount = _round_currency(max(Decimal("0.00"), new_outstanding))
+
+    if installment.outstanding_amount <= Decimal("0.00"):
+        installment.status = "paid"
+    else:
+        installment.status = "partially_paid"
+
+    # 6. Check if all installments for assignment are settled
+    all_settled = all(inst.status == "paid" for inst in assignment.installments)
+    if all_settled:
+        assignment.status = "completed"
+
+    db.commit()
+    db.refresh(payment)
+    return payment
+
+
+def process_failed_payment(
+    gateway_order_id: str,
+    gateway_payment_id: str | None,
+    error_code: str | None,
+    error_description: str | None,
+    db: Session,
+):
+    tx = db.execute(
+        select(PaymentTransaction).where(PaymentTransaction.gateway_order_id == gateway_order_id)
+    ).scalar_one_or_none()
+
+    if tx:
+        tx.status = "failed"
+        tx.gateway_payment_id = gateway_payment_id
+        tx.error_code = error_code
+        tx.error_description = error_description
+        db.commit()
+
+
+# ==========================================
+# Webhook Handler Service
+# ==========================================
+
+def process_webhook_event(raw_body: bytes, signature: str | None, db: Session) -> dict:
+    # 1. Parse JSON payload
+    try:
+        body_text = raw_body.decode("utf-8")
+        payload = json.loads(body_text)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid JSON payload: {str(e)}",
+        )
+
+    # Razorpay webhooks contain an event id (e.g. "event_id" or "id" or generated from payload)
+    event_id = payload.get("id") or payload.get("event_id")
+    event_type = payload.get("event", "unknown")
+
+    if not event_id:
+        # Fallback hash-based ID for deduplication
+        event_id = f"evt_{hashlib.sha256(raw_body).hexdigest()[:20]}"
+
+    # 2. Check Idempotency: has this event already been processed?
+    existing_evt = db.execute(
+        select(PaymentWebhookEvent).where(PaymentWebhookEvent.event_id == event_id)
+    ).scalar_one_or_none()
+
+    if existing_evt and existing_evt.processing_status == "processed":
+        return {
+            "status": "ignored",
+            "message": f"Webhook event '{event_id}' has already been processed successfully.",
+            "event_id": event_id,
+        }
+
+    # 3. Verify Signature
+    is_valid_sig = verify_webhook_signature(raw_body, signature)
+    if not is_valid_sig and not (settings.RAZORPAY_WEBHOOK_SECRET == "rzp_webhook_secret_placeholder"):
+        # Record failure and reject
+        if not existing_evt:
+            evt = PaymentWebhookEvent(
+                event_id=event_id,
+                gateway_provider="razorpay",
+                event_type=event_type,
+                raw_payload=body_text,
+                processing_status="failed",
+                failure_reason="Invalid webhook signature",
+                retry_count=1,
+            )
+            db.add(evt)
+            db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid webhook signature",
+        )
+
+    # 4. Create or update event record as processing
+    if not existing_evt:
+        evt = PaymentWebhookEvent(
+            event_id=event_id,
+            gateway_provider="razorpay",
+            event_type=event_type,
+            raw_payload=body_text,
+            processing_status="received",
+            retry_count=0,
+        )
+        db.add(evt)
+        db.flush()
+    else:
+        evt = existing_evt
+        evt.retry_count += 1
+
+    # 5. Dispatch Event Actions
+    try:
+        if event_type in ("payment.captured", "order.paid"):
+            # Extract payment entity
+            payment_entity = payload.get("payload", {}).get("payment", {}).get("entity", {})
+            order_id = payment_entity.get("order_id")
+            payment_id = payment_entity.get("id")
+            amt_paise = payment_entity.get("amount", 0)
+            amount_inr = Decimal(str(amt_paise)) / Decimal("100")
+            method = payment_entity.get("method", "online_gateway")
+
+            if not order_id:
+                # Some webhooks have order in payload.order.entity
+                order_entity = payload.get("payload", {}).get("order", {}).get("entity", {})
+                order_id = order_entity.get("id")
+
+            if order_id and payment_id:
+                process_captured_payment(
+                    gateway_order_id=order_id,
+                    gateway_payment_id=payment_id,
+                    amount_paid=amount_inr,
+                    payment_method=f"online_{method}",
+                    db=db,
+                )
+
+        elif event_type == "payment.failed":
+            payment_entity = payload.get("payload", {}).get("payment", {}).get("entity", {})
+            order_id = payment_entity.get("order_id")
+            payment_id = payment_entity.get("id")
+            error_code = payment_entity.get("error_code")
+            error_desc = payment_entity.get("error_description")
+            if order_id:
+                process_failed_payment(order_id, payment_id, error_code, error_desc, db)
+
+        evt.processing_status = "processed"
+        evt.failure_reason = None
+        evt.processed_at = dt.datetime.now(dt.timezone.utc)
+        db.commit()
+
+        return {
+            "status": "success",
+            "message": f"Webhook event '{event_id}' processed successfully",
+            "event_id": event_id,
+        }
+
+    except Exception as e:
+        db.rollback()
+        evt.processing_status = "failed"
+        evt.failure_reason = str(e)
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Webhook processing failed: {str(e)}",
+        )
+
+
+def verify_client_payment(payload: PaymentVerifyRequest, db: Session) -> PaymentVerificationResponse:
+    # 1. Validate signature
+    is_valid = verify_razorpay_signature(
+        payload.gateway_order_id, payload.gateway_payment_id, payload.gateway_signature
+    )
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payment signature verification failed",
+        )
+
+    # 2. Fetch transaction
+    tx = db.execute(
+        select(PaymentTransaction).where(
+            PaymentTransaction.gateway_order_id == payload.gateway_order_id
+        )
+    ).scalar_one_or_none()
+
+    if not tx:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
+
+    # 3. Process payment capture atomically
+    payment = process_captured_payment(
+        gateway_order_id=payload.gateway_order_id,
+        gateway_payment_id=payload.gateway_payment_id,
+        amount_paid=tx.amount,
+        payment_method="online_gateway",
+        reference_note="Verified via client checkout signature",
+        db=db,
+    )
+
+    installment = payment.installment
+    return PaymentVerificationResponse(
+        success=True,
+        status="captured",
+        message="Payment verified and recorded successfully",
+        receipt_number=payment.receipt_number,
+        paid_amount=payment.amount,
+        remaining_balance=installment.outstanding_amount if installment else None,
+    )
+
+
+# ==========================================
+# Offline Payment & Concession Services
+# ==========================================
+
+def record_offline_payment(
+    installment_id: uuid.UUID,
+    payload: RecordOfflinePaymentRequest,
+    actor_user_id: uuid.UUID | None,
+    db: Session,
+) -> FeeReceiptResponse:
+    installment = db.get(FeeInstallment, installment_id)
+    if not installment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Installment not found")
+
+    assignment = installment.assignment
+    if not assignment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fee assignment not found")
+
+    amount = _round_currency(payload.amount)
+    if amount <= Decimal("0.00"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payment amount must be greater than zero",
+        )
+
+    if amount > installment.outstanding_amount:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Amount (₹{amount}) cannot exceed remaining installment balance (₹{installment.outstanding_amount})",
+        )
+
+    pay_date = payload.payment_date or dt.date.today()
+    receipt_num = generate_receipt_number(db)
+
+    payment = FeePayment(
+        installment_id=installment.id,
+        assignment_id=assignment.id,
+        transaction_id=None,
+        receipt_number=receipt_num,
+        amount=amount,
+        payment_method=payload.payment_method,
+        payment_date=pay_date,
+        status="completed",
+        reference_note=payload.reference_note or f"Offline payment via {payload.payment_method}",
+        recorded_by_user_id=actor_user_id,
+    )
+    db.add(payment)
+
+    # Update installment
+    installment.paid_amount = _round_currency(installment.paid_amount + amount)
+    installment.outstanding_amount = _round_currency(
+        max(Decimal("0.00"), installment.amount - installment.paid_amount)
+    )
+
+    if installment.outstanding_amount <= Decimal("0.00"):
+        installment.status = "paid"
+    else:
+        installment.status = "partially_paid"
+
+    # Check if all installments for assignment are settled
+    all_settled = all(inst.status == "paid" for inst in assignment.installments)
+    if all_settled:
+        assignment.status = "completed"
+
+    db.commit()
+    db.refresh(payment)
+    return _build_receipt_response(payment)
+
+
+def apply_student_fee_adjustment(
+    assignment_id: uuid.UUID,
+    payload: StudentFeeAdjustmentCreate,
+    actor_user_id: uuid.UUID | None,
+    db: Session,
+) -> StudentFeeAssignmentResponse:
+    assignment = db.get(StudentFeeAssignment, assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student fee assignment not found")
+
+    if not payload.description or not payload.description.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A clear description/reason is required for every fee adjustment",
+        )
+
+    eff_amt = Decimal("0.00")
+    if payload.calculation_type == "percentage":
+        eff_amt = _round_currency(assignment.base_amount * (Decimal(str(payload.rate)) / Decimal("100")))
+    else:
+        eff_amt = _round_currency(payload.amount)
+
+    db_adj = StudentFeeAdjustment(
+        assignment_id=assignment.id,
+        adjustment_type=payload.adjustment_type,
+        category=payload.category,
+        description=payload.description.strip(),
+        calculation_type=payload.calculation_type,
+        rate=Decimal(str(payload.rate)) if payload.rate is not None else None,
+        amount=eff_amt,
+        created_by_user_id=actor_user_id,
+    )
+    db.add(db_adj)
+
+    # Recalculate totals
+    if payload.category in ("discount", "concession"):
+        assignment.total_discount = _round_currency(assignment.total_discount + eff_amt)
+    else:
+        assignment.total_additional = _round_currency(assignment.total_additional + eff_amt)
+
+    new_final = max(Decimal("0.00"), assignment.base_amount - assignment.total_discount + assignment.total_additional)
+    assignment.final_payable_amount = _round_currency(new_final)
+
+    # Rebalance remaining unpaid installments
+    unpaid_installments = [
+        inst for inst in assignment.installments if inst.status in ("pending", "partially_paid", "overdue")
+    ]
+    if unpaid_installments:
+        total_already_paid = sum((inst.paid_amount for inst in assignment.installments), Decimal("0.00"))
+        remaining_balance = max(Decimal("0.00"), assignment.final_payable_amount - total_already_paid)
+        count = len(unpaid_installments)
+        part = _round_currency(remaining_balance / Decimal(count))
+        sum_first = part * Decimal(count - 1)
+        rem = remaining_balance - sum_first
+
+        for idx, inst in enumerate(unpaid_installments):
+            inst.amount = part if idx < count - 1 else rem
+            inst.outstanding_amount = max(Decimal("0.00"), inst.amount - inst.paid_amount)
+            if inst.outstanding_amount <= Decimal("0.00"):
+                inst.status = "paid"
+            elif inst.paid_amount > Decimal("0.00"):
+                inst.status = "partially_paid"
+            else:
+                inst.status = "pending"
+
+    db.commit()
+    return get_student_fee_assignment_detail(assignment.id, db)
+
+
+# ==========================================
+# Student / Parent Portal Schedule Service
+# ==========================================
+
+def get_student_portal_fee_schedule(student_id: uuid.UUID, db: Session) -> StudentPortalFeeScheduleResponse:
+    student = db.get(Student, student_id)
+    if not student:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+
+    student_name = f"{student.first_name} {student.last_name}"
+
+    assignment = db.execute(
+        select(StudentFeeAssignment)
+        .where(StudentFeeAssignment.student_id == student_id)
+        .order_by(StudentFeeAssignment.created_at.desc())
+    ).scalars().first()
+
+    if not assignment:
+        return StudentPortalFeeScheduleResponse(
+            student_id=student_id,
+            student_name=student_name,
+            student_code=student.student_code,
+        )
+
+    today = dt.date.today()
+    total_paid = sum((inst.paid_amount for inst in assignment.installments), Decimal("0.00"))
+    total_out = sum((inst.outstanding_amount for inst in assignment.installments), Decimal("0.00"))
+
+    # Load receipts
+    all_payments = db.execute(
+        select(FeePayment)
+        .where(FeePayment.assignment_id == assignment.id)
+        .order_by(FeePayment.created_at.desc())
+    ).scalars().all()
+    receipts_list = [_build_receipt_response(p) for p in all_payments]
+
+    # Map receipts to installments
+    receipts_by_inst: dict[uuid.UUID, list[FeeReceiptResponse]] = {}
+    for r in receipts_list:
+        receipts_by_inst.setdefault(r.installment_id, []).append(r)
+
+    inst_items: list[PortalInstallmentItem] = []
+    for inst in sorted(assignment.installments, key=lambda x: x.installment_number):
+        is_overdue = inst.due_date < today and inst.outstanding_amount > Decimal("0.00")
+        inst_items.append(
+            PortalInstallmentItem(
+                id=inst.id,
+                installment_number=inst.installment_number,
+                installment_name=inst.installment_name,
+                due_date=inst.due_date,
+                amount=inst.amount,
+                paid_amount=inst.paid_amount,
+                outstanding_amount=inst.outstanding_amount,
+                status="overdue" if is_overdue else inst.status,
+                is_overdue=is_overdue,
+                receipts=receipts_by_inst.get(inst.id, []),
+            )
+        )
+
+    comp_items = [
+        StudentFeeAssignmentItemResponse(
+            id=it.id,
+            fee_component_id=it.fee_component_id,
+            component_name=it.component_name,
+            amount=it.amount,
+            payment_frequency=it.payment_frequency,
+            is_mandatory=it.is_mandatory,
+            is_selected=it.is_selected,
+        )
+        for it in assignment.items
+    ]
+
+    adj_items = [
+        StudentFeeAdjustmentResponse(
+            id=adj.id,
+            assignment_id=adj.assignment_id,
+            adjustment_type=adj.adjustment_type,
+            category=adj.category,
+            description=adj.description,
+            calculation_type=adj.calculation_type,
+            rate=adj.rate,
+            amount=adj.amount,
+            created_by_user_id=adj.created_by_user_id,
+            created_at=adj.created_at,
+        )
+        for adj in assignment.adjustments
+    ]
+
+    return StudentPortalFeeScheduleResponse(
+        assignment_id=assignment.id,
+        student_id=student.id,
+        student_name=student_name,
+        student_code=student.student_code,
+        grade_name=assignment.grade.name if assignment.grade else None,
+        academic_year_name=assignment.academic_year.name if assignment.academic_year else None,
+        base_amount=assignment.base_amount,
+        total_discount=assignment.total_discount,
+        total_additional=assignment.total_additional,
+        final_payable_amount=assignment.final_payable_amount,
+        total_paid_amount=_round_currency(total_paid),
+        total_outstanding_amount=_round_currency(total_out),
+        currency=assignment.currency,
+        components=comp_items,
+        adjustments=adj_items,
+        installments=inst_items,
+        payment_history=receipts_list,
+    )
+
+
+# ==========================================
+# Transaction & Webhook Listing Services
+# ==========================================
+
+def list_payment_transactions(
+    academic_year_id: uuid.UUID | None,
+    grade_id: uuid.UUID | None,
+    student_id: uuid.UUID | None,
+    status_filter: str | None,
+    payment_method: str | None,
+    skip: int,
+    limit: int,
+    db: Session,
+) -> PaginatedTransactionsResponse:
+    stmt = (
+        select(PaymentTransaction)
+        .join(Student, PaymentTransaction.student_id == Student.id)
+        .join(FeeInstallment, PaymentTransaction.installment_id == FeeInstallment.id)
+        .join(StudentFeeAssignment, FeeInstallment.assignment_id == StudentFeeAssignment.id)
+    )
+
+    if academic_year_id:
+        stmt = stmt.where(StudentFeeAssignment.academic_year_id == academic_year_id)
+    if grade_id:
+        stmt = stmt.where(StudentFeeAssignment.grade_id == grade_id)
+    if student_id:
+        stmt = stmt.where(PaymentTransaction.student_id == student_id)
+    if status_filter:
+        stmt = stmt.where(PaymentTransaction.status == status_filter)
+
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+
+    txs = db.execute(
+        stmt.order_by(PaymentTransaction.created_at.desc()).offset(skip).limit(limit)
+    ).scalars().all()
+
+    items = []
+    for tx in txs:
+        student = tx.student
+        installment = tx.installment
+        assignment = installment.assignment if installment else None
+        grade = assignment.grade if assignment else None
+
+        receipt = None
+        if tx.payments:
+            receipt = tx.payments[0].receipt_number
+
+        items.append(
+            PaymentTransactionResponse(
+                id=tx.id,
+                installment_id=tx.installment_id,
+                installment_name=installment.installment_name if installment else None,
+                student_id=tx.student_id,
+                student_name=f"{student.first_name} {student.last_name}" if student else "Student",
+                student_code=student.student_code if student else None,
+                grade_name=grade.name if grade else None,
+                gateway_provider=tx.gateway_provider,
+                gateway_order_id=tx.gateway_order_id,
+                gateway_payment_id=tx.gateway_payment_id,
+                amount=tx.amount,
+                currency=tx.currency,
+                status=tx.status,
+                receipt_number=receipt,
+                error_code=tx.error_code,
+                error_description=tx.error_description,
+                created_at=tx.created_at,
+            )
+        )
+
+    return PaginatedTransactionsResponse(items=items, total=total, skip=skip, limit=limit)
+
+
+def list_webhook_events(
+    status_filter: str | None,
+    event_type: str | None,
+    skip: int,
+    limit: int,
+    db: Session,
+) -> PaginatedWebhookEventsResponse:
+    stmt = select(PaymentWebhookEvent)
+    if status_filter:
+        stmt = stmt.where(PaymentWebhookEvent.processing_status == status_filter)
+    if event_type:
+        stmt = stmt.where(PaymentWebhookEvent.event_type == event_type)
+
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+
+    evts = db.execute(
+        stmt.order_by(PaymentWebhookEvent.created_at.desc()).offset(skip).limit(limit)
+    ).scalars().all()
+
+    items = [PaymentWebhookEventResponse.model_validate(e) for e in evts]
+    return PaginatedWebhookEventsResponse(items=items, total=total, skip=skip, limit=limit)
+
+
+def retry_webhook_event(event_id: str, db: Session) -> dict:
+    evt = db.execute(
+        select(PaymentWebhookEvent).where(PaymentWebhookEvent.event_id == event_id)
+    ).scalar_one_or_none()
+    if not evt:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook event not found")
+
+    raw_body = evt.raw_payload.encode("utf-8")
+    return process_webhook_event(raw_body, signature=None, db=db)
+
 

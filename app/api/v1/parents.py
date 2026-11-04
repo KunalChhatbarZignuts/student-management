@@ -1058,10 +1058,19 @@ def get_child_timetable(
     current_user: User = Depends(require_roles(UserRole.PARENT.value)),
     db: Session = Depends(get_db),
 ):
-    """Parent Portal: view child's class schedule derived from section and subjects."""
+    """Parent Portal: view child's published timetable, or fallback schedule."""
     parent = _get_parent_profile(current_user.id, db)
     student = _verify_parent_child_link(parent.id, student_id, db)
 
+    # Attempt to return published school timetable
+    try:
+        from app.services import timetable_service
+        return timetable_service.get_child_timetable_for_parent(current_user.id, student.id, db)
+    except HTTPException as e:
+        if e.status_code != status.HTTP_404_NOT_FOUND:
+            raise e
+
+    # Fallback to assignment schedule if timetable not yet configured/published
     active_enr = db.execute(
         select(StudentEnrollment).where(
             StudentEnrollment.student_id == student.id,
@@ -1099,6 +1108,9 @@ def get_child_timetable(
         "class_name": student.class_name,
         "section": student.section,
         "schedule": schedule_items,
+        "entries": [],
+        "periods": [],
+        "working_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
     }
 
 

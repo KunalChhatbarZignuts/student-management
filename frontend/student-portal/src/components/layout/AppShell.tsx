@@ -29,6 +29,7 @@ import FamilyRestroomIcon from '@mui/icons-material/FamilyRestroom';
 import GradeIcon from '@mui/icons-material/Grade';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import PaymentsIcon from '@mui/icons-material/Payments';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -75,9 +76,15 @@ const navItems: NavItem[] = [
     icon: <EventAvailableIcon />,
   },
   {
+    label: 'Class Timetable',
+    href: '/timetable',
+    icon: <ScheduleIcon />,
+  },
+  {
     label: 'Fee Details',
     href: '/fees',
     icon: <PaymentsIcon />,
+    roles: [ROLES.PARENT],
   },
 ];
 

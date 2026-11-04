@@ -1,7 +1,7 @@
 import datetime as dt
 import uuid
 from decimal import Decimal
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 
 # ==========================================
@@ -289,4 +289,182 @@ class FeeDashboardMetricsResponse(BaseModel):
     total_active_structures: int
     total_student_assignments: int
     grade_wise_summaries: list[dict]
+
+
+# ==========================================
+# Online Payment & Webhook Schemas
+# ==========================================
+
+class PaymentOrderCreateRequest(BaseModel):
+    installment_id: uuid.UUID
+    amount: Decimal | None = Field(None, ge=Decimal("1.00"), description="Optional partial payment amount. Defaults to outstanding.")
+
+
+class PaymentOrderResponse(BaseModel):
+    order_id: str
+    gateway_provider: str
+    key_id: str
+    amount: Decimal
+    amount_paise: int
+    currency: str
+    installment_id: uuid.UUID
+    installment_name: str
+    student_id: uuid.UUID
+    student_name: str
+    student_email: str | None = None
+
+
+class PaymentVerifyRequest(BaseModel):
+    gateway_order_id: str
+    gateway_payment_id: str
+    gateway_signature: str
+
+
+class PaymentVerificationResponse(BaseModel):
+    success: bool
+    status: str
+    message: str
+    receipt_number: str | None = None
+    paid_amount: Decimal | None = None
+    remaining_balance: Decimal | None = None
+
+
+class RecordOfflinePaymentRequest(BaseModel):
+    amount: Decimal = Field(..., ge=Decimal("0.01"))
+    payment_method: str = Field(default="cash")  # cash, cheque, bank_transfer, demand_draft
+    payment_date: dt.date | None = None
+    reference_note: str | None = None
+
+
+class FeeReceiptResponse(BaseModel):
+    receipt_number: str
+    payment_date: dt.date
+    amount: Decimal
+    payment_method: str
+    status: str
+    reference_note: str | None = None
+    student_id: uuid.UUID
+    student_name: str
+    student_code: str | None = None
+    enrollment_number: str | None = None
+    grade_name: str | None = None
+    academic_year_name: str | None = None
+    installment_id: uuid.UUID
+    installment_name: str
+    installment_total_amount: Decimal
+    installment_paid_amount: Decimal
+    installment_outstanding_amount: Decimal
+    currency: str = "INR"
+    created_at: dt.datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PaymentTransactionResponse(BaseModel):
+    id: uuid.UUID
+    installment_id: uuid.UUID
+    installment_name: str | None = None
+    student_id: uuid.UUID
+    student_name: str
+    student_code: str | None = None
+    grade_name: str | None = None
+    gateway_provider: str
+    gateway_order_id: str
+    gateway_payment_id: str | None = None
+    amount: Decimal
+    currency: str
+    status: str
+    receipt_number: str | None = None
+    error_code: str | None = None
+    error_description: str | None = None
+    created_at: dt.datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PaginatedTransactionsResponse(BaseModel):
+    items: list[PaymentTransactionResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class PaymentWebhookEventResponse(BaseModel):
+    id: uuid.UUID
+    event_id: str
+    gateway_provider: str
+    event_type: str
+    processing_status: str
+    failure_reason: str | None = None
+    retry_count: int
+    processed_at: dt.datetime | None = None
+    created_at: dt.datetime
+    raw_payload: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PaginatedWebhookEventsResponse(BaseModel):
+    items: list[PaymentWebhookEventResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+# ==========================================
+# Student / Parent Portal Fee Schedule
+# ==========================================
+
+class PortalInstallmentItem(BaseModel):
+    id: uuid.UUID
+    installment_number: int
+    installment_name: str
+    due_date: dt.date
+    amount: Decimal
+    paid_amount: Decimal
+    outstanding_amount: Decimal
+    status: str
+    is_overdue: bool
+    receipts: list[FeeReceiptResponse] = Field(default_factory=list)
+
+
+class StudentPortalFeeScheduleResponse(BaseModel):
+    assignment_id: uuid.UUID | None = None
+    student_id: uuid.UUID
+    student_name: str
+    student_code: str | None = None
+    grade_name: str | None = None
+    academic_year_name: str | None = None
+    base_amount: Decimal = Decimal("0.00")
+    total_discount: Decimal = Decimal("0.00")
+    total_additional: Decimal = Decimal("0.00")
+    final_payable_amount: Decimal = Decimal("0.00")
+    total_paid_amount: Decimal = Decimal("0.00")
+    total_outstanding_amount: Decimal = Decimal("0.00")
+    currency: str = "INR"
+    components: list[StudentFeeAssignmentItemResponse] = Field(default_factory=list)
+    adjustments: list[StudentFeeAdjustmentResponse] = Field(default_factory=list)
+    installments: list[PortalInstallmentItem] = Field(default_factory=list)
+    payment_history: list[FeeReceiptResponse] = Field(default_factory=list)
+
+    @computed_field
+    @property
+    def total_annual_fee(self) -> Decimal:
+        return self.base_amount
+
+    @computed_field
+    @property
+    def net_payable_fee(self) -> Decimal:
+        return self.final_payable_amount
+
+    @computed_field
+    @property
+    def total_paid(self) -> Decimal:
+        return self.total_paid_amount
+
+    @computed_field
+    @property
+    def total_outstanding(self) -> Decimal:
+        return self.total_outstanding_amount
+
 

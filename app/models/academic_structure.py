@@ -3,7 +3,7 @@ import enum
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Date, ForeignKey, Index, Integer, String, Time, UniqueConstraint, Uuid, text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Time, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -49,6 +49,9 @@ class Shift(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)  # e.g., "Morning Shift"
     start_time: Mapped[dt.time] = mapped_column(Time, nullable=False)
     end_time: Mapped[dt.time] = mapped_column(Time, nullable=False)
+    working_days: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, default="Monday,Tuesday,Wednesday,Thursday,Friday"
+    )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
 
     # Relationships
@@ -69,6 +72,7 @@ class Period(TimestampMixin, Base):
         Uuid, ForeignKey("shifts.id", ondelete="CASCADE"), nullable=False,
     )
     number: Mapped[int] = mapped_column(Integer, nullable=False)
+    name: Mapped[str | None] = mapped_column(String(50), nullable=True)
     start_time: Mapped[dt.time] = mapped_column(Time, nullable=False)
     end_time: Mapped[dt.time] = mapped_column(Time, nullable=False)
     is_break: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -322,4 +326,84 @@ class TeacherSubject(TimestampMixin, Base):
 
     def __repr__(self) -> str:
         return f"<TeacherSubject teacher={self.teacher_id} subject={self.subject_id} grade={self.grade_id} section={self.section_id}>"
+
+
+class Timetable(TimestampMixin, Base):
+    __tablename__ = "timetables"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    academic_year_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("academic_years.id", ondelete="RESTRICT"), nullable=False,
+    )
+    grade_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("grades.id", ondelete="CASCADE"), nullable=False,
+    )
+    section_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("sections.id", ondelete="CASCADE"), nullable=False,
+    )
+    shift_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("shifts.id", ondelete="RESTRICT"), nullable=False,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")  # draft, published, archived
+    published_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
+    )
+
+    # Relationships
+    academic_year: Mapped["AcademicYear"] = relationship("AcademicYear")
+    grade: Mapped["Grade"] = relationship("Grade")
+    section: Mapped["Section"] = relationship("Section")
+    shift: Mapped["Shift"] = relationship("Shift")
+    entries: Mapped[list["TimetableEntry"]] = relationship(
+        "TimetableEntry", back_populates="timetable", cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        UniqueConstraint("academic_year_id", "section_id", "version", name="uq_timetable_year_section_version"),
+        Index("ix_timetables_section_status", "section_id", "status"),
+        Index("ix_timetables_grade", "grade_id"),
+        Index("ix_timetables_year", "academic_year_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<Timetable section={self.section_id} v{self.version} ({self.status})>"
+
+
+class TimetableEntry(TimestampMixin, Base):
+    __tablename__ = "timetable_entries"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    timetable_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("timetables.id", ondelete="CASCADE"), nullable=False,
+    )
+    day_of_week: Mapped[int] = mapped_column(Integer, nullable=False)  # 1 = Monday, ..., 6 = Saturday
+    period_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("periods.id", ondelete="RESTRICT"), nullable=False,
+    )
+    subject_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("subjects.id", ondelete="RESTRICT"), nullable=True,
+    )
+    teacher_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("teachers.id", ondelete="SET NULL"), nullable=True,
+    )
+    room_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # Relationships
+    timetable: Mapped["Timetable"] = relationship("Timetable", back_populates="entries")
+    period: Mapped["Period"] = relationship("Period")
+    subject: Mapped["Subject | None"] = relationship("Subject")
+    teacher: Mapped["Teacher | None"] = relationship("Teacher")
+
+    __table_args__ = (
+        UniqueConstraint("timetable_id", "day_of_week", "period_id", name="uq_timetable_slot"),
+        Index("ix_timetable_entries_timetable", "timetable_id"),
+        Index("ix_timetable_entries_teacher", "teacher_id"),
+        Index("ix_timetable_entries_day_period", "day_of_week", "period_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<TimetableEntry day={self.day_of_week} period={self.period_id} subject={self.subject_id} teacher={self.teacher_id}>"
+
 

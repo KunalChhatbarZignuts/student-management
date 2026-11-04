@@ -46,6 +46,10 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import PaymentIcon from '@mui/icons-material/Payment';
+import ReplayIcon from '@mui/icons-material/Replay';
+import PrintIcon from '@mui/icons-material/Print';
 
 import RequireRole from '@/components/guards/RequireRole';
 import AppShell from '@/components/layout/AppShell';
@@ -60,6 +64,12 @@ import {
   FeeStructure,
   FeeStructureCreatePayload,
   StudentFeeAssignment,
+  FeeInstallmentItem,
+  PaymentTransaction,
+  PaymentWebhookEvent,
+  FeeReceipt,
+  RecordOfflinePaymentPayload,
+  StudentFeeAdjustmentPayload,
 } from '@/features/fees/api';
 
 export default function FeesManagementPage() {
@@ -80,6 +90,37 @@ export default function FeesManagementPage() {
 
   // Drawer for Student Assignment details
   const [viewingAssignmentId, setViewingAssignmentId] = React.useState<string | null>(null);
+
+  // Additional Filters for Tab 3 & Tab 4
+  const [txStatusFilter, setTxStatusFilter] = React.useState<string>('');
+  const [txMethodFilter, setTxMethodFilter] = React.useState<string>('');
+  const [webhookStatusFilter, setWebhookStatusFilter] = React.useState<string>('');
+
+  // Offline Payment Modal State
+  const [openOfflineDialog, setOpenOfflineDialog] = React.useState(false);
+  const [payingInstallment, setPayingInstallment] = React.useState<FeeInstallmentItem | null>(null);
+  const [offlineAmount, setOfflineAmount] = React.useState<number>(0);
+  const [offlineMethod, setOfflineMethod] = React.useState<string>('cash');
+  const [offlineDate, setOfflineDate] = React.useState<string>(new Date().toISOString().split('T')[0]);
+  const [offlineNote, setOfflineNote] = React.useState<string>('');
+
+  // Adjustment Modal State
+  const [openAdjustmentDialog, setOpenAdjustmentDialog] = React.useState(false);
+  const [adjPayload, setAdjPayload] = React.useState<StudentFeeAdjustmentPayload>({
+    adjustment_type: 'merit_scholarship',
+    category: 'concession',
+    description: '',
+    calculation_type: 'fixed',
+    rate: null,
+    amount: 0,
+  });
+
+  // Receipt Modal State
+  const [openReceiptDialog, setOpenReceiptDialog] = React.useState(false);
+  const [viewingReceiptNumber, setViewingReceiptNumber] = React.useState<string | null>(null);
+
+  // Webhook Payload Modal
+  const [viewingWebhook, setViewingWebhook] = React.useState<PaymentWebhookEvent | null>(null);
 
   // Fetch Academic Years
   const { data: academicYears = [] } = useQuery({
@@ -142,6 +183,38 @@ export default function FeesManagementPage() {
     queryKey: ['fees', 'assignment-detail', viewingAssignmentId],
     queryFn: () => adminFeeApi.getAssignmentDetail(viewingAssignmentId!),
     enabled: Boolean(viewingAssignmentId),
+  });
+
+  // Fetch Payment Transactions (Tab 3)
+  const { data: transactionsData, isLoading: loadingTransactions } = useQuery({
+    queryKey: ['fees', 'transactions', { academic_year_id: selectedYearId, grade_id: selectedGradeId, status: txStatusFilter, payment_method: txMethodFilter }],
+    queryFn: () =>
+      adminFeeApi.listTransactions({
+        academic_year_id: selectedYearId || undefined,
+        grade_id: selectedGradeId || undefined,
+        status: txStatusFilter || undefined,
+        payment_method: txMethodFilter || undefined,
+        limit: 50,
+      }),
+    enabled: tabIndex === 3,
+  });
+
+  // Fetch Webhook Events (Tab 4)
+  const { data: webhooksData, isLoading: loadingWebhooks } = useQuery({
+    queryKey: ['fees', 'webhooks', { status: webhookStatusFilter }],
+    queryFn: () =>
+      adminFeeApi.listWebhooks({
+        status: webhookStatusFilter || undefined,
+        limit: 50,
+      }),
+    enabled: tabIndex === 4,
+  });
+
+  // Fetch Receipt Detail
+  const { data: receiptDetail, isLoading: loadingReceipt } = useQuery({
+    queryKey: ['fees', 'receipt', viewingReceiptNumber],
+    queryFn: () => adminFeeApi.getReceiptDetail(viewingReceiptNumber!),
+    enabled: Boolean(viewingReceiptNumber),
   });
 
   // --- Component Form State ---
@@ -254,6 +327,41 @@ export default function FeesManagementPage() {
       setOpenStructureDialog(false);
     },
     onError: (err) => showSnackbar(formatErrorMessage(err, 'Failed to create fee structure'), 'error'),
+  });
+
+  const recordOfflinePaymentMutation = useMutation({
+    mutationFn: ({ installmentId, payload }: { installmentId: string; payload: RecordOfflinePaymentPayload }) =>
+      adminFeeApi.recordOfflinePayment(installmentId, payload),
+    onSuccess: (receipt) => {
+      queryClient.invalidateQueries({ queryKey: ['fees'] });
+      showSnackbar(`Offline payment recorded. Receipt: ${receipt.receipt_number}`, 'success');
+      setOpenOfflineDialog(false);
+      setViewingReceiptNumber(receipt.receipt_number);
+      setOpenReceiptDialog(true);
+    },
+    onError: (err) => showSnackbar(formatErrorMessage(err, 'Failed to record offline payment'), 'error'),
+  });
+
+  const applyAdjustmentMutation = useMutation({
+    mutationFn: ({ assignmentId, payload }: { assignmentId: string; payload: StudentFeeAdjustmentPayload }) =>
+      adminFeeApi.applyAdjustment(assignmentId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fees'] });
+      showSnackbar('Fee adjustment applied and schedule recalculated', 'success');
+      setOpenAdjustmentDialog(false);
+    },
+    onError: (err) => showSnackbar(formatErrorMessage(err, 'Failed to apply adjustment'), 'error'),
+  });
+
+  const retryWebhookMutation = useMutation({
+    mutationFn: (eventId: string) => adminFeeApi.retryWebhook(eventId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fees', 'webhooks'] });
+      queryClient.invalidateQueries({ queryKey: ['fees', 'transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['fees', 'dashboard'] });
+      showSnackbar('Webhook event reprocessed successfully', 'success');
+    },
+    onError: (err) => showSnackbar(formatErrorMessage(err, 'Webhook retry failed'), 'error'),
   });
 
   const handleSaveStructure = () => {
@@ -677,6 +785,279 @@ export default function FeesManagementPage() {
           </Card>
         )}
 
+        {/* Tab 3: Payment Transactions */}
+        {tabIndex === 3 && (
+          <Card sx={{ p: 2.5 }}>
+            <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+              <FormControl size="small" sx={{ minWidth: 160 }}>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  label="Status"
+                  value={txStatusFilter}
+                  onChange={(e) => setTxStatusFilter(e.target.value)}
+                >
+                  <MenuItem value="">All Statuses</MenuItem>
+                  <MenuItem value="captured">Captured / Success</MenuItem>
+                  <MenuItem value="authorized">Authorized</MenuItem>
+                  <MenuItem value="created">Created (Pending)</MenuItem>
+                  <MenuItem value="failed">Failed</MenuItem>
+                  <MenuItem value="refunded">Refunded</MenuItem>
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" sx={{ minWidth: 160 }}>
+                <InputLabel>Method / Channel</InputLabel>
+                <Select
+                  label="Method / Channel"
+                  value={txMethodFilter}
+                  onChange={(e) => setTxMethodFilter(e.target.value)}
+                >
+                  <MenuItem value="">All Methods</MenuItem>
+                  <MenuItem value="online">Online (Razorpay)</MenuItem>
+                  <MenuItem value="cash">Cash</MenuItem>
+                  <MenuItem value="cheque">Cheque</MenuItem>
+                  <MenuItem value="bank_transfer">Bank Transfer</MenuItem>
+                  <MenuItem value="demand_draft">Demand Draft</MenuItem>
+                </Select>
+              </FormControl>
+
+              <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Total Transactions: <b>{transactionsData?.total ?? 0}</b>
+                </Typography>
+              </Box>
+            </Box>
+
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead sx={{ bgcolor: 'action.hover' }}>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Student</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Installment</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Provider / Channel</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Order ID / Ref</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }} align="right">Amount (₹)</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }} align="center">Receipt</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {loadingTransactions ? (
+                    <TableRow>
+                      <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
+                        <CircularProgress size={24} />
+                      </TableCell>
+                    </TableRow>
+                  ) : !transactionsData?.items || transactionsData.items.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                        No payment transactions recorded for the selected filters.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    transactionsData.items.map((tx) => (
+                      <TableRow key={tx.id} hover>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {new Date(tx.created_at).toLocaleDateString()}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={600}>
+                            {tx.student_name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {tx.student_code || tx.grade_name || 'Student'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{tx.installment_name || 'Installment'}</TableCell>
+                        <TableCell sx={{ textTransform: 'uppercase' }}>
+                          <Chip
+                            label={tx.gateway_provider}
+                            size="small"
+                            variant="outlined"
+                            color={tx.gateway_provider === 'razorpay' ? 'primary' : 'default'}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                            {tx.gateway_payment_id || tx.gateway_order_id}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700 }}>
+                          ₹{Number(tx.amount).toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={tx.status}
+                            size="small"
+                            color={
+                              tx.status === 'captured'
+                                ? 'success'
+                                : tx.status === 'failed'
+                                ? 'error'
+                                : tx.status === 'authorized'
+                                ? 'info'
+                                : 'default'
+                            }
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          {tx.receipt_number ? (
+                            <Tooltip title={`View Receipt: ${tx.receipt_number}`}>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<ReceiptIcon fontSize="small" />}
+                                onClick={() => {
+                                  setViewingReceiptNumber(tx.receipt_number!);
+                                  setOpenReceiptDialog(true);
+                                }}
+                              >
+                                {tx.receipt_number}
+                              </Button>
+                            </Tooltip>
+                          ) : (
+                            <Typography variant="caption" color="text.disabled">
+                              —
+                            </Typography>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Card>
+        )}
+
+        {/* Tab 4: Webhook Monitoring */}
+        {tabIndex === 4 && (
+          <Card sx={{ p: 2.5 }}>
+            <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+              <FormControl size="small" sx={{ minWidth: 160 }}>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  label="Status"
+                  value={webhookStatusFilter}
+                  onChange={(e) => setWebhookStatusFilter(e.target.value)}
+                >
+                  <MenuItem value="">All Statuses</MenuItem>
+                  <MenuItem value="processed">Processed</MenuItem>
+                  <MenuItem value="failed">Failed</MenuItem>
+                  <MenuItem value="received">Received / Pending</MenuItem>
+                  <MenuItem value="ignored">Ignored</MenuItem>
+                </Select>
+              </FormControl>
+
+              <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Total Webhook Events: <b>{webhooksData?.total ?? 0}</b>
+                </Typography>
+              </Box>
+            </Box>
+
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead sx={{ bgcolor: 'action.hover' }}>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700 }}>Timestamp</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Event ID</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Event Type</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Provider</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Retries</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Error / Notes</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }} align="center">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {loadingWebhooks ? (
+                    <TableRow>
+                      <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
+                        <CircularProgress size={24} />
+                      </TableCell>
+                    </TableRow>
+                  ) : !webhooksData?.items || webhooksData.items.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                        No webhook events recorded matching criteria.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    webhooksData.items.map((ev) => (
+                      <TableRow key={ev.id} hover>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {new Date(ev.created_at).toLocaleDateString()}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(ev.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                          {ev.event_id}
+                        </TableCell>
+                        <TableCell>
+                          <Chip label={ev.event_type} size="small" variant="outlined" />
+                        </TableCell>
+                        <TableCell sx={{ textTransform: 'uppercase' }}>{ev.gateway_provider}</TableCell>
+                        <TableCell>
+                          <Chip
+                            label={ev.processing_status}
+                            size="small"
+                            color={
+                              ev.processing_status === 'processed'
+                                ? 'success'
+                                : ev.processing_status === 'failed'
+                                ? 'error'
+                                : 'default'
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>{ev.retry_count ?? 0}</TableCell>
+                        <TableCell>
+                          <Typography
+                            variant="caption"
+                            color={ev.failure_reason ? 'error.main' : 'text.secondary'}
+                            sx={{ maxWidth: 220, display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          >
+                            {ev.failure_reason || 'OK'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Tooltip title="View Payload">
+                            <IconButton size="small" onClick={() => setViewingWebhook(ev)}>
+                              <VisibilityIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          {ev.processing_status === 'failed' && (
+                            <Tooltip title="Retry Processing Webhook">
+                              <IconButton
+                                size="small"
+                                color="warning"
+                                onClick={() => retryWebhookMutation.mutate(ev.event_id)}
+                                disabled={retryWebhookMutation.isPending}
+                              >
+                                <ReplayIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Card>
+        )}
+
         {/* Dialog: Create/Edit Fee Component */}
         <Dialog open={openComponentDialog} onClose={() => setOpenComponentDialog(false)} maxWidth="sm" fullWidth>
           <DialogTitle>{editingComponent ? 'Edit Fee Component' : 'Add Fee Component'}</DialogTitle>
@@ -968,11 +1349,32 @@ export default function FeesManagementPage() {
               </Paper>
 
               {/* Adjustments List */}
-              {assignmentDetail.adjustments.length > 0 && (
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle2" fontWeight={700}>
+                  Individual Adjustments ({assignmentDetail.adjustments?.length || 0})
+                </Typography>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<AddIcon fontSize="small" />}
+                  onClick={() => {
+                    setAdjPayload({
+                      adjustment_type: 'merit_scholarship',
+                      category: 'concession',
+                      description: '',
+                      calculation_type: 'fixed',
+                      rate: null,
+                      amount: 0,
+                    });
+                    setOpenAdjustmentDialog(true);
+                  }}
+                >
+                  Add Concession / Charge
+                </Button>
+              </Box>
+
+              {assignmentDetail.adjustments && assignmentDetail.adjustments.length > 0 ? (
                 <Box sx={{ mb: 3 }}>
-                  <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-                    Individual Adjustments ({assignmentDetail.adjustments.length})
-                  </Typography>
                   {assignmentDetail.adjustments.map((adj) => (
                     <Paper key={adj.id} variant="outlined" sx={{ p: 1.5, mb: 1 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -991,6 +1393,10 @@ export default function FeesManagementPage() {
                     </Paper>
                   ))}
                 </Box>
+              ) : (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 3 }}>
+                  No individual concessions or additional charges applied.
+                </Typography>
               )}
 
               {/* Installment Schedule */}
@@ -1004,7 +1410,9 @@ export default function FeesManagementPage() {
                       <TableCell>Installment</TableCell>
                       <TableCell>Due Date</TableCell>
                       <TableCell align="right">Amount</TableCell>
+                      <TableCell align="right">Outstanding</TableCell>
                       <TableCell>Status</TableCell>
+                      <TableCell align="center">Action</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1013,12 +1421,44 @@ export default function FeesManagementPage() {
                         <TableCell sx={{ fontWeight: 600 }}>{inst.installment_name}</TableCell>
                         <TableCell>{inst.due_date}</TableCell>
                         <TableCell align="right">₹{Number(inst.amount).toLocaleString()}</TableCell>
+                        <TableCell
+                          align="right"
+                          sx={{
+                            fontWeight: 600,
+                            color: Number(inst.outstanding_amount) > 0 ? 'warning.main' : 'success.main',
+                          }}
+                        >
+                          ₹{Number(inst.outstanding_amount ?? 0).toLocaleString()}
+                        </TableCell>
                         <TableCell>
                           <Chip
                             label={inst.status}
                             size="small"
                             color={inst.status === 'paid' ? 'success' : inst.status === 'pending' ? 'default' : 'warning'}
                           />
+                        </TableCell>
+                        <TableCell align="center">
+                          {Number(inst.outstanding_amount) > 0 && (
+                            <Tooltip title="Record Offline Payment (Cash, Cheque, Bank Transfer)">
+                              <Button
+                                size="small"
+                                variant="contained"
+                                color="primary"
+                                startIcon={<PaymentIcon fontSize="small" />}
+                                onClick={() => {
+                                  setPayingInstallment(inst);
+                                  setOfflineAmount(Number(inst.outstanding_amount));
+                                  setOfflineMethod('cash');
+                                  setOfflineDate(new Date().toISOString().split('T')[0]);
+                                  setOfflineNote('');
+                                  setOpenOfflineDialog(true);
+                                }}
+                                sx={{ py: 0.25, fontSize: '0.75rem' }}
+                              >
+                                Record Pay
+                              </Button>
+                            </Tooltip>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1028,6 +1468,408 @@ export default function FeesManagementPage() {
             </Box>
           )}
         </Drawer>
+
+        {/* Dialog: Record Offline Payment */}
+        <Dialog open={openOfflineDialog} onClose={() => setOpenOfflineDialog(false)} maxWidth="xs" fullWidth>
+          <DialogTitle>Record Offline Payment</DialogTitle>
+          <DialogContent dividers>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Installment: <b>{payingInstallment?.installment_name}</b>
+              </Typography>
+              <Typography variant="body2" color="warning.main" fontWeight={600}>
+                Outstanding Balance: ₹{Number(payingInstallment?.outstanding_amount ?? 0).toLocaleString()}
+              </Typography>
+            </Box>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  label="Payment Amount (₹)"
+                  type="number"
+                  required
+                  fullWidth
+                  value={offlineAmount}
+                  onChange={(e) => setOfflineAmount(Math.max(0, parseFloat(e.target.value) || 0))}
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                  }}
+                  helperText={`Cannot exceed outstanding ₹${Number(payingInstallment?.outstanding_amount ?? 0).toLocaleString()}`}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth required>
+                  <InputLabel>Payment Mode</InputLabel>
+                  <Select
+                    label="Payment Mode"
+                    value={offlineMethod}
+                    onChange={(e) => setOfflineMethod(e.target.value)}
+                  >
+                    <MenuItem value="cash">Cash</MenuItem>
+                    <MenuItem value="cheque">Cheque</MenuItem>
+                    <MenuItem value="bank_transfer">Bank Transfer (NEFT/RTGS/IMPS)</MenuItem>
+                    <MenuItem value="demand_draft">Demand Draft</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="Payment Date"
+                  type="date"
+                  required
+                  fullWidth
+                  value={offlineDate}
+                  onChange={(e) => setOfflineDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="Reference / Cheque No / Remarks"
+                  placeholder="e.g. Cheque #492810 HDFC or Cash counter ref"
+                  fullWidth
+                  multiline
+                  rows={2}
+                  value={offlineNote}
+                  onChange={(e) => setOfflineNote(e.target.value)}
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenOfflineDialog(false)}>Cancel</Button>
+            <Button
+              variant="contained"
+              onClick={() => {
+                if (!payingInstallment) return;
+                if (offlineAmount <= 0) {
+                  showSnackbar('Amount must be greater than 0', 'error');
+                  return;
+                }
+                if (offlineAmount > Number(payingInstallment.outstanding_amount)) {
+                  showSnackbar('Amount cannot exceed outstanding balance', 'error');
+                  return;
+                }
+                recordOfflinePaymentMutation.mutate({
+                  installmentId: payingInstallment.id,
+                  payload: {
+                    amount: offlineAmount,
+                    payment_method: offlineMethod,
+                    payment_date: offlineDate,
+                    reference_note: offlineNote || undefined,
+                  },
+                });
+              }}
+              disabled={recordOfflinePaymentMutation.isPending}
+            >
+              {recordOfflinePaymentMutation.isPending ? 'Recording...' : 'Confirm Payment'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Dialog: Add Concession or Additional Charge */}
+        <Dialog open={openAdjustmentDialog} onClose={() => setOpenAdjustmentDialog(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Apply Concession or Fee Adjustment</DialogTitle>
+          <DialogContent dividers>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth required>
+                  <InputLabel>Category</InputLabel>
+                  <Select
+                    label="Category"
+                    value={adjPayload.category}
+                    onChange={(e) =>
+                      setAdjPayload({
+                        ...adjPayload,
+                        category: e.target.value as any,
+                        adjustment_type:
+                          e.target.value === 'additional_charge'
+                            ? 'additional_charge'
+                            : e.target.value === 'discount'
+                            ? 'early_bird_discount'
+                            : 'merit_scholarship',
+                      })
+                    }
+                  >
+                    <MenuItem value="concession">Concession / Scholarship</MenuItem>
+                    <MenuItem value="discount">Discount</MenuItem>
+                    <MenuItem value="additional_charge">Additional Charge</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Adjustment Identifier / Type"
+                  fullWidth
+                  required
+                  value={adjPayload.adjustment_type}
+                  onChange={(e) => setAdjPayload({ ...adjPayload, adjustment_type: e.target.value })}
+                  placeholder="e.g. sibling_concession or merit_scholarship"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="Description / Reason"
+                  fullWidth
+                  required
+                  placeholder="e.g. 10% Sibling Concession or Academic Excellence Grant"
+                  value={adjPayload.description}
+                  onChange={(e) => setAdjPayload({ ...adjPayload, description: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth required>
+                  <InputLabel>Calculation Type</InputLabel>
+                  <Select
+                    label="Calculation Type"
+                    value={adjPayload.calculation_type}
+                    onChange={(e) =>
+                      setAdjPayload({
+                        ...adjPayload,
+                        calculation_type: e.target.value as any,
+                        rate: e.target.value === 'percentage' ? 10 : null,
+                      })
+                    }
+                  >
+                    <MenuItem value="fixed">Fixed Amount (₹)</MenuItem>
+                    <MenuItem value="percentage">Percentage (%)</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              {adjPayload.calculation_type === 'percentage' ? (
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="Percentage Rate (%)"
+                    type="number"
+                    required
+                    fullWidth
+                    value={adjPayload.rate ?? ''}
+                    onChange={(e) =>
+                      setAdjPayload({
+                        ...adjPayload,
+                        rate: parseFloat(e.target.value) || 0,
+                        amount: 0,
+                      })
+                    }
+                    InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                  />
+                </Grid>
+              ) : (
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="Fixed Amount (₹)"
+                    type="number"
+                    required
+                    fullWidth
+                    value={adjPayload.amount}
+                    onChange={(e) =>
+                      setAdjPayload({
+                        ...adjPayload,
+                        amount: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
+                  />
+                </Grid>
+              )}
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenAdjustmentDialog(false)}>Cancel</Button>
+            <Button
+              variant="contained"
+              onClick={() => {
+                if (!viewingAssignmentId) return;
+                if (!adjPayload.description.trim()) {
+                  showSnackbar('Please enter a description', 'error');
+                  return;
+                }
+                applyAdjustmentMutation.mutate({
+                  assignmentId: viewingAssignmentId,
+                  payload: adjPayload,
+                });
+              }}
+              disabled={applyAdjustmentMutation.isPending}
+            >
+              {applyAdjustmentMutation.isPending ? 'Applying...' : 'Apply & Recalculate'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Dialog: Printable Fee Receipt Modal */}
+        <Dialog open={openReceiptDialog} onClose={() => setOpenReceiptDialog(false)} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Official Fee Payment Receipt</span>
+            <Box>
+              <IconButton onClick={() => window.print()} title="Print Receipt">
+                <PrintIcon />
+              </IconButton>
+              <IconButton onClick={() => setOpenReceiptDialog(false)}>
+                <CloseIcon />
+              </IconButton>
+            </Box>
+          </DialogTitle>
+          <DialogContent dividers>
+            {loadingReceipt || !receiptDetail ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <Paper variant="outlined" sx={{ p: 3, bgcolor: '#fafafa' }}>
+                <Box sx={{ textAlign: 'center', mb: 3 }}>
+                  <Typography variant="h5" fontWeight={800} color="primary.main">
+                    STUDENT MANAGEMENT ACADEMY
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Official Fee Payment Receipt & Acknowledgment
+                  </Typography>
+                  <Divider sx={{ my: 1.5 }} />
+                  <Typography variant="h6" fontWeight={700} sx={{ letterSpacing: 1 }}>
+                    {receiptDetail.receipt_number}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Date: {receiptDetail.payment_date} • Channel: {receiptDetail.payment_method.toUpperCase()}
+                  </Typography>
+                </Box>
+
+                <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary">Student Name</Typography>
+                    <Typography variant="body2" fontWeight={600}>{receiptDetail.student_name}</Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary">Enrollment / Code</Typography>
+                    <Typography variant="body2" fontWeight={600}>{receiptDetail.enrollment_number || receiptDetail.student_code || '—'}</Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary">Grade / Class</Typography>
+                    <Typography variant="body2" fontWeight={600}>{receiptDetail.grade_name || '—'}</Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary">Academic Year</Typography>
+                    <Typography variant="body2" fontWeight={600}>{receiptDetail.academic_year_name || '—'}</Typography>
+                  </Grid>
+                </Grid>
+
+                <Divider sx={{ my: 2 }} />
+
+                <Box sx={{ mb: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="body2">Installment Description:</Typography>
+                    <Typography variant="body2" fontWeight={600}>{receiptDetail.installment_name}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="body2">Installment Total:</Typography>
+                    <Typography variant="body2">₹{Number(receiptDetail.installment_total_amount).toLocaleString()}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, color: 'success.main' }}>
+                    <Typography variant="subtitle1" fontWeight={700}>Amount Paid Today:</Typography>
+                    <Typography variant="subtitle1" fontWeight={700}>₹{Number(receiptDetail.amount).toLocaleString()}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', color: 'text.secondary' }}>
+                    <Typography variant="body2">Remaining Outstanding:</Typography>
+                    <Typography variant="body2" fontWeight={600}>₹{Number(receiptDetail.installment_outstanding_amount).toLocaleString()}</Typography>
+                  </Box>
+                </Box>
+
+                {receiptDetail.reference_note && (
+                  <Box sx={{ mt: 2, p: 1.5, bgcolor: '#f0f0f0', borderRadius: 1 }}>
+                    <Typography variant="caption" color="text.secondary">Note / Ref:</Typography>
+                    <Typography variant="body2">{receiptDetail.reference_note}</Typography>
+                  </Box>
+                )}
+
+                <Box sx={{ mt: 3, pt: 2, borderTop: '1px dashed #ccc', textAlign: 'center' }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Status: <b>{receiptDetail.status.toUpperCase()}</b> • This is a computer-generated receipt, valid without physical signature.
+                  </Typography>
+                </Box>
+              </Paper>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button startIcon={<PrintIcon />} onClick={() => window.print()}>
+              Print Receipt
+            </Button>
+            <Button onClick={() => setOpenReceiptDialog(false)}>Close</Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Dialog: Webhook Payload Viewer */}
+        <Dialog open={Boolean(viewingWebhook)} onClose={() => setViewingWebhook(null)} maxWidth="md" fullWidth>
+          <DialogTitle>Webhook Event: {viewingWebhook?.event_id}</DialogTitle>
+          <DialogContent dividers>
+            {viewingWebhook && (
+              <Box>
+                <Grid container spacing={2} sx={{ mb: 2 }}>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="caption" color="text.secondary">Provider</Typography>
+                    <Typography variant="body2" fontWeight={600} sx={{ textTransform: 'uppercase' }}>
+                      {viewingWebhook.gateway_provider}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="caption" color="text.secondary">Event Type</Typography>
+                    <Typography variant="body2" fontWeight={600}>{viewingWebhook.event_type}</Typography>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="caption" color="text.secondary">Processing Status</Typography>
+                    <Chip
+                      label={viewingWebhook.processing_status}
+                      size="small"
+                      color={viewingWebhook.processing_status === 'processed' ? 'success' : viewingWebhook.processing_status === 'failed' ? 'error' : 'default'}
+                    />
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="caption" color="text.secondary">Retries</Typography>
+                    <Typography variant="body2" fontWeight={600}>{viewingWebhook.retry_count ?? 0}</Typography>
+                  </Grid>
+                </Grid>
+
+                {viewingWebhook.failure_reason && (
+                  <Alert severity="error" sx={{ mb: 2 }}>
+                    {viewingWebhook.failure_reason}
+                  </Alert>
+                )}
+
+                <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                  Raw Gateway Payload (JSON)
+                </Typography>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 2,
+                    bgcolor: '#272822',
+                    color: '#f8f8f2',
+                    fontFamily: 'monospace',
+                    fontSize: '0.8rem',
+                    maxHeight: 400,
+                    overflow: 'auto',
+                  }}
+                >
+                  <pre style={{ margin: 0 }}>
+                    {JSON.stringify(viewingWebhook.raw_payload, null, 2)}
+                  </pre>
+                </Paper>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            {viewingWebhook?.processing_status === 'failed' && (
+              <Button
+                color="warning"
+                startIcon={<ReplayIcon />}
+                onClick={() => {
+                  retryWebhookMutation.mutate(viewingWebhook.event_id);
+                  setViewingWebhook(null);
+                }}
+                disabled={retryWebhookMutation.isPending}
+              >
+                Retry Processing
+              </Button>
+            )}
+            <Button onClick={() => setViewingWebhook(null)}>Close</Button>
+          </DialogActions>
+        </Dialog>
       </AppShell>
     </RequireRole>
   );

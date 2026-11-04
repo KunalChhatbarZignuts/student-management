@@ -5,8 +5,11 @@ from app.models.admission import Admission
 from app.models.fee import (
     FeeComponent,
     FeeInstallment,
+    FeePayment,
     FeeStructure,
     FeeStructureItem,
+    PaymentTransaction,
+    PaymentWebhookEvent,
     StudentFeeAdjustment,
     StudentFeeAssignment,
     StudentFeeAssignmentItem,
@@ -22,6 +25,8 @@ from app.models.academic_structure import (
     Shift,
     StudentEnrollment,
     TeacherSubject,
+    Timetable,
+    TimetableEntry,
 )
 from app.models.application import Application
 from app.models.attendance import (
@@ -66,6 +71,7 @@ __all__ = [
     "FeeComponent",
     "FeeInstallment",
     "FeeInvoice",
+    "FeePayment",
     "FeeStructure",
     "FeeStructureItem",
     "Grade",
@@ -77,6 +83,8 @@ __all__ = [
     "Parent",
     "ParentStudentLink",
     "PasswordReset",
+    "PaymentTransaction",
+    "PaymentWebhookEvent",
     "Period",
     "RefreshToken",
     "SchoolCalendarSettings",
@@ -93,5 +101,7 @@ __all__ = [
     "Teacher",
     "TeacherAssignment",
     "TeacherSubject",
+    "Timetable",
+    "TimetableEntry",
     "User",
 ]

@@ -11,6 +11,13 @@ import {
   FeeStructureListItem,
   PaginatedFeeAssignmentsResponse,
   StudentFeeAssignment,
+  FeeReceipt,
+  PaymentTransaction,
+  PaginatedTransactionsResponse,
+  PaymentWebhookEvent,
+  PaginatedWebhookEventsResponse,
+  RecordOfflinePaymentPayload,
+  StudentFeeAdjustmentPayload,
 } from './types';
 
 export * from './types';
@@ -24,6 +31,9 @@ export const feeKeys = {
   structureDetail: (id: string) => [...feeKeys.all, 'structure-detail', id] as const,
   assignments: (filters?: Record<string, unknown>) => [...feeKeys.all, 'assignments', filters || {}] as const,
   assignmentDetail: (id: string) => [...feeKeys.all, 'assignment-detail', id] as const,
+  transactions: (filters?: Record<string, unknown>) => [...feeKeys.all, 'transactions', filters || {}] as const,
+  webhooks: (filters?: Record<string, unknown>) => [...feeKeys.all, 'webhooks', filters || {}] as const,
+  receipt: (number: string) => [...feeKeys.all, 'receipt', number] as const,
 };
 
 export const adminFeeApi = {
@@ -102,6 +112,63 @@ export const adminFeeApi = {
 
   getAssignmentDetail: async (id: string): Promise<StudentFeeAssignment> => {
     const res = await apiClient.get<StudentFeeAssignment>(`/admin/fees/assignments/${id}`);
+    return res.data;
+  },
+
+  listTransactions: async (params?: {
+    academic_year_id?: string;
+    grade_id?: string;
+    student_id?: string;
+    status?: string;
+    payment_method?: string;
+    skip?: number;
+    limit?: number;
+  }): Promise<PaginatedTransactionsResponse> => {
+    const res = await apiClient.get<PaginatedTransactionsResponse>('/admin/fees/transactions', { params });
+    return res.data;
+  },
+
+  recordOfflinePayment: async (
+    installmentId: string,
+    payload: RecordOfflinePaymentPayload
+  ): Promise<FeeReceipt> => {
+    const res = await apiClient.post<FeeReceipt>(
+      `/admin/fees/installments/${installmentId}/record-offline-payment`,
+      payload
+    );
+    return res.data;
+  },
+
+  applyAdjustment: async (
+    assignmentId: string,
+    payload: StudentFeeAdjustmentPayload
+  ): Promise<StudentFeeAssignment> => {
+    const res = await apiClient.post<StudentFeeAssignment>(
+      `/admin/fees/assignments/${assignmentId}/adjustments`,
+      payload
+    );
+    return res.data;
+  },
+
+  listWebhooks: async (params?: {
+    status?: string;
+    event_type?: string;
+    skip?: number;
+    limit?: number;
+  }): Promise<PaginatedWebhookEventsResponse> => {
+    const res = await apiClient.get<PaginatedWebhookEventsResponse>('/admin/fees/webhooks', { params });
+    return res.data;
+  },
+
+  retryWebhook: async (eventId: string): Promise<{ status: string; message: string }> => {
+    const res = await apiClient.post<{ status: string; message: string }>(
+      `/admin/fees/webhooks/${eventId}/retry`
+    );
+    return res.data;
+  },
+
+  getReceiptDetail: async (receiptNumber: string): Promise<FeeReceipt> => {
+    const res = await apiClient.get<FeeReceipt>(`/fees/receipts/${receiptNumber}`);
     return res.data;
   },
 };

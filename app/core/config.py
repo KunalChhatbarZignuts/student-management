@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     # Feature flags
     ENABLE_ONLINE_APPLICATIONS: bool = False
 
+    # Payments & Razorpay
+    RAZORPAY_KEY_ID: str = "rzp_test_placeholder"
+    RAZORPAY_KEY_SECRET: str = "rzp_secret_placeholder"
+    RAZORPAY_WEBHOOK_SECRET: str = "rzp_webhook_secret_placeholder"
+
     # CORS
     CORS_ORIGINS: list[str] = [
         "http://localhost:3000",

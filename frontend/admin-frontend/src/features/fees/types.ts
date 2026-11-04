@@ -223,3 +223,89 @@ export interface FeeDashboardMetrics {
   grade_wise_summaries: GradeWiseSummary[];
 }
 
+export interface FeeReceipt {
+  receipt_number: string;
+  payment_date: string;
+  amount: number | string;
+  payment_method: string;
+  status: string;
+  reference_note?: string | null;
+  student_id: string;
+  student_name: string;
+  student_code?: string | null;
+  enrollment_number?: string | null;
+  grade_name?: string | null;
+  academic_year_name?: string | null;
+  installment_id: string;
+  installment_name: string;
+  installment_total_amount: number | string;
+  installment_paid_amount: number | string;
+  installment_outstanding_amount: number | string;
+  currency: string;
+  created_at: string;
+}
+
+export interface PaymentTransaction {
+  id: string;
+  installment_id: string;
+  installment_name?: string | null;
+  student_id: string;
+  student_name: string;
+  student_code?: string | null;
+  grade_name?: string | null;
+  gateway_provider: string;
+  gateway_order_id: string;
+  gateway_payment_id?: string | null;
+  amount: number | string;
+  currency: string;
+  status: 'created' | 'authorized' | 'captured' | 'failed' | 'refunded';
+  receipt_number?: string | null;
+  error_code?: string | null;
+  error_description?: string | null;
+  created_at: string;
+}
+
+export interface PaginatedTransactionsResponse {
+  items: PaymentTransaction[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export interface PaymentWebhookEvent {
+  id: string;
+  event_id: string;
+  gateway_provider: string;
+  event_type: string;
+  processing_status: 'received' | 'processed' | 'failed' | 'ignored';
+  failure_reason?: string | null;
+  retry_count: number;
+  processed_at?: string | null;
+  created_at: string;
+  raw_payload?: string | null;
+}
+
+export interface PaginatedWebhookEventsResponse {
+  items: PaymentWebhookEvent[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export interface RecordOfflinePaymentPayload {
+  amount: number;
+  payment_method: string;
+  payment_date?: string;
+  reference_note?: string;
+}
+
+export interface StudentFeeAdjustmentPayload {
+  adjustment_type: string;
+  category: 'discount' | 'concession' | 'additional_charge';
+  description: string;
+  calculation_type: 'percentage' | 'fixed';
+  rate?: number | null;
+  amount: number;
+}
+
+
