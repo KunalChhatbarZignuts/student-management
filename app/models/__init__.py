@@ -48,6 +48,7 @@ from app.models.calendar import (
 from app.models.classroom import Class, Subject, TeacherAssignment
 from app.models.id_counter import IdCounter
 from app.models.invite import Invite
+from app.models.leave import LeaveStatus, LeaveSubmissionRole, StudentLeaveApplication
 from app.models.parent import Parent, ParentStudentLink
 from app.models.password_reset import PasswordReset
 from app.models.refresh_token import RefreshToken
@@ -96,6 +97,9 @@ __all__ = [
     "StudentFeeAdjustment",
     "StudentFeeAssignment",
     "StudentFeeAssignmentItem",
+    "StudentLeaveApplication",
+    "LeaveStatus",
+    "LeaveSubmissionRole",
     "StudentMark",
     "Subject",
     "Teacher",

@@ -138,7 +138,7 @@ export default function TeacherTimetablePage() {
     if (personalData?.working_days && personalData.working_days.length > 0) {
       return DAYS_OF_WEEK.filter((d) => personalData.working_days.includes(d.label));
     }
-    return DAYS_OF_WEEK.slice(0, 5);
+    return DAYS_OF_WEEK;
   }, [personalData]);
 
   return (
@@ -363,9 +363,9 @@ export default function TeacherTimetablePage() {
                                 }}
                               >
                                 {slots.length > 0 ? (
-                                  slots.map((s) => (
+                                  slots.map((s, sIdx) => (
                                     <Box
-                                      key={s.id}
+                                      key={s.id || `${s.day_of_week}_${s.period_number}_${s.grade_name}_${s.section_name}_${sIdx}`}
                                       sx={{
                                         p: 1.25,
                                         mb: slots.length > 1 ? 1 : 0,

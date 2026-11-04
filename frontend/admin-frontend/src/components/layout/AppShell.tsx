@@ -116,9 +116,21 @@ const navItems: NavItem[] = [
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
   },
   {
+    label: 'Leave Monitoring',
+    href: '/leave-monitoring',
+    icon: <AssignmentTurnedInIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
     label: 'My Classes',
     href: '/my-classes',
     icon: <ClassIcon />,
+    roles: [ROLES.TEACHER],
+  },
+  {
+    label: 'Student Leave Requests',
+    href: '/leave-requests',
+    icon: <AssignmentTurnedInIcon />,
     roles: [ROLES.TEACHER],
   },
   {

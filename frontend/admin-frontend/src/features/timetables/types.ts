@@ -106,7 +106,7 @@ export interface SaveDraftPayload {
 }
 
 export interface TeacherSlotItem {
-  id: string;
+  id?: string;
   day_of_week: number;
   period_number: number;
   period_name?: string;

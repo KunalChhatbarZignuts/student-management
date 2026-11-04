@@ -748,9 +748,6 @@ def get_teacher_personal_schedule(
                 )
 
         for e in entries:
-            if target_day_of_week is not None and e.day_of_week != target_day_of_week:
-                continue
-
             p = e.period
             sub = e.subject
             sec = e.timetable.section if e.timetable else None

@@ -3,6 +3,8 @@
 All notable changes to the Student Management System will be documented in this file.
 
 ## [Unreleased]
+- feat(student-leave-management): implemented Student Leave Application Management with strict Class Teacher approval, attendance EXCUSED integration, and multi-portal interfaces for Student, Parent, Teacher, and Admin.
+- feat(timetable-weekly-dummy-data): generated balanced Monday-Saturday timetables across all 15 grades and 37 sections (1,272 slots, 0 clashes) with strict teacher_subjects certification compliance and full weekly workload distribution.
 - refactor(remove-bulk-import): completely removed Bulk CSV User Import feature from backend router, import service, frontend navigation, and dashboard.
 - feat(calendar-timetable-integration): integrated School Calendar working-day and holiday status with Timetable Management across backend and all four portals (Admin, Teacher, Student, Parent) with automatic holiday suppression and compensatory working day support.
 - feat(timetable-full-school-dummy-data): seeded clash-free published timetables across all 15 grades (Nursery through Grade 12) and 37 sections with dual shifts (Morning & Pre-Primary), complete faculty rotation, and robust student section resolution.

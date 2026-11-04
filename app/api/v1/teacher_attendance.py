@@ -36,12 +36,13 @@ def get_assigned_sections(
 @router.get("/sections/{section_id}/roster", response_model=list[SectionRosterStudentItem])
 def get_section_roster(
     section_id: uuid.UUID,
+    date: date | None = Query(None, description="Date for checking approved leaves"),
     teacher: Teacher = Depends(get_current_teacher),
     db: Session = Depends(get_db),
 ):
     """Retrieve the student roster for an assigned section."""
     attendance_service.verify_teacher_section_access(teacher.id, section_id, db)
-    return attendance_service.get_section_roster(section_id, db)
+    return attendance_service.get_section_roster(section_id, db, target_date=date)
 
 
 @router.get("/sections/{section_id}", response_model=AttendanceSessionResponse | None)

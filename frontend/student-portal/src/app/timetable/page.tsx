@@ -106,7 +106,7 @@ export default function StudentParentTimetablePage() {
     if (timetableData?.working_days && timetableData.working_days.length > 0) {
       return DAYS_OF_WEEK.filter((d) => timetableData.working_days?.includes(d.label));
     }
-    return DAYS_OF_WEEK.slice(0, 5);
+    return DAYS_OF_WEEK;
   }, [timetableData]);
 
   const handlePrint = () => {

@@ -610,8 +610,12 @@ def verify_teacher_section_access(teacher_id: uuid.UUID, section_id: uuid.UUID, 
     return section
 
 
-def get_section_roster(section_id: uuid.UUID, db: Session) -> list[dict]:
-    """Retrieve enrolled student roster for a section."""
+def get_section_roster(
+    section_id: uuid.UUID,
+    db: Session,
+    target_date: date | None = None,
+) -> list[dict]:
+    """Retrieve enrolled student roster for a section, annotated with approved leave status."""
     section = db.get(Section, section_id)
     if not section:
         raise HTTPException(status_code=404, detail="Section not found")
@@ -625,11 +629,26 @@ def get_section_roster(section_id: uuid.UUID, db: Session) -> list[dict]:
         .order_by(StudentEnrollment.roll_no.asc())
     ).scalars().all()
 
+    # Query approved leaves for target date
+    check_dt = target_date or date.today()
+    from app.models.leave import LeaveStatus, StudentLeaveApplication
+    approved_leaves = db.execute(
+        select(StudentLeaveApplication).where(
+            StudentLeaveApplication.section_id == section.id,
+            StudentLeaveApplication.status == LeaveStatus.APPROVED.value,
+            StudentLeaveApplication.start_date <= check_dt,
+            StudentLeaveApplication.end_date >= check_dt,
+        )
+    ).scalars().all()
+    leave_map = {l.student_id: l for l in approved_leaves}
+
     roster = []
     for enr in enrollments:
         stu = enr.student
         if not stu:
             continue
+        leave_app = leave_map.get(stu.id)
+        has_leave = leave_app is not None
         roster.append({
             "student_id": stu.id,
             "enrollment_id": enr.id,
@@ -640,6 +659,10 @@ def get_section_roster(section_id: uuid.UUID, db: Session) -> list[dict]:
             "student_code": stu.student_code,
             "enrollment_number": stu.enrollment_number or stu.student_code,
             "gender": stu.gender,
+            "has_approved_leave": has_leave,
+            "leave_reason": leave_app.reason if leave_app else None,
+            "default_status": "EXCUSED" if has_leave else "PRESENT",
+            "default_remark": f"Approved Leave: {leave_app.reason}" if leave_app else None,
         })
     return roster
 

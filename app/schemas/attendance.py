@@ -130,6 +130,10 @@ class SectionRosterStudentItem(BaseModel):
     student_code: str
     roll_no: int | None = None
     gender: str | None = None
+    has_approved_leave: bool = False
+    leave_reason: str | None = None
+    default_status: str | None = None
+    default_remark: str | None = None
 
 
 class SectionDailyOverviewItem(BaseModel):

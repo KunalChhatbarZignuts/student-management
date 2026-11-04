@@ -17,6 +17,7 @@ from app.api.v1 import (
     auth,
     calendar,
     fees,
+    leaves,
     parents,
     students,
     teacher_classes,
@@ -70,6 +71,7 @@ app.include_router(teacher_sections.router, prefix="/api/v1")
 app.include_router(teacher_subjects.router, prefix="/api/v1")
 app.include_router(students.router, prefix="/api/v1")
 app.include_router(applications.router, prefix="/api/v1")
+app.include_router(leaves.router, prefix="/api/v1")
 app.include_router(timetables.router, prefix="/api/v1")
 
 

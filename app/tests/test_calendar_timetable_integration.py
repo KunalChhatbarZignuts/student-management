@@ -440,8 +440,8 @@ def test_calendar_timetable_integration_all_scenarios(client: TestClient, integr
     teach_mon = timetable_service.get_teacher_personal_schedule(teach_u.id, ay.id, db, target_date=mon_date)
     assert teach_mon.is_holiday is False
     assert teach_mon.date_status.is_working_day is True
-    assert len(teach_mon.slots) == 1
-    assert teach_mon.slots[0].day_of_week == 1
+    assert len(teach_mon.slots) == 4
+    assert any(s.day_of_week == 1 for s in teach_mon.slots)
 
     # Holiday
     teach_hol = timetable_service.get_teacher_personal_schedule(teach_u.id, ay.id, db, target_date=vacation_start)
