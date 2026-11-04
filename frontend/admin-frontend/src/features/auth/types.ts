@@ -38,7 +38,6 @@ export interface User {
   role: UserRole;
   status: string;
   must_change_password: boolean;
-  totp_enabled: boolean;
   last_login_at?: string | null;
   created_at: string;
   updated_at: string;
@@ -51,16 +50,9 @@ export interface TokenResponse {
   access_token: string;
   token_type: string;
   must_change_password?: boolean;
-  requires_2fa?: boolean;
   temp_token?: string | null;
 }
 
 export interface MessageResponse {
   message: string;
 }
-
-export interface TwoFactorSetupResponse {
-  secret: string;
-  otpauth_url: string;
-}
-

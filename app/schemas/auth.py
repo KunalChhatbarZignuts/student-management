@@ -7,7 +7,6 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     must_change_password: bool = False
-    requires_2fa: bool = False
     temp_token: str | None = None
 
 
@@ -41,19 +40,3 @@ class RefreshTokenRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
-
-
-# 2FA schemas
-class TwoFactorSetupResponse(BaseModel):
-    secret: str
-    otpauth_url: str
-
-
-class TwoFactorVerifyRequest(BaseModel):
-    code: str = Field(..., min_length=6, max_length=6)
-    temp_token: str | None = None
-
-
-class TwoFactorDisableRequest(BaseModel):
-    code: str = Field(..., min_length=6, max_length=6)
-    password: str

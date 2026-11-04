@@ -17,14 +17,6 @@ const server = setupServer(
         { status: 429 }
       );
     }
-    if (body.identifier === 'admin2fa@school.edu') {
-      return HttpResponse.json({
-        access_token: '',
-        token_type: 'bearer',
-        requires_2fa: true,
-        temp_token: 'valid-admin-temp-token',
-      });
-    }
     if (body.password === 'wrong-password') {
       return new HttpResponse(
         JSON.stringify({ detail: 'Invalid credentials' }),
@@ -53,7 +45,6 @@ const server = setupServer(
       role: ROLES.ADMIN,
       status: 'ACTIVE',
       must_change_password: false,
-      totp_enabled: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -87,7 +78,6 @@ describe('Admin Frontend Auth & Security Interceptors', () => {
       role: ROLES.ADMIN,
       status: 'ACTIVE',
       must_change_password: false,
-      totp_enabled: false,
       created_at: '',
       updated_at: '',
     });
@@ -98,14 +88,14 @@ describe('Admin Frontend Auth & Security Interceptors', () => {
     expect(localStorage.getItem('auth-storage')).toBeNull();
   });
 
-  it('handles admin login requiring 2FA step', async () => {
+  it('handles direct admin login without 2FA step', async () => {
     const res = await authApi.login({
-      identifier: 'admin2fa@school.edu',
+      identifier: 'admin@school.edu',
       password: 'SecurePassword123!',
     });
 
-    expect(res.requires_2fa).toBe(true);
-    expect(res.temp_token).toBe('valid-admin-temp-token');
+    expect(res.access_token).toBe('mock-admin-access-token');
+    expect(res.token_type).toBe('bearer');
   });
 
   it('rejects invalid invite tokens with clean error response', async () => {

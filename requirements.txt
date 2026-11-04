@@ -13,7 +13,6 @@ alembic==1.20.1
 # Auth & Security
 argon2-cffi==25.1.0
 PyJWT==2.15.1
-pyotp==2.10.0
 
 # Rate limiting
 slowapi==0.1.10

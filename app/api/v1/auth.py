@@ -27,7 +27,6 @@ from app.core.security import (
 from app.models.invite import Invite
 from app.models.password_reset import PasswordReset
 from app.models.user import User, UserRole, UserStatus
-import pyotp
 from app.schemas.auth import (
     AcceptInviteRequest,
     ChangePasswordRequest,
@@ -37,9 +36,6 @@ from app.schemas.auth import (
     RefreshTokenRequest,
     ResetPasswordRequest,
     TokenResponse,
-    TwoFactorDisableRequest,
-    TwoFactorSetupResponse,
-    TwoFactorVerifyRequest,
 )
 from app.schemas.user import UserRead
 from app.services.audit_service import log_action
@@ -141,15 +137,6 @@ def login(
         return TokenResponse(
             access_token=temp_token,
             must_change_password=True,
-            temp_token=temp_token,
-        )
-
-    # Check 2FA requirement for Admin / Super Admin
-    if user.role in (UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value) and user.totp_enabled:
-        temp_token = create_restricted_token(user.id, user.role, token_type="2fa_pending")
-        return TokenResponse(
-            access_token="",
-            requires_2fa=True,
             temp_token=temp_token,
         )
 
@@ -427,134 +414,4 @@ def change_password(
 def get_me(current_user: User = Depends(get_current_user)):
     """Return profile of current authenticated user, including linked person profile."""
     return current_user
-
-
-@router.post("/2fa/setup", response_model=TwoFactorSetupResponse)
-def setup_2fa(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Generate TOTP secret and provisioning URL for Admin/SuperAdmin."""
-    if current_user.role not in (UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="2FA is only available for administrative accounts",
-        )
-
-    secret = pyotp.random_base32()
-    current_user.totp_secret = secret
-    db.commit()
-
-    totp = pyotp.TOTP(secret)
-    provisioning_url = totp.provisioning_uri(
-        name=current_user.email,
-        issuer_name="StudentManagementSMS",
-    )
-
-    return TwoFactorSetupResponse(
-        secret=secret,
-        otpauth_url=provisioning_url,
-    )
-
-
-@router.post("/2fa/verify", response_model=TokenResponse)
-def verify_2fa(
-    request: Request,
-    response: Response,
-    payload: TwoFactorVerifyRequest,
-    db: Session = Depends(get_db),
-):
-    """Verify TOTP code during login (using temp_token) or during initial setup."""
-    user = None
-    ip = get_client_ip(request)
-
-    # If temp_token provided (login flow)
-    if payload.temp_token:
-        claims = decode_token(payload.temp_token)
-        if claims.get("type") != "2fa_pending":
-            raise HTTPException(status_code=401, detail="Invalid 2FA token type")
-        user = db.get(User, uuid.UUID(claims["sub"]))
-    else:
-        # Initial 2FA activation flow with active session
-        auth_header = request.headers.get("Authorization")
-        if not auth_header or not auth_header.startswith("Bearer "):
-            raise HTTPException(status_code=401, detail="Authentication required")
-        claims = decode_token(auth_header.split(" ")[1])
-        user = db.get(User, uuid.UUID(claims["sub"]))
-
-    if not user or not user.totp_secret:
-        raise HTTPException(status_code=400, detail="2FA is not configured for this user")
-
-    totp = pyotp.TOTP(user.totp_secret)
-    if not totp.verify(payload.code, valid_window=1):
-        log_action(
-            db,
-            actor_user_id=user.id,
-            action="2fa_failed",
-            entity_type="user",
-            entity_id=str(user.id),
-            ip=ip,
-        )
-        raise HTTPException(status_code=400, detail="Invalid 2FA verification code")
-
-    # Mark 2FA enabled and reset any failed counters
-    user.totp_enabled = True
-    reset_failed_login(db, user, ip=ip)
-
-    # Issue full session
-    access_token = create_access_token(user.id, user.role)
-    raw_refresh_token, _ = create_refresh_token_session(
-        db,
-        user_id=user.id,
-        user_agent=request.headers.get("user-agent"),
-        ip=ip,
-    )
-    _set_refresh_cookie(response, raw_refresh_token)
-
-    log_action(
-        db,
-        actor_user_id=user.id,
-        action="2fa_verified",
-        entity_type="user",
-        entity_id=str(user.id),
-        ip=ip,
-    )
-
-    return TokenResponse(
-        access_token=access_token,
-        token_type="bearer",
-        must_change_password=False,
-    )
-
-
-@router.post("/2fa/disable", response_model=MessageResponse)
-def disable_2fa(
-    payload: TwoFactorDisableRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Disable TOTP 2FA. Requires valid current TOTP code and account password."""
-    if not current_user.totp_enabled or not current_user.totp_secret:
-        raise HTTPException(status_code=400, detail="2FA is not enabled")
-
-    if not verify_password(payload.password, current_user.password_hash):
-        raise HTTPException(status_code=400, detail="Invalid account password")
-
-    totp = pyotp.TOTP(current_user.totp_secret)
-    if not totp.verify(payload.code, valid_window=1):
-        raise HTTPException(status_code=400, detail="Invalid 2FA verification code")
-
-    current_user.totp_enabled = False
-    current_user.totp_secret = None
-    db.commit()
-
-    log_action(
-        db,
-        actor_user_id=current_user.id,
-        action="2fa_disabled",
-        entity_type="user",
-        entity_id=str(current_user.id),
-    )
-
-    return MessageResponse(message="2FA has been disabled successfully")
 

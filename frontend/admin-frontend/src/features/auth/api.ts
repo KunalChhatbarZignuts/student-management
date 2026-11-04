@@ -3,7 +3,6 @@ import {
   TokenResponse,
   User,
   MessageResponse,
-  TwoFactorSetupResponse,
 } from './types';
 import {
   LoginFormData,
@@ -11,7 +10,6 @@ import {
   ForgotPasswordFormData,
   ResetPasswordFormData,
   ChangePasswordFormData,
-  TwoFactorFormData,
 } from './schemas';
 
 export const authApi = {
@@ -54,25 +52,4 @@ export const authApi = {
     const res = await apiClient.post<MessageResponse>('/auth/change-password', data);
     return res.data;
   },
-
-  verify2FA: async (data: { code: string; temp_token: string }): Promise<TokenResponse> => {
-    const res = await apiClient.post<TokenResponse>('/auth/2fa/verify', data);
-    return res.data;
-  },
-
-  setup2FA: async (): Promise<TwoFactorSetupResponse> => {
-    const res = await apiClient.post<TwoFactorSetupResponse>('/auth/2fa/setup', {});
-    return res.data;
-  },
-
-  enable2FA: async (data: { code: string }): Promise<MessageResponse> => {
-    const res = await apiClient.post<MessageResponse>('/auth/2fa/enable', data);
-    return res.data;
-  },
-
-  disable2FA: async (data: { code: string; password: string }): Promise<MessageResponse> => {
-    const res = await apiClient.post<MessageResponse>('/auth/2fa/disable', data);
-    return res.data;
-  },
 };
-

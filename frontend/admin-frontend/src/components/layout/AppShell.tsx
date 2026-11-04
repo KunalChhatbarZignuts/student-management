@@ -376,7 +376,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <ListItemIcon>
                   <PersonIcon fontSize="small" />
                 </ListItemIcon>
-                Profile & 2FA
+                Profile & Settings
               </MenuItem>
               <MenuItem
                 onClick={() => {

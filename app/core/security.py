@@ -98,7 +98,7 @@ def create_access_token(
 
 
 def create_restricted_token(user_id: uuid.UUID, role: str, token_type: str = "must_change_password") -> str:
-    """Generate a restricted JWT (e.g. forced password change or 2FA pending)."""
+    """Generate a restricted JWT (e.g. forced password change)."""
     now = datetime.now(timezone.utc)
     expire = now + timedelta(minutes=15)
 
