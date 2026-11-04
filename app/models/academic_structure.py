@@ -32,7 +32,6 @@ class AcademicYear(TimestampMixin, Base):
 
     # Relationships
     grades: Mapped[list["Grade"]] = relationship("Grade", back_populates="academic_year")
-    class_groups: Mapped[list["ClassGroup"]] = relationship("ClassGroup", back_populates="academic_year")
 
     __table_args__ = (
         Index("ix_academic_years_current", "is_current"),
@@ -113,11 +112,7 @@ class Grade(TimestampMixin, Base):
     shift: Mapped["Shift | None"] = relationship("Shift", back_populates="grades")
     academic_year: Mapped["AcademicYear"] = relationship("AcademicYear", back_populates="grades")
     coordinator: Mapped["Teacher | None"] = relationship("Teacher", foreign_keys=[coordinator_teacher_id])
-    class_groups: Mapped[list["ClassGroup"]] = relationship("ClassGroup", back_populates="grade")
     sections: Mapped[list["Section"]] = relationship("Section", back_populates="grade", cascade="all, delete-orphan")
-    grade_subjects: Mapped[list["GradeSubject"]] = relationship(
-        "GradeSubject", back_populates="grade", cascade="all, delete-orphan",
-    )
 
     __table_args__ = (
         UniqueConstraint("academic_year_id", "name", name="uq_grade_year_name"),
@@ -163,72 +158,6 @@ class Section(TimestampMixin, Base):
         return f"<Section {self.name} (grade={self.grade_id})>"
 
 
-class GradeSubject(TimestampMixin, Base):
-    __tablename__ = "grade_subjects"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    grade_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("grades.id", ondelete="CASCADE"), nullable=False,
-    )
-    subject_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False,
-    )
-    periods_per_week: Mapped[int] = mapped_column(Integer, nullable=False, default=4)
-    is_optional: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
-
-    # Relationships
-    grade: Mapped["Grade"] = relationship("Grade", back_populates="grade_subjects")
-    subject: Mapped["Subject"] = relationship("Subject")
-
-    __table_args__ = (
-        UniqueConstraint("grade_id", "subject_id", name="uq_grade_subject"),
-        Index("ix_grade_subjects_grade", "grade_id"),
-    )
-
-    def __repr__(self) -> str:
-        return f"<GradeSubject grade={self.grade_id} subject={self.subject_id} periods={self.periods_per_week}>"
-
-
-class ClassGroup(TimestampMixin, Base):
-    __tablename__ = "class_groups"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    grade_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("grades.id", ondelete="CASCADE"), nullable=False,
-    )
-    name: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g. "Section A"
-    room: Mapped[str] = mapped_column(String(50), nullable=False, default="Room 101")
-    capacity: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
-    head_teacher_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey("teachers.id", ondelete="SET NULL"), nullable=True,
-    )
-    academic_year_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("academic_years.id", ondelete="RESTRICT"), nullable=False,
-    )
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
-
-    # Relationships
-    grade: Mapped["Grade"] = relationship("Grade", back_populates="class_groups")
-    academic_year: Mapped["AcademicYear"] = relationship("AcademicYear", back_populates="class_groups")
-    head_teacher: Mapped["Teacher | None"] = relationship("Teacher")
-    enrollments: Mapped[list["StudentEnrollment"]] = relationship(
-        "StudentEnrollment", back_populates="class_group", cascade="all, delete-orphan",
-    )
-    teacher_assignments: Mapped[list["TeacherAssignment"]] = relationship(
-        "TeacherAssignment", back_populates="class_group",
-    )
-
-    __table_args__ = (
-        UniqueConstraint("grade_id", "name", name="uq_class_group_grade_name"),
-        Index("ix_class_groups_grade", "grade_id"),
-        Index("ix_class_groups_head_teacher", "head_teacher_id"),
-    )
-
-    def __repr__(self) -> str:
-        return f"<ClassGroup {self.name} (grade={self.grade_id}, cap={self.capacity})>"
-
-
 class StudentEnrollment(TimestampMixin, Base):
     __tablename__ = "student_enrollments"
 
@@ -241,9 +170,6 @@ class StudentEnrollment(TimestampMixin, Base):
     )
     section_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("sections.id", ondelete="CASCADE"), nullable=True,
-    )
-    class_group_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey("class_groups.id", ondelete="CASCADE"), nullable=True,
     )
     academic_year_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("academic_years.id", ondelete="RESTRICT"), nullable=False,
@@ -258,7 +184,6 @@ class StudentEnrollment(TimestampMixin, Base):
     student: Mapped["Student"] = relationship("Student")
     grade: Mapped["Grade | None"] = relationship("Grade")
     section: Mapped["Section | None"] = relationship("Section", back_populates="enrollments")
-    class_group: Mapped["ClassGroup | None"] = relationship("ClassGroup", back_populates="enrollments")
     academic_year: Mapped["AcademicYear"] = relationship("AcademicYear")
 
     __table_args__ = (
@@ -272,7 +197,6 @@ class StudentEnrollment(TimestampMixin, Base):
         ),
         Index("ix_student_enrollments_section", "section_id"),
         Index("ix_student_enrollments_grade", "grade_id"),
-        Index("ix_student_enrollments_group", "class_group_id"),
         Index("ix_student_enrollments_student", "student_id"),
     )
 

@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import settings
 from app.models.academic_structure import AcademicYear, Grade, Section, StudentEnrollment
@@ -622,6 +622,7 @@ def get_section_roster(
 
     enrollments = db.execute(
         select(StudentEnrollment)
+        .options(joinedload(StudentEnrollment.student))
         .where(
             StudentEnrollment.section_id == section.id,
             StudentEnrollment.status == "ACTIVE",

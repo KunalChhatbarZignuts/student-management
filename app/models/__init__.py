@@ -16,10 +16,8 @@ from app.models.fee import (
 )
 from app.models.academic_structure import (
     AcademicYear,
-    ClassGroup,
     EnrollmentStatus,
     Grade,
-    GradeSubject,
     Period,
     Section,
     Shift,
@@ -67,7 +65,6 @@ __all__ = [
     "AuditLog",
     "CalendarSpecialWorkingDay",
     "Class",
-    "ClassGroup",
     "EnrollmentStatus",
     "FeeComponent",
     "FeeInstallment",
@@ -76,7 +73,6 @@ __all__ = [
     "FeeStructure",
     "FeeStructureItem",
     "Grade",
-    "GradeSubject",
     "HolidayAuditHistory",
     "HolidayCategory",
     "IdCounter",
