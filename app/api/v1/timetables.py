@@ -1,3 +1,4 @@
+import datetime as dt
 import uuid
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
@@ -140,6 +141,7 @@ def get_class_timetable(
     section_id: uuid.UUID = Query(...),
     academic_year_id: uuid.UUID | None = Query(None),
     include_draft: bool = Query(True),
+    date: dt.date | None = Query(None),
     db: Session = Depends(get_db),
 ):
     """Admin: retrieve draft or published timetable matrix for a grade section."""
@@ -147,6 +149,7 @@ def get_class_timetable(
         academic_year_id=academic_year_id,
         section_id=section_id,
         include_draft=include_draft,
+        target_date=date,
         db=db,
     )
 
@@ -232,11 +235,17 @@ def publish_timetable(
 )
 def get_my_teaching_timetable(
     academic_year_id: uuid.UUID | None = Query(None),
+    date: dt.date | None = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Teacher View 1: Personal timetable showing only the logged-in teacher's assigned periods."""
-    return timetable_service.get_teacher_personal_schedule(current_user.id, academic_year_id, db)
+    return timetable_service.get_teacher_personal_schedule(
+        current_user.id,
+        academic_year_id,
+        db,
+        target_date=date,
+    )
 
 
 @router.get(
@@ -246,11 +255,17 @@ def get_my_teaching_timetable(
 )
 def get_teacher_grade_timetable(
     section_id: uuid.UUID = Query(...),
+    date: dt.date | None = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Teacher View 2: Complete grade timetable with the teacher's assigned subjects/periods highlighted."""
-    return timetable_service.get_teacher_grade_timetable(current_user.id, section_id, db)
+    return timetable_service.get_teacher_grade_timetable(
+        current_user.id,
+        section_id,
+        db,
+        target_date=date,
+    )
 
 
 # ==========================================
@@ -263,8 +278,9 @@ def get_teacher_grade_timetable(
     dependencies=[Depends(student_only)],
 )
 def get_student_class_timetable(
+    date: dt.date | None = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Student Portal: view current published class timetable."""
-    return timetable_service.get_student_timetable(current_user.id, db)
+    return timetable_service.get_student_timetable(current_user.id, db, target_date=date)

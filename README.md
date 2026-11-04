@@ -1,6 +1,6 @@
 # Student Management System — Platform Architecture & Backend API
 
-Production-grade **FastAPI** backend for a comprehensive Student Management System featuring JWT authentication, role-based access control (RBAC), TOTP 2FA, academic calendar management, daily attendance roll-call, academic structure (grades/classes/sections), multi-step student admissions, parent-child linking, student fee invoicing, bulk CSV imports, audit logging, and durable workflow automations.
+Production-grade **FastAPI** backend for a comprehensive Student Management System featuring JWT authentication, role-based access control (RBAC), TOTP 2FA, academic calendar management, daily attendance roll-call, academic structure (grades/classes/sections), multi-step student admissions, parent-child linking, student fee invoicing, audit logging, and durable workflow automations.
 
 ---
 
@@ -32,7 +32,7 @@ Users can **never** self-select their role. Roles are assigned strictly by the s
 | Role | Created By | Capabilities |
 | :--- | :--- | :--- |
 | `SUPER_ADMIN` | Seed script only | System-wide configuration, create admins, seed data, view full audit logs |
-| `ADMIN` | Super Admin | Manage users, classes, sections, calendar, student admissions, fees, attendance overview, bulk CSV import |
+| `ADMIN` | Super Admin | Manage users, classes, sections, calendar, student admissions, fees, attendance overview |
 | `TEACHER` | Admin / Super Admin | Access assigned classes & sections, conduct daily roll-call attendance, report missing students |
 | `STUDENT` | Admin / Admissions | Access own learner record (`/students/me`), personal attendance stats, marks, fee invoices |
 | `PARENT` | Admin / Link Flow | Access linked children (`/parents/me/children`), view child attendance, grades, fee invoices |
@@ -94,7 +94,6 @@ student-management/
 │   │   ├── applications.py         # Public online applications & admin approval pipeline
 │   │   ├── fees.py                 # Fee structures, student invoices & payment logging
 │   │   ├── parents.py              # Parent creation, student linking, `/parents/me/children`
-│   │   ├── bulk_import.py          # CSV bulk user import with dry-run verification
 │   │   ├── audit_logs.py           # Operational audit trail querying
 │   │   ├── students.py             # `/students/me` personal profile and records
 │   │   ├── teachers.py             # Teacher profile & missing student incident reporting
@@ -106,8 +105,7 @@ student-management/
 │   │   ├── calendar_service.py     # Calendar calculations, working day validation, holiday rules
 │   │   ├── attendance_service.py   # Roll-call processing, daily summaries, presence percentage
 │   │   ├── admission_service.py    # Concurrency-safe student ID generator & admission handling
-│   │   ├── fee_service.py          # Invoice calculation & payment validation
-│   │   └── import_service.py       # CSV parsing, schema validation & batch creation
+│   │   └── fee_service.py          # Invoice calculation & payment validation
 │   └── tests/                      # Automated unit, integration, and security test suites
 ├── frontend/
 │   ├── admin-frontend/             # Admin & Teacher Portal (Next.js 14, MUI v6, DataGrid, Pickers)
@@ -162,11 +160,8 @@ student-management/
 - **Student Invoices:** Auto-generate term invoices with due dates, amounts, and payment tracking.
 - **Payment Records:** Log full or partial fee payments with receipts and outstanding balance calculation.
 
-### 8. Audit Logging & Bulk CSV Import
+### 8. Audit Logging
 - **Audit Logs (`/api/v1/audit-logs`):** Automatically logs administrative events with user ID, client IP, action type, and JSONB metadata.
-- **Bulk CSV Import (`/api/v1/admin/users/bulk-import`):** Two-phase import process:
-  1. `dry_run=true`: Validates CSV columns, data formats, and flags email duplicates without committing.
-  2. `dry_run=false`: Executes batch import, creates users, and dispatches single-use invite emails.
 
 ---
 

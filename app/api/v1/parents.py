@@ -1055,6 +1055,7 @@ def get_child_fees(
 @router.get("/parent/children/{student_id}/timetable")
 def get_child_timetable(
     student_id: uuid.UUID,
+    date: dt.date | None = Query(None),
     current_user: User = Depends(require_roles(UserRole.PARENT.value)),
     db: Session = Depends(get_db),
 ):
@@ -1065,7 +1066,12 @@ def get_child_timetable(
     # Attempt to return published school timetable
     try:
         from app.services import timetable_service
-        return timetable_service.get_child_timetable_for_parent(current_user.id, student.id, db)
+        return timetable_service.get_child_timetable_for_parent(
+            current_user.id,
+            student.id,
+            db,
+            target_date=date,
+        )
     except HTTPException as e:
         if e.status_code != status.HTTP_404_NOT_FOUND:
             raise e

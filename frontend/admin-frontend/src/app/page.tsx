@@ -260,22 +260,6 @@ export default function AdminDashboardPage() {
                 <Card sx={{ height: '100%' }}>
                   <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                     <Typography variant="subtitle1" fontWeight={700} gutterBottom>
-                      Bulk CSV Import
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1, mb: 2 }}>
-                      Upload bulk student and teacher CSVs with dry-run validation preview and error reporting.
-                    </Typography>
-                    <Button component={Link} href="/bulk-import" variant="outlined" endIcon={<ArrowForwardIcon />}>
-                      Bulk Import
-                    </Button>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              <Grid item xs={12} sm={6} md={4}>
-                <Card sx={{ height: '100%' }}>
-                  <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                    <Typography variant="subtitle1" fontWeight={700} gutterBottom>
                       Audit Trail
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1, mb: 2 }}>

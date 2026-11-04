@@ -24,12 +24,17 @@ import TableRow from '@mui/material/TableRow';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
 
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import SchoolIcon from '@mui/icons-material/School';
 import PersonIcon from '@mui/icons-material/Person';
 import StarIcon from '@mui/icons-material/Star';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import EventBusyIcon from '@mui/icons-material/EventBusy';
+import TodayIcon from '@mui/icons-material/Today';
+import ViewWeekIcon from '@mui/icons-material/ViewWeek';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 
 import { useQuery } from '@tanstack/react-query';
 import AppShell from '@/components/layout/AppShell';
@@ -50,6 +55,8 @@ const DAYS_OF_WEEK = [
 
 export default function TeacherTimetablePage() {
   const [viewMode, setViewMode] = React.useState<number>(0); // 0 = Personal, 1 = Grade-wise
+  const todayStr = React.useMemo(() => new Date().toISOString().split('T')[0], []);
+  const [selectedDate, setSelectedDate] = React.useState<string>(todayStr);
 
   // Grade-wise selector states
   const [selectedGradeId, setSelectedGradeId] = React.useState<string>('');
@@ -62,8 +69,8 @@ export default function TeacherTimetablePage() {
     error: personalError,
     refetch: refetchPersonal,
   } = useQuery({
-    queryKey: timetableKeys.teacherPersonal(),
-    queryFn: () => timetableApi.getTeacherPersonalSchedule(),
+    queryKey: timetableKeys.teacherPersonal(undefined, selectedDate || undefined),
+    queryFn: () => timetableApi.getTeacherPersonalSchedule(undefined, selectedDate || undefined),
   });
 
   // Grades for Grade-wise view
@@ -85,8 +92,8 @@ export default function TeacherTimetablePage() {
     error: gradeTimetableError,
     refetch: refetchGradeTimetable,
   } = useQuery({
-    queryKey: timetableKeys.teacherGrade(selectedSectionId),
-    queryFn: () => timetableApi.getTeacherGradeTimetable(selectedSectionId),
+    queryKey: timetableKeys.teacherGrade(selectedSectionId, selectedDate || undefined),
+    queryFn: () => timetableApi.getTeacherGradeTimetable(selectedSectionId, selectedDate || undefined),
     enabled: !!selectedSectionId && viewMode === 1,
   });
 
@@ -147,6 +154,64 @@ export default function TeacherTimetablePage() {
               Review your personal teaching schedule and explore full grade-wise timetables.
             </Typography>
           </Box>
+
+          {/* Calendar Date Bar */}
+          <Paper sx={{ p: 2, mb: 3, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+              <TextField
+                type="date"
+                label="Select Date Schedule"
+                size="small"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                sx={{ width: 190 }}
+              />
+              <Button
+                variant={selectedDate === todayStr ? 'contained' : 'outlined'}
+                size="small"
+                onClick={() => setSelectedDate(todayStr)}
+              >
+                Today
+              </Button>
+              <Button
+                variant={!selectedDate ? 'contained' : 'outlined'}
+                size="small"
+                onClick={() => setSelectedDate('')}
+              >
+                Entire Week
+              </Button>
+            </Box>
+
+            {(personalData?.date_status || gradeTimetable?.date_status) && selectedDate && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                {(() => {
+                  const ds = personalData?.date_status || gradeTimetable?.date_status;
+                  if (!ds) return null;
+                  return (
+                    <Chip
+                      label={
+                        ds.is_working_day
+                          ? (ds.day_type === 'special_working_day'
+                              ? 'Compensatory Special Working Day'
+                              : 'Regular School Day')
+                          : (ds.day_type === 'weekly_off'
+                              ? 'Weekly Off (Sunday)'
+                              : `Holiday: ${ds.holiday_name || 'School Holiday'}`)
+                      }
+                      color={
+                        ds.is_working_day
+                          ? (ds.day_type === 'special_working_day' ? 'success' : 'primary')
+                          : 'warning'
+                      }
+                      icon={ds.is_working_day ? <CheckCircleOutlineIcon /> : <EventBusyIcon />}
+                      sx={{ fontWeight: 600 }}
+                    />
+                  );
+                })()}
+              </Box>
+            )}
+          </Paper>
 
           {/* View Mode Tabs */}
           <Paper sx={{ mb: 3, borderRadius: 2 }}>
@@ -225,6 +290,35 @@ export default function TeacherTimetablePage() {
                 <Box sx={{ display: 'flex', justifyContent: 'center', p: 6 }}>
                   <CircularProgress />
                 </Box>
+              ) : selectedDate && personalData?.is_holiday ? (
+                <Paper
+                  sx={{
+                    p: 5,
+                    textAlign: 'center',
+                    borderRadius: 2,
+                    bgcolor: '#FFFDF0',
+                    border: '1px solid #FFE082',
+                    mb: 3,
+                  }}
+                >
+                  <EventBusyIcon sx={{ fontSize: 64, color: '#F57C00', mb: 2 }} />
+                  <Typography variant="h5" fontWeight={700} color="#E65100" gutterBottom>
+                    {personalData.date_status?.holiday_name ||
+                      (personalData.date_status?.day_type === 'weekly_off' ? 'Weekly Off (Sunday)' : 'School Holiday')}
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 620, mx: 'auto', mb: 2 }}>
+                    {personalData.date_status?.reason ||
+                      'No regular teaching sessions scheduled on this date.'}
+                  </Typography>
+                  {personalData.date_status?.holiday_category && (
+                    <Chip
+                      label={personalData.date_status.holiday_category}
+                      color="warning"
+                      size="medium"
+                      sx={{ fontWeight: 600 }}
+                    />
+                  )}
+                </Paper>
               ) : personalData?.slots?.length === 0 ? (
                 <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 2 }}>
                   <Typography variant="h6" color="text.secondary" gutterBottom>
@@ -392,6 +486,35 @@ export default function TeacherTimetablePage() {
                 <Box sx={{ display: 'flex', justifyContent: 'center', p: 6 }}>
                   <CircularProgress />
                 </Box>
+              ) : selectedDate && gradeTimetable?.is_holiday ? (
+                <Paper
+                  sx={{
+                    p: 5,
+                    textAlign: 'center',
+                    borderRadius: 2,
+                    bgcolor: '#FFFDF0',
+                    border: '1px solid #FFE082',
+                    mb: 3,
+                  }}
+                >
+                  <EventBusyIcon sx={{ fontSize: 64, color: '#F57C00', mb: 2 }} />
+                  <Typography variant="h5" fontWeight={700} color="#E65100" gutterBottom>
+                    {gradeTimetable.date_status?.holiday_name ||
+                      (gradeTimetable.date_status?.day_type === 'weekly_off' ? 'Weekly Off (Sunday)' : 'School Holiday')}
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 620, mx: 'auto', mb: 2 }}>
+                    {gradeTimetable.date_status?.reason ||
+                      'No regular classes scheduled for this grade on this date.'}
+                  </Typography>
+                  {gradeTimetable.date_status?.holiday_category && (
+                    <Chip
+                      label={gradeTimetable.date_status.holiday_category}
+                      color="warning"
+                      size="medium"
+                      sx={{ fontWeight: 600 }}
+                    />
+                  )}
+                </Paper>
               ) : !gradeTimetable ? (
                 <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 2 }}>
                   <Typography variant="body1" color="text.secondary">

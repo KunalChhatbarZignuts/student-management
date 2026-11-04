@@ -27,7 +27,6 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleIcon from '@mui/icons-material/People';
 import SchoolIcon from '@mui/icons-material/School';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import FamilyRestroomIcon from '@mui/icons-material/FamilyRestroom';
 import ClassIcon from '@mui/icons-material/Class';
@@ -103,12 +102,6 @@ const navItems: NavItem[] = [
     href: '/users',
     icon: <AdminPanelSettingsIcon />,
     roles: [ROLES.SUPER_ADMIN],
-  },
-  {
-    label: 'Bulk Import',
-    href: '/bulk-import',
-    icon: <UploadFileIcon />,
-    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
   },
   {
     label: 'Applications',

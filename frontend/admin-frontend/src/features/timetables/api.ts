@@ -13,9 +13,9 @@ import {
 export const timetableKeys = {
   shifts: ['shifts'] as const,
   shiftPeriods: (shiftId: string) => ['shifts', shiftId, 'periods'] as const,
-  classTimetable: (sectionId: string) => ['timetable', 'class', sectionId] as const,
-  teacherPersonal: (academicYearId?: string) => ['timetable', 'teacher-personal', academicYearId] as const,
-  teacherGrade: (sectionId: string) => ['timetable', 'teacher-grade', sectionId] as const,
+  classTimetable: (sectionId: string, date?: string) => ['timetable', 'class', sectionId, date] as const,
+  teacherPersonal: (academicYearId?: string, date?: string) => ['timetable', 'teacher-personal', academicYearId, date] as const,
+  teacherGrade: (sectionId: string, date?: string) => ['timetable', 'teacher-grade', sectionId, date] as const,
 };
 
 export const timetableApi = {
@@ -57,10 +57,18 @@ export const timetableApi = {
   },
 
   // Timetable Class Management
-  getClassTimetable: async (sectionId: string, academicYearId?: string): Promise<TimetableDetail | null> => {
+  getClassTimetable: async (
+    sectionId: string,
+    academicYearId?: string,
+    date?: string
+  ): Promise<TimetableDetail | null> => {
     try {
       const res = await apiClient.get<TimetableDetail>('/admin/timetables', {
-        params: { section_id: sectionId, ...(academicYearId ? { academic_year_id: academicYearId } : {}) },
+        params: {
+          section_id: sectionId,
+          ...(academicYearId ? { academic_year_id: academicYearId } : {}),
+          ...(date ? { date } : {}),
+        },
       });
       return res.data;
     } catch (err: any) {
@@ -90,16 +98,28 @@ export const timetableApi = {
   },
 
   // Teacher Endpoints
-  getTeacherPersonalSchedule: async (academicYearId?: string): Promise<TeacherPersonalSchedule> => {
+  getTeacherPersonalSchedule: async (
+    academicYearId?: string,
+    date?: string
+  ): Promise<TeacherPersonalSchedule> => {
     const res = await apiClient.get<TeacherPersonalSchedule>('/teacher/timetable/personal', {
-      params: academicYearId ? { academic_year_id: academicYearId } : {},
+      params: {
+        ...(academicYearId ? { academic_year_id: academicYearId } : {}),
+        ...(date ? { date } : {}),
+      },
     });
     return res.data;
   },
 
-  getTeacherGradeTimetable: async (sectionId: string): Promise<TimetableDetail> => {
+  getTeacherGradeTimetable: async (
+    sectionId: string,
+    date?: string
+  ): Promise<TimetableDetail> => {
     const res = await apiClient.get<TimetableDetail>('/teacher/timetable/grade-wise', {
-      params: { section_id: sectionId },
+      params: {
+        section_id: sectionId,
+        ...(date ? { date } : {}),
+      },
     });
     return res.data;
   },

@@ -3,6 +3,8 @@
 All notable changes to the Student Management System will be documented in this file.
 
 ## [Unreleased]
+- refactor(remove-bulk-import): completely removed Bulk CSV User Import feature from backend router, import service, frontend navigation, and dashboard.
+- feat(calendar-timetable-integration): integrated School Calendar working-day and holiday status with Timetable Management across backend and all four portals (Admin, Teacher, Student, Parent) with automatic holiday suppression and compensatory working day support.
 - feat(timetable-full-school-dummy-data): seeded clash-free published timetables across all 15 grades (Nursery through Grade 12) and 37 sections with dual shifts (Morning & Pre-Primary), complete faculty rotation, and robust student section resolution.
 - fix(timetable-shift-linking-and-timepickers): resolved major blocker by enabling shift-to-grade assignment, added MUI TimePicker to shift and period dialogs, resolved fee NaN amounts, fixed teacher RBAC grade lookups, and verified conflict-free publishing across all 4 roles.
 - feat(timetable-and-access-restrictions): implemented shift-based timetable configuration, period timings, clash validation, draft versioning & publishing, teacher dual-view schedule with assigned class highlights, student/parent timetable views, and restricted fee module from student access.

@@ -1,4 +1,3 @@
-import io
 import uuid
 from datetime import date, datetime
 
@@ -66,51 +65,6 @@ def test_2fa_setup_login_and_disable(client, db):
         headers={"Authorization": f"Bearer {new_token}"},
     )
     assert disable_res.status_code == 200
-
-
-def test_bulk_csv_import_dry_run_and_confirm(client, db):
-    admin = User(
-        email="bulk.admin@school.edu",
-        password_hash=hash_password("AdminPass#1234"),
-        role=UserRole.ADMIN.value,
-        status=UserStatus.ACTIVE.value,
-    )
-    db.add(admin)
-    db.commit()
-
-    token = create_access_token(admin.id, admin.role)
-    headers = {"Authorization": f"Bearer {token}"}
-
-    csv_data = """type,email,first_name,last_name,department,dob,class_name,section,admission_date,phone
-student,import.stu1@school.edu,Sam,Altman,CS,2006-01-01,11,A,2026-08-01,
-teacher,import.tea1@school.edu,Linus,Torvalds,Kernel,,,,,+1234567890
-student,invalid.stu@school.edu,,,,,,,,
-"""
-
-    # 1. Dry run
-    file_payload = {"file": ("students.csv", io.BytesIO(csv_data.encode("utf-8")), "text/csv")}
-    dry_resp = client.post("/api/v1/admin/users/bulk-import?dry_run=true", files=file_payload, headers=headers)
-    assert dry_resp.status_code == 200, dry_resp.text
-    dry_data = dry_resp.json()
-    assert dry_data["dry_run"] is True
-    assert dry_data["valid_rows"] == 2
-    assert dry_data["invalid_rows"] == 1
-
-    # Ensure no users were created in dry run
-    assert db.query(User).filter_by(email="import.stu1@school.edu").first() is None
-
-    # 2. Confirm import
-    file_payload2 = {"file": ("students.csv", io.BytesIO(csv_data.encode("utf-8")), "text/csv")}
-    confirm_resp = client.post("/api/v1/admin/users/bulk-import?dry_run=false", files=file_payload2, headers=headers)
-    assert confirm_resp.status_code == 200
-    confirm_data = confirm_resp.json()
-    assert confirm_data["dry_run"] is False
-    assert confirm_data["valid_rows"] == 2
-
-    # Verify user created in DB
-    created_stu = db.query(User).filter_by(email="import.stu1@school.edu").first()
-    assert created_stu is not None
-    assert created_stu.status == UserStatus.INVITED.value
 
 
 def test_parent_linking_and_ownership(client, db):

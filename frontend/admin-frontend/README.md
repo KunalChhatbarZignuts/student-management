@@ -8,8 +8,8 @@ The administrative web application for the Student Management System, serving **
 
 | Role | Permitted Pages & Capabilities |
 | :--- | :--- |
-| **SUPER_ADMIN** | Full access to all modules: Dashboard, User Accounts, School Calendar, Attendance, Admissions Wizard, Students, Teachers, Grades & Classes, Fees, Bulk Import, Applications, Parent Linking, and Audit Logs |
-| **ADMIN** | Dashboard, School Calendar, Attendance Overview, Admissions Wizard, Students, Teachers, Grades & Classes, Fees, Bulk Import, Applications, Parent Linking, Audit Logs |
+| **SUPER_ADMIN** | Full access to all modules: Dashboard, User Accounts, School Calendar, Attendance, Admissions Wizard, Students, Teachers, Grades & Classes, Fees, Applications, Parent Linking, and Audit Logs |
+| **ADMIN** | Dashboard, School Calendar, Attendance Overview, Admissions Wizard, Students, Teachers, Grades & Classes, Fees, Applications, Parent Linking, Audit Logs |
 | **TEACHER** | Dashboard, Daily Roll-Call Attendance, My Classes & Sections, Report Missing Student, Profile & Security Settings |
 | **STUDENT / PARENT** | **Blocked.** Displays *"You don't have access to this portal"* and initiates instant logout. |
 

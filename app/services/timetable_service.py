@@ -360,6 +360,8 @@ def update_period(shift_id: uuid.UUID, period_id: uuid.UUID, payload: PeriodUpda
 def _build_timetable_detail_response(
     tt: Timetable,
     current_teacher_id: uuid.UUID | None = None,
+    target_date: dt.date | None = None,
+    db: Session | None = None,
 ) -> TimetableDetailResponse:
     shift = tt.shift
     periods_resp = [
@@ -378,32 +380,58 @@ def _build_timetable_detail_response(
 
     working_days = [d.strip() for d in (shift.working_days or "Monday,Tuesday,Wednesday,Thursday,Friday").split(",") if d.strip()]
 
-    entries_resp = []
-    for e in tt.entries:
-        sub = e.subject
-        teacher = e.teacher
-        period = e.period
-        is_mine = bool(current_teacher_id and e.teacher_id == current_teacher_id)
+    date_status_resp = None
+    is_holiday = False
 
-        entries_resp.append(
-            TimetableSlotResponse(
-                id=e.id,
-                day_of_week=e.day_of_week,
-                period_id=e.period_id,
-                period_number=period.number if period else 0,
-                period_name=period.name if period else None,
-                start_time=format_time(period.start_time) if period else "",
-                end_time=format_time(period.end_time) if period else "",
-                is_break=period.is_break if period else False,
-                subject_id=e.subject_id,
-                subject_name=sub.name if sub else None,
-                subject_code=sub.code if sub else None,
-                teacher_id=e.teacher_id,
-                teacher_name=f"{teacher.first_name} {teacher.last_name}" if teacher else None,
-                room_number=e.room_number,
-                is_current_teacher=is_mine,
-            )
+    if target_date is not None and db is not None:
+        from app.services.calendar_service import check_date_working_status
+
+        date_status_resp = check_date_working_status(
+            target_date=target_date,
+            academic_year_id=tt.academic_year_id,
+            grade_id=tt.grade_id,
+            section_id=tt.section_id,
+            db=db,
         )
+        is_holiday = not date_status_resp.is_working_day
+
+    entries_resp = []
+    # If a specific date was queried and it IS a holiday or weekly off, suppress regular scheduled classes
+    if not (target_date is not None and is_holiday):
+        target_day_of_week = None
+        if target_date is not None:
+            iso_wd = target_date.isoweekday()  # 1=Monday, ..., 7=Sunday
+            # For special compensatory working day falling on Sunday, map to Monday's schedule (1)
+            target_day_of_week = 1 if iso_wd == 7 else iso_wd
+
+        for e in tt.entries:
+            if target_day_of_week is not None and e.day_of_week != target_day_of_week:
+                continue
+
+            sub = e.subject
+            teacher = e.teacher
+            period = e.period
+            is_mine = bool(current_teacher_id and e.teacher_id == current_teacher_id)
+
+            entries_resp.append(
+                TimetableSlotResponse(
+                    id=e.id,
+                    day_of_week=e.day_of_week,
+                    period_id=e.period_id,
+                    period_number=period.number if period else 0,
+                    period_name=period.name if period else None,
+                    start_time=format_time(period.start_time) if period else "",
+                    end_time=format_time(period.end_time) if period else "",
+                    is_break=period.is_break if period else False,
+                    subject_id=e.subject_id,
+                    subject_name=sub.name if sub else None,
+                    subject_code=sub.code if sub else None,
+                    teacher_id=e.teacher_id,
+                    teacher_name=f"{teacher.first_name} {teacher.last_name}" if teacher else None,
+                    room_number=e.room_number,
+                    is_current_teacher=is_mine,
+                )
+            )
 
     return TimetableDetailResponse(
         id=tt.id,
@@ -421,6 +449,9 @@ def _build_timetable_detail_response(
         working_days=working_days,
         periods=periods_resp,
         entries=entries_resp,
+        target_date=target_date,
+        date_status=date_status_resp,
+        is_holiday=is_holiday,
     )
 
 
@@ -430,6 +461,7 @@ def get_section_timetable(
     include_draft: bool,
     db: Session,
     current_teacher_id: uuid.UUID | None = None,
+    target_date: dt.date | None = None,
 ) -> TimetableDetailResponse | None:
     query = select(Timetable).where(Timetable.section_id == section_id)
     if academic_year_id:
@@ -441,7 +473,12 @@ def get_section_timetable(
     tt = db.execute(query).scalars().first()
     if not tt:
         return None
-    return _build_timetable_detail_response(tt, current_teacher_id=current_teacher_id)
+    return _build_timetable_detail_response(
+        tt,
+        current_teacher_id=current_teacher_id,
+        target_date=target_date,
+        db=db,
+    )
 
 
 def validate_timetable_clashes(
@@ -627,6 +664,7 @@ def get_teacher_personal_schedule(
     teacher_user_id: uuid.UUID,
     academic_year_id: uuid.UUID | None,
     db: Session,
+    target_date: dt.date | None = None,
 ) -> TeacherPersonalScheduleResponse:
     teacher = db.execute(select(Teacher).where(Teacher.user_id == teacher_user_id)).scalar_one_or_none()
     if not teacher:
@@ -642,7 +680,28 @@ def get_teacher_personal_schedule(
         ay = db.execute(select(AcademicYear).order_by(AcademicYear.start_date.desc())).scalars().first()
 
     slots_resp = []
-    if ay:
+    date_status_resp = None
+    is_holiday = False
+
+    if ay and target_date is not None:
+        from app.services.calendar_service import check_date_working_status
+
+        date_status_resp = check_date_working_status(
+            target_date=target_date,
+            academic_year_id=ay.id,
+            grade_id=None,
+            section_id=None,
+            db=db,
+        )
+        is_holiday = not date_status_resp.is_working_day
+
+    # If target_date is a holiday or weekly off, suppress regular slots
+    if not (target_date is not None and is_holiday) and ay:
+        target_day_of_week = None
+        if target_date is not None:
+            iso_wd = target_date.isoweekday()  # 1=Monday, ..., 7=Sunday
+            target_day_of_week = 1 if iso_wd == 7 else iso_wd
+
         entries = (
             db.execute(
                 select(TimetableEntry)
@@ -689,6 +748,9 @@ def get_teacher_personal_schedule(
                 )
 
         for e in entries:
+            if target_day_of_week is not None and e.day_of_week != target_day_of_week:
+                continue
+
             p = e.period
             sub = e.subject
             sec = e.timetable.section if e.timetable else None
@@ -714,6 +776,9 @@ def get_teacher_personal_schedule(
         teacher_name=f"{teacher.first_name} {teacher.last_name}",
         academic_year_name=ay.name if ay else "",
         slots=slots_resp,
+        target_date=target_date,
+        date_status=date_status_resp,
+        is_holiday=is_holiday,
     )
 
 
@@ -721,6 +786,7 @@ def get_teacher_grade_timetable(
     teacher_user_id: uuid.UUID,
     section_id: uuid.UUID,
     db: Session,
+    target_date: dt.date | None = None,
 ) -> TimetableDetailResponse:
     teacher = db.execute(select(Teacher).where(Teacher.user_id == teacher_user_id)).scalar_one_or_none()
     if not teacher:
@@ -746,11 +812,20 @@ def get_teacher_grade_timetable(
             detail=f"No published timetable found for section {section.name}",
         )
 
-    # Automatically highlight the requesting teacher's assigned periods
-    return _build_timetable_detail_response(tt, current_teacher_id=teacher.id)
+    # Automatically highlight the requesting teacher's assigned periods and apply date context
+    return _build_timetable_detail_response(
+        tt,
+        current_teacher_id=teacher.id,
+        target_date=target_date,
+        db=db,
+    )
 
 
-def get_student_timetable(student_user_id: uuid.UUID, db: Session) -> TimetableDetailResponse:
+def get_student_timetable(
+    student_user_id: uuid.UUID,
+    db: Session,
+    target_date: dt.date | None = None,
+) -> TimetableDetailResponse:
     student = db.execute(select(Student).where(Student.user_id == student_user_id)).scalar_one_or_none()
     if not student:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student profile not found")
@@ -800,13 +875,14 @@ def get_student_timetable(student_user_id: uuid.UUID, db: Session) -> TimetableD
             detail="Timetable has not been published for your class yet",
         )
 
-    return _build_timetable_detail_response(tt)
+    return _build_timetable_detail_response(tt, target_date=target_date, db=db)
 
 
 def get_child_timetable_for_parent(
     parent_user_id: uuid.UUID,
     child_student_id: uuid.UUID,
     db: Session,
+    target_date: dt.date | None = None,
 ) -> TimetableDetailResponse:
     parent = db.execute(select(Parent).where(Parent.user_id == parent_user_id)).scalar_one_or_none()
     if not parent:
@@ -829,5 +905,5 @@ def get_child_timetable_for_parent(
     if not student or not student.user_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student profile not found")
 
-    return get_student_timetable(student.user_id, db)
+    return get_student_timetable(student.user_id, db=db, target_date=target_date)
 

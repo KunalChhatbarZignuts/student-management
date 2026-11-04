@@ -15,7 +15,6 @@ from app.api.v1 import (
     applications,
     audit_logs,
     auth,
-    bulk_import,
     calendar,
     fees,
     parents,
@@ -61,7 +60,6 @@ app.include_router(admin_grades.router, prefix="/api/v1")
 app.include_router(admin_attendance.router, prefix="/api/v1")
 app.include_router(admin_sections.router, prefix="/api/v1")
 app.include_router(audit_logs.router, prefix="/api/v1")
-app.include_router(bulk_import.router, prefix="/api/v1")
 app.include_router(calendar.router, prefix="/api/v1")
 app.include_router(fees.router, prefix="/api/v1")
 app.include_router(parents.router, prefix="/api/v1")

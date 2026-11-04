@@ -885,43 +885,25 @@ export default function SchoolCalendarPage() {
               <CardContent>
                 <Typography variant="h6" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                   <Weekend color="primary" />
-                  Institutional Weekly Non-Working Days
+                  Standard Weekly Schedule
                 </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  Select days of the week when regular school attendance is not conducted.
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Standard institutional operational schedule for academic attendance and timetables.
                 </Typography>
 
-                <FormGroup sx={{ mb: 3 }}>
-                  {[
-                    { dayNum: 6, label: 'Sunday (Standard Weekly Off)' },
-                    { dayNum: 5, label: 'Saturday (Weekend Off)' },
-                    { dayNum: 4, label: 'Friday' },
-                    { dayNum: 0, label: 'Monday' },
-                  ].map((d) => {
-                    const isChecked = calendarSettings?.weekly_off_days.includes(d.dayNum);
-                    return (
-                      <FormControlLabel
-                        key={d.dayNum}
-                        control={
-                          <Checkbox
-                            checked={isChecked}
-                            onChange={(e) => {
-                              const cur = calendarSettings?.weekly_off_days || [6];
-                              const updated = e.target.checked
-                                ? [...cur, d.dayNum]
-                                : cur.filter((num) => num !== d.dayNum);
-                              updateSettingsMutation.mutate(updated);
-                            }}
-                          />
-                        }
-                        label={d.label}
-                      />
-                    );
-                  })}
-                </FormGroup>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
+                    <Typography variant="subtitle2" fontWeight={600}>Monday – Saturday</Typography>
+                    <Chip label="Regular Working Days" color="success" size="small" />
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
+                    <Typography variant="subtitle2" fontWeight={600}>Sunday</Typography>
+                    <Chip label="Standard Weekly Off" color="default" size="small" />
+                  </Box>
+                </Box>
 
                 <Alert severity="info">
-                  Weekly non-working days are automatically excluded from student attendance percentages and do not count toward total school working days.
+                  Monday through Saturday are official teaching days. Sunday is the default weekly holiday. Use Special Working Days (on the right) to designate specific Sundays or holidays as compensatory class days.
                 </Alert>
               </CardContent>
             </Card>

@@ -45,6 +45,8 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import DoneIcon from '@mui/icons-material/Done';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import LinkIcon from '@mui/icons-material/Link';
+import EventBusyIcon from '@mui/icons-material/EventBusy';
+import TodayIcon from '@mui/icons-material/Today';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AppShell from '@/components/layout/AppShell';
@@ -155,14 +157,16 @@ export default function AdminTimetablePage() {
     queryFn: timetableApi.listShifts,
   });
 
+  const [previewDate, setPreviewDate] = React.useState<string>('');
+
   // Fetch timetable for selected section
   const {
     data: timetableData,
     isLoading: loadingTimetable,
     refetch: refetchTimetable,
   } = useQuery({
-    queryKey: ['timetable', 'class', selectedSectionId, selectedAcademicYearId],
-    queryFn: () => timetableApi.getClassTimetable(selectedSectionId, selectedAcademicYearId),
+    queryKey: ['timetable', 'class', selectedSectionId, selectedAcademicYearId, previewDate || undefined],
+    queryFn: () => timetableApi.getClassTimetable(selectedSectionId, selectedAcademicYearId, previewDate || undefined),
     enabled: !!selectedSectionId,
   });
 
@@ -663,6 +667,56 @@ export default function AdminTimetablePage() {
                   ) : (
                     'All scheduled periods are conflict-free! No teacher double-bookings detected.'
                   )}
+                </Alert>
+              )}
+
+              {/* Calendar Date Status Check Bar */}
+              {selectedSectionId && (
+                <Paper sx={{ p: 1.5, mb: 2, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, bgcolor: 'action.hover' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <TodayIcon color="action" fontSize="small" />
+                    <Typography variant="body2" fontWeight={600}>Calendar Date Check:</Typography>
+                    <TextField
+                      type="date"
+                      size="small"
+                      value={previewDate}
+                      onChange={(e) => setPreviewDate(e.target.value)}
+                      sx={{ width: 170 }}
+                    />
+                    {previewDate && (
+                      <Button size="small" variant="text" onClick={() => setPreviewDate('')}>
+                        Clear
+                      </Button>
+                    )}
+                  </Box>
+
+                  {timetableData?.date_status && previewDate && (
+                    <Chip
+                      label={
+                        timetableData.date_status.is_working_day
+                          ? (timetableData.date_status.day_type === 'special_working_day'
+                              ? 'Compensatory Special Working Day'
+                              : 'Regular School Day')
+                          : (timetableData.date_status.day_type === 'weekly_off'
+                              ? 'Weekly Off (Sunday)'
+                              : `Holiday: ${timetableData.date_status.holiday_name || 'School Holiday'}`)
+                      }
+                      color={
+                        timetableData.date_status.is_working_day
+                          ? (timetableData.date_status.day_type === 'special_working_day' ? 'success' : 'primary')
+                          : 'warning'
+                      }
+                      icon={timetableData.date_status.is_working_day ? <CheckCircleOutlineIcon /> : <EventBusyIcon />}
+                      sx={{ fontWeight: 600 }}
+                      size="small"
+                    />
+                  )}
+                </Paper>
+              )}
+
+              {previewDate && timetableData?.is_holiday && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  <strong>Notice:</strong> The selected date ({previewDate}) is marked as a {timetableData.date_status?.day_type === 'weekly_off' ? 'Weekly Off (Sunday)' : 'School Holiday'} ({timetableData.date_status?.holiday_name || 'Holiday'}). Regular classes are automatically suspended on this date.
                 </Alert>
               )}
 

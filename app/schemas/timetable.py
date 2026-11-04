@@ -2,6 +2,8 @@ import datetime as dt
 import uuid
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.calendar import DateWorkingStatusResponse
+
 
 # ==========================================
 # Shift & Period Schemas
@@ -128,6 +130,9 @@ class TimetableDetailResponse(BaseModel):
     working_days: list[str] = []
     periods: list[PeriodResponse] = []
     entries: list[TimetableSlotResponse] = []
+    target_date: dt.date | None = None
+    date_status: DateWorkingStatusResponse | None = None
+    is_holiday: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -154,6 +159,9 @@ class TeacherPersonalScheduleResponse(BaseModel):
     teacher_name: str
     academic_year_name: str
     slots: list[TeacherPersonalScheduleItem] = []
+    target_date: dt.date | None = None
+    date_status: DateWorkingStatusResponse | None = None
+    is_holiday: bool = False
 
 
 class ClashValidationResult(BaseModel):

@@ -27,6 +27,16 @@ export interface TimetableSlot {
   is_current_teacher?: boolean;
 }
 
+export interface DateWorkingStatus {
+  date: string;
+  is_working_day: boolean;
+  day_type: 'working_day' | 'holiday' | 'weekly_off' | 'special_working_day';
+  reason?: string;
+  holiday_name?: string;
+  holiday_category?: string;
+  can_mark_attendance: boolean;
+}
+
 export interface TimetableDetail {
   id?: string;
   academic_year_id?: string;
@@ -43,6 +53,9 @@ export interface TimetableDetail {
   working_days?: string[];
   periods?: Period[];
   entries?: TimetableSlot[];
+  target_date?: string;
+  date_status?: DateWorkingStatus;
+  is_holiday?: boolean;
   // Legacy compatibility
   student_id?: string;
   student_name?: string;
