@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useMutation } from '@tanstack/react-query';
 
@@ -12,48 +11,7 @@ import Stepper from '@mui/material/Stepper';
 import Step from '@mui/material/Step';
 import StepLabel from '@mui/material/StepLabel';
 import Card from '@mui/material/Card';
-import Grid from '@mui/material/Grid';
-import TextField from '@mui/material/TextField';
-import MenuItem from '@mui/material/MenuItem';
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
-import Select from '@mui/material/Select';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
-import Switch from '@mui/material/Switch';
-import Radio from '@mui/material/Radio';
-import RadioGroup from '@mui/material/RadioGroup';
-import Divider from '@mui/material/Divider';
-import Alert from '@mui/material/Alert';
-import CircularProgress from '@mui/material/CircularProgress';
-import Chip from '@mui/material/Chip';
-import IconButton from '@mui/material/IconButton';
-import Tooltip from '@mui/material/Tooltip';
-import Paper from '@mui/material/Paper';
-import Autocomplete from '@mui/material/Autocomplete';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import AppDatePicker from '@/components/ui/AppDatePicker';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
-import InputAdornment from '@mui/material/InputAdornment';
-
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import KeyIcon from '@mui/icons-material/Key';
-import AutoRenewIcon from '@mui/icons-material/Autorenew';
-import PersonIcon from '@mui/icons-material/Person';
-import FamilyRestroomIcon from '@mui/icons-material/FamilyRestroom';
-import SchoolIcon from '@mui/icons-material/School';
-import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
-import LaunchIcon from '@mui/icons-material/Launch';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 
 import RequireRole from '@/components/guards/RequireRole';
 import AppShell from '@/components/layout/AppShell';
@@ -61,14 +19,25 @@ import { useSnackbar } from '@/components/ui/SnackbarProvider';
 import { formatErrorMessage } from '@/lib/errorMapper';
 import { ROLES } from '@/lib/constants';
 import { adminGradeApi } from '@/features/grades/api';
-import { adminParentApi, ParentWithChildren } from '@/features/parents/api';
+import { adminParentApi } from '@/features/parents/api';
 import { adminAdmissionApi } from '@/features/admissions/api';
 import { adminFeeApi, StudentFeeAdjustmentItem } from '@/features/fees/api';
 import {
   AdmissionCreateRequest,
   AdmissionResponse,
   AdmissionParentPayload,
+  ParentFormItem,
+  StudentFormData,
 } from '@/features/admissions/types';
+
+import {
+  StudentPersonalStep,
+  ParentGuardianStep,
+  AcademicPlacementStep,
+  FeeAdjustmentStep,
+  AccountSetupReviewStep,
+  AdmissionSuccessCard,
+} from '@/features/admissions/components';
 
 function generateSecurePassword(): string {
   const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -87,20 +56,6 @@ function generateSecurePassword(): string {
   return pwd;
 }
 
-interface ParentFormItem {
-  id: string;
-  isExisting: boolean;
-  existingParent: ParentWithChildren | null;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  address: string;
-  relationshipType: string;
-  isPrimaryGuardian: boolean;
-  password: string;
-}
-
 const STEPS = [
   'Student Personal Details',
   'Parent & Guardian Details',
@@ -110,13 +65,12 @@ const STEPS = [
 ];
 
 export default function StudentAdmissionWizardPage() {
-  const router = useRouter();
   const { showSnackbar } = useSnackbar();
 
   const [activeStep, setActiveStep] = React.useState<number>(0);
 
   // --- Step 0: Student Personal Details State ---
-  const [studentData, setStudentData] = React.useState({
+  const [studentData, setStudentData] = React.useState<StudentFormData>({
     firstName: '',
     middleName: '',
     lastName: '',
@@ -347,7 +301,10 @@ export default function StudentAdmissionWizardPage() {
     onSuccess: (data) => {
       setAdmissionResult(data);
       setActiveStep(STEPS.length); // step index 5 is the success screen
-      showSnackbar(`Admission successful! Enrollment No: ${data.student.enrollment_number}`, 'success');
+      showSnackbar(
+        `Admission successful! Enrollment No: ${data.student.enrollment_number}`,
+        'success'
+      );
     },
     onError: (err) => {
       showSnackbar(formatErrorMessage(err, 'Failed to complete admission'), 'error');
@@ -393,7 +350,10 @@ export default function StudentAdmissionWizardPage() {
 
       if (p.isExisting) {
         if (!p.existingParent) {
-          showSnackbar(`Parent #${i + 1}: Please select an existing parent from the search list`, 'error');
+          showSnackbar(
+            `Parent #${i + 1}: Please select an existing parent from the search list`,
+            'error'
+          );
           return false;
         }
       } else {
@@ -450,7 +410,10 @@ export default function StudentAdmissionWizardPage() {
       if (adj.calculation_type === 'percentage') {
         const rate = Number(adj.rate) || 0;
         if (rate <= 0 || rate > 100) {
-          showSnackbar(`Adjustment #${i + 1}: Percentage rate must be between 1% and 100%`, 'error');
+          showSnackbar(
+            `Adjustment #${i + 1}: Percentage rate must be between 1% and 100%`,
+            'error'
+          );
           return false;
         }
       } else {
@@ -587,16 +550,16 @@ export default function StudentAdmissionWizardPage() {
       fee_assignment:
         enableFeeAssignment && activeFeeStructure
           ? {
-              fee_structure_id: activeFeeStructure.id,
-              selected_component_ids: selectedComponentIds,
-              adjustments: adjustments.map((a) => ({
-                ...a,
-                description: a.description.trim(),
-                rate: a.calculation_type === 'percentage' ? Number(a.rate) : null,
-                amount: a.calculation_type === 'fixed' ? Number(a.amount) : 0,
-              })),
-              installment_frequency: installmentFrequency,
-            }
+            fee_structure_id: activeFeeStructure.id,
+            selected_component_ids: selectedComponentIds,
+            adjustments: adjustments.map((a) => ({
+              ...a,
+              description: a.description.trim(),
+              rate: a.calculation_type === 'percentage' ? Number(a.rate) : null,
+              amount: a.calculation_type === 'fixed' ? Number(a.amount) : 0,
+            })),
+            installment_frequency: installmentFrequency,
+          }
           : undefined,
     };
 
@@ -615,7 +578,9 @@ export default function StudentAdmissionWizardPage() {
 
     if (admissionResult.fee_assignment) {
       text += `--- Fee Assignment ---\n`;
-      text += `Payable Amount: ₹${Number(admissionResult.fee_assignment.final_payable_amount).toLocaleString()}\n`;
+      text += `Payable Amount: ₹${Number(
+        admissionResult.fee_assignment.final_payable_amount
+      ).toLocaleString()}\n`;
       text += `Installments: ${admissionResult.fee_assignment.installments.length} parts (${admissionResult.fee_assignment.installment_frequency})\n\n`;
     }
 
@@ -712,7 +677,8 @@ export default function StudentAdmissionWizardPage() {
               Student Admission Wizard
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              Complete student registration, parent relationships, academic placement, fee schedules, and portal credentials in one unified workflow.
+              Complete student registration, parent relationships, academic placement, fee
+              schedules, and portal credentials in one unified workflow.
             </Typography>
           </Box>
 
@@ -731,1265 +697,126 @@ export default function StudentAdmissionWizardPage() {
 
           {/* Step 0: Student Personal Details */}
           {activeStep === 0 && (
-            <Card sx={{ p: { xs: 2, sm: 3 } }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-                <PersonIcon color="primary" sx={{ fontSize: 28 }} />
-                <Typography variant="h6" fontWeight={700}>
-                  Step 1: Student Personal Information
-                </Typography>
-              </Box>
-
-              <Grid container spacing={2.5}>
-                <Grid item xs={12} sm={4}>
-                  <TextField
-                    label="First Name"
-                    required
-                    fullWidth
-                    value={studentData.firstName}
-                    onChange={(e) => setStudentData({ ...studentData, firstName: e.target.value })}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <TextField
-                    label="Middle Name"
-                    fullWidth
-                    value={studentData.middleName}
-                    onChange={(e) => setStudentData({ ...studentData, middleName: e.target.value })}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <TextField
-                    label="Last Name"
-                    required
-                    fullWidth
-                    value={studentData.lastName}
-                    onChange={(e) => setStudentData({ ...studentData, lastName: e.target.value })}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <AppDatePicker
-                    label="Date of Birth"
-                    required
-                    value={studentData.dob}
-                    onChange={(val) => setStudentData({ ...studentData, dob: val })}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth required>
-                    <InputLabel>Gender</InputLabel>
-                    <Select
-                      label="Gender"
-                      value={studentData.gender}
-                      onChange={(e) => setStudentData({ ...studentData, gender: e.target.value })}
-                    >
-                      <MenuItem value="Male">Male</MenuItem>
-                      <MenuItem value="Female">Female</MenuItem>
-                      <MenuItem value="Other">Other</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Student Email (Optional)"
-                    type="email"
-                    fullWidth
-                    placeholder="student@school.edu"
-                    helperText="If omitted, an institutional login identifier will be automatically generated."
-                    value={studentData.email}
-                    onChange={(e) => setStudentData({ ...studentData, email: e.target.value })}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Phone Number"
-                    fullWidth
-                    placeholder="+1 555-0100"
-                    value={studentData.phone}
-                    onChange={(e) => setStudentData({ ...studentData, phone: e.target.value })}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Alternate Phone"
-                    fullWidth
-                    value={studentData.alternatePhone}
-                    onChange={(e) => setStudentData({ ...studentData, alternatePhone: e.target.value })}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth>
-                    <InputLabel>Department / Stream</InputLabel>
-                    <Select
-                      label="Department / Stream"
-                      value={studentData.department || 'General'}
-                      onChange={(e) => setStudentData({ ...studentData, department: e.target.value })}
-                    >
-                      <MenuItem value="General">General</MenuItem>
-                      <MenuItem value="Science">Science</MenuItem>
-                      <MenuItem value="Commerce">Commerce</MenuItem>
-                      <MenuItem value="Arts">Arts</MenuItem>
-                      <MenuItem value="Humanities">Humanities</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-
-                <Grid item xs={12}>
-                  <Divider sx={{ my: 1 }}>
-                    <Chip label="Address & Location" size="small" />
-                  </Divider>
-                </Grid>
-
-                <Grid item xs={12}>
-                  <TextField
-                    label="Street Address"
-                    fullWidth
-                    value={studentData.address}
-                    onChange={(e) => setStudentData({ ...studentData, address: e.target.value })}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={3}>
-                  <TextField
-                    label="City"
-                    fullWidth
-                    value={studentData.city}
-                    onChange={(e) => setStudentData({ ...studentData, city: e.target.value })}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={3}>
-                  <TextField
-                    label="State / Province"
-                    fullWidth
-                    value={studentData.state}
-                    onChange={(e) => setStudentData({ ...studentData, state: e.target.value })}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={3}>
-                  <TextField
-                    label="Country"
-                    fullWidth
-                    value={studentData.country}
-                    onChange={(e) => setStudentData({ ...studentData, country: e.target.value })}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={3}>
-                  <TextField
-                    label="Postal Code"
-                    fullWidth
-                    value={studentData.postalCode}
-                    onChange={(e) => setStudentData({ ...studentData, postalCode: e.target.value })}
-                  />
-                </Grid>
-
-                <Grid item xs={12}>
-                  <Divider sx={{ my: 1 }}>
-                    <Chip label="Previous Academic Background" size="small" />
-                  </Divider>
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Previous School Name"
-                    fullWidth
-                    placeholder="e.g. St. Mary's Elementary"
-                    value={studentData.previousSchoolName}
-                    onChange={(e) => setStudentData({ ...studentData, previousSchoolName: e.target.value })}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Previous School Details / Remarks"
-                    fullWidth
-                    placeholder="Grades attended, transfer certificate info..."
-                    value={studentData.previousSchoolDetails}
-                    onChange={(e) => setStudentData({ ...studentData, previousSchoolDetails: e.target.value })}
-                  />
-                </Grid>
-              </Grid>
-
-              {/* Step Navigation */}
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
-                <Button variant="contained" size="large" onClick={handleNext} endIcon={<ArrowForwardIcon />}>
-                  Continue to Parent Details
-                </Button>
-              </Box>
-            </Card>
+            <StudentPersonalStep
+              studentData={studentData}
+              onUpdate={(updates) => setStudentData((prev) => ({ ...prev, ...updates }))}
+              onNext={handleNext}
+            />
           )}
 
           {/* Step 1: Parent & Guardian Details */}
           {activeStep === 1 && (
-            <Card sx={{ p: { xs: 2, sm: 3 } }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <FamilyRestroomIcon color="primary" sx={{ fontSize: 28 }} />
-                  <div>
-                    <Typography variant="h6" fontWeight={700}>
-                      Step 2: Parent & Guardian Details
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Link one or more parents/guardians. You can link existing parents or provision new accounts.
-                    </Typography>
-                  </div>
-                </Box>
-                <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddParent}>
-                  Add Another Parent / Guardian
-                </Button>
-              </Box>
-
-              {parents.map((p, index) => (
-                <Paper
-                  key={p.id}
-                  variant="outlined"
-                  sx={{
-                    p: 2.5,
-                    mb: 3,
-                    borderRadius: 2,
-                    borderColor: p.isPrimaryGuardian ? 'primary.main' : 'divider',
-                    borderWidth: p.isPrimaryGuardian ? 2 : 1,
-                    position: 'relative',
-                  }}
-                >
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="subtitle1" fontWeight={700}>
-                        Parent / Guardian #{index + 1}
-                      </Typography>
-                      {p.isPrimaryGuardian && <Chip label="Primary Guardian" color="primary" size="small" />}
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <FormControlLabel
-                        control={
-                          <Radio checked={p.isPrimaryGuardian} onChange={() => handleSetPrimaryGuardian(index)} />
-                        }
-                        label="Set as Primary"
-                      />
-                      {parents.length > 1 && (
-                        <IconButton color="error" size="small" onClick={() => handleRemoveParent(index)}>
-                          <DeleteOutlineIcon />
-                        </IconButton>
-                      )}
-                    </Box>
-                  </Box>
-
-                  <RadioGroup
-                    row
-                    value={p.isExisting ? 'existing' : 'new'}
-                    onChange={(e) => handleUpdateParent(index, { isExisting: e.target.value === 'existing' })}
-                    sx={{ mb: 2 }}
-                  >
-                    <FormControlLabel value="new" control={<Radio />} label="Create New Parent Account" />
-                    <FormControlLabel value="existing" control={<Radio />} label="Select Existing Parent" />
-                  </RadioGroup>
-
-                  {p.isExisting ? (
-                    <Box sx={{ mb: 2 }}>
-                      <Autocomplete
-                        options={searchParentsResult?.items || []}
-                        getOptionLabel={(option) => `${option.first_name} ${option.last_name} (${option.email})`}
-                        value={p.existingParent}
-                        loading={searchingParents}
-                        onInputChange={(_, value) => setParentSearchQuery(value)}
-                        onChange={(_, value) => handleUpdateParent(index, { existingParent: value })}
-                        renderInput={(params) => (
-                          <TextField
-                            {...params}
-                            label="Search Parent by Name, Email, or Phone"
-                            placeholder="Type at least 2 characters..."
-                            helperText="Search will list registered parent accounts across the system."
-                            InputProps={{
-                              ...params.InputProps,
-                              endAdornment: (
-                                <>
-                                  {searchingParents ? <CircularProgress color="inherit" size={20} /> : null}
-                                  {params.InputProps.endAdornment}
-                                </>
-                              ),
-                            }}
-                          />
-                        )}
-                      />
-
-                      {p.existingParent && (
-                        <Alert severity="success" sx={{ mt: 1.5 }}>
-                          Selected: <strong>{p.existingParent.first_name} {p.existingParent.last_name}</strong> ({p.existingParent.email}) — Phone: {p.existingParent.phone || 'N/A'} — Status: {p.existingParent.user_status}
-                        </Alert>
-                      )}
-                    </Box>
-                  ) : (
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          label="First Name"
-                          required
-                          fullWidth
-                          value={p.firstName}
-                          onChange={(e) => handleUpdateParent(index, { firstName: e.target.value })}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          label="Last Name"
-                          required
-                          fullWidth
-                          value={p.lastName}
-                          onChange={(e) => handleUpdateParent(index, { lastName: e.target.value })}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          label="Email Address"
-                          type="email"
-                          required
-                          fullWidth
-                          placeholder="parent@example.com"
-                          value={p.email}
-                          onChange={(e) => handleUpdateParent(index, { email: e.target.value })}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          label="Phone Number"
-                          fullWidth
-                          placeholder="+1 555-0199"
-                          value={p.phone}
-                          onChange={(e) => handleUpdateParent(index, { phone: e.target.value })}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          label="Residential Address"
-                          fullWidth
-                          value={p.address}
-                          onChange={(e) => handleUpdateParent(index, { address: e.target.value })}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          <TextField
-                            label="Initial Portal Password"
-                            fullWidth
-                            value={p.password}
-                            onChange={(e) => handleUpdateParent(index, { password: e.target.value })}
-                          />
-                          <Tooltip title="Generate secure password">
-                            <IconButton
-                              color="primary"
-                              onClick={() => handleUpdateParent(index, { password: generateSecurePassword() })}
-                              sx={{ alignSelf: 'center', border: 1, borderColor: 'divider' }}
-                            >
-                              <AutoRenewIcon />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      </Grid>
-                    </Grid>
-                  )}
-
-                  <Grid container spacing={2} sx={{ mt: 1 }}>
-                    <Grid item xs={12} sm={6}>
-                      <FormControl fullWidth required>
-                        <InputLabel>Relationship Type</InputLabel>
-                        <Select
-                          label="Relationship Type"
-                          value={p.relationshipType}
-                          onChange={(e) => handleUpdateParent(index, { relationshipType: e.target.value })}
-                        >
-                          <MenuItem value="Father">Father</MenuItem>
-                          <MenuItem value="Mother">Mother</MenuItem>
-                          <MenuItem value="Guardian">Guardian</MenuItem>
-                          <MenuItem value="Other">Other</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                  </Grid>
-                </Paper>
-              ))}
-
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-                <Button variant="outlined" onClick={handleBack} startIcon={<ArrowBackIcon />}>
-                  Back
-                </Button>
-                <Button variant="contained" size="large" onClick={handleNext} endIcon={<ArrowForwardIcon />}>
-                  Continue to Academic Assignment
-                </Button>
-              </Box>
-            </Card>
+            <ParentGuardianStep
+              parents={parents}
+              onAddParent={handleAddParent}
+              onRemoveParent={handleRemoveParent}
+              onUpdateParent={handleUpdateParent}
+              onSetPrimaryGuardian={handleSetPrimaryGuardian}
+              parentSearchQuery={parentSearchQuery}
+              onSearchQueryChange={setParentSearchQuery}
+              searchParentsResult={searchParentsResult}
+              searchingParents={searchingParents}
+              onNext={handleNext}
+              onBack={handleBack}
+              generatePassword={generateSecurePassword}
+            />
           )}
 
           {/* Step 2: Academic Details & Teacher Assignment */}
           {activeStep === 2 && (
-            <Card sx={{ p: { xs: 2, sm: 3 } }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-                <SchoolIcon color="primary" sx={{ fontSize: 28 }} />
-                <div>
-                  <Typography variant="h6" fontWeight={700}>
-                    Step 3: Academic Placement & Class Teacher
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Select the academic session, grade, and section.
-                  </Typography>
-                </div>
-              </Box>
-
-              <Grid container spacing={3}>
-                <Grid item xs={12} sm={4}>
-                  <FormControl fullWidth required>
-                    <InputLabel>Academic Year</InputLabel>
-                    <Select
-                      label="Academic Year"
-                      value={selectedAcademicYearId}
-                      onChange={(e) => {
-                        setSelectedAcademicYearId(e.target.value);
-                        setSelectedGradeId('');
-                        setSelectedSectionId('');
-                      }}
-                    >
-                      {academicYears.map((ay) => (
-                        <MenuItem key={ay.id} value={ay.id}>
-                          {ay.name} {ay.is_current ? ' (Current Active)' : ''}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-
-                <Grid item xs={12} sm={4}>
-                  <FormControl fullWidth required disabled={!selectedAcademicYearId || loadingGrades}>
-                    <InputLabel>Grade / Level</InputLabel>
-                    <Select
-                      label="Grade / Level"
-                      value={selectedGradeId}
-                      onChange={(e) => {
-                        setSelectedGradeId(e.target.value);
-                        setSelectedSectionId('');
-                      }}
-                    >
-                      {grades.map((g) => (
-                        <MenuItem key={g.id} value={g.id}>
-                          {g.name} (Level {g.level})
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-
-                <Grid item xs={12} sm={4}>
-                  <FormControl fullWidth required disabled={!selectedGradeId || loadingSections}>
-                    <InputLabel>Section</InputLabel>
-                    <Select
-                      label="Section"
-                      value={selectedSectionId}
-                      onChange={(e) => setSelectedSectionId(e.target.value)}
-                    >
-                      {sections.map((s) => (
-                        <MenuItem key={s.id} value={s.id}>
-                          Section {s.name} ({s.total_students ?? 0} / {s.class_capacity ?? 'unlimited'} enrolled)
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <AppDatePicker
-                    label="Official Admission Date"
-                    required
-                    value={admissionDate}
-                    onChange={(val) => setAdmissionDate(val)}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Admission Notes / Remarks"
-                    fullWidth
-                    placeholder="e.g. Merit scholar, sibling discount..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
-                </Grid>
-
-                {selectedSectionId && (
-                  <Grid item xs={12}>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sm={6}>
-                        <Paper variant="outlined" sx={{ p: 2, height: '100%', borderRadius: 2 }}>
-                          <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" gutterBottom>
-                            SECTION CLASS TEACHER
-                          </Typography>
-                          {loadingSectionTeacher ? (
-                            <CircularProgress size={24} />
-                          ) : sectionTeacher && sectionTeacher.teacher_name ? (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                              <CheckCircleIcon color="success" />
-                              <Box>
-                                <Typography variant="subtitle2" fontWeight={700}>
-                                  {sectionTeacher.teacher_name}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  Emp Code: {sectionTeacher.employee_code || 'N/A'} • Assigned Role: {sectionTeacher.assignment_type}
-                                </Typography>
-                              </Box>
-                            </Box>
-                          ) : (
-                            <Alert severity="warning" sx={{ py: 0.5 }}>
-                              No active class teacher assigned to Section {selectedSection?.name}.
-                            </Alert>
-                          )}
-                        </Paper>
-                      </Grid>
-
-                      <Grid item xs={12} sm={6}>
-                        <Paper variant="outlined" sx={{ p: 2, height: '100%', borderRadius: 2 }}>
-                          <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" gutterBottom>
-                            GRADE COORDINATOR
-                          </Typography>
-                          {selectedGrade?.coordinator_name ? (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                              <CheckCircleIcon color="primary" />
-                              <Box>
-                                <Typography variant="subtitle2" fontWeight={700}>
-                                  {selectedGrade.coordinator_name}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  Coordinator for Grade {selectedGrade.name}
-                                </Typography>
-                              </Box>
-                            </Box>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">
-                              No coordinator currently configured for this grade level.
-                            </Typography>
-                          )}
-                        </Paper>
-                      </Grid>
-                    </Grid>
-                  </Grid>
-                )}
-              </Grid>
-
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-                <Button variant="outlined" onClick={handleBack} startIcon={<ArrowBackIcon />}>
-                  Back
-                </Button>
-                <Button variant="contained" size="large" onClick={handleNext} endIcon={<ArrowForwardIcon />}>
-                  Continue to Fee Configuration
-                </Button>
-              </Box>
-            </Card>
+            <AcademicPlacementStep
+              academicYears={academicYears}
+              selectedAcademicYearId={selectedAcademicYearId}
+              onAcademicYearChange={(val) => {
+                setSelectedAcademicYearId(val);
+                setSelectedGradeId('');
+                setSelectedSectionId('');
+              }}
+              grades={grades}
+              selectedGradeId={selectedGradeId}
+              onGradeChange={(val) => {
+                setSelectedGradeId(val);
+                setSelectedSectionId('');
+              }}
+              loadingGrades={loadingGrades}
+              sections={sections}
+              selectedSectionId={selectedSectionId}
+              onSectionChange={setSelectedSectionId}
+              loadingSections={loadingSections}
+              admissionDate={admissionDate}
+              onAdmissionDateChange={setAdmissionDate}
+              notes={notes}
+              onNotesChange={setNotes}
+              sectionTeacher={sectionTeacher}
+              loadingSectionTeacher={loadingSectionTeacher}
+              selectedGrade={selectedGrade}
+              selectedSection={selectedSection}
+              onNext={handleNext}
+              onBack={handleBack}
+            />
           )}
 
-          {/* Step 3: Fee Configuration & Adjustments (NEW) */}
+          {/* Step 3: Fee Configuration & Adjustments */}
           {activeStep === 3 && (
-            <Card sx={{ p: { xs: 2, sm: 3 } }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <AccountBalanceWalletIcon color="primary" sx={{ fontSize: 28 }} />
-                  <div>
-                    <Typography variant="h6" fontWeight={700}>
-                      Step 4: Grade Fee Configuration & Adjustments
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Grade-level fee plan automatically resolved. Configure optional fees, scholarships, and installment schedules.
-                    </Typography>
-                  </div>
-                </Box>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={enableFeeAssignment}
-                      onChange={(e) => setEnableFeeAssignment(e.target.checked)}
-                      color="primary"
-                    />
-                  }
-                  label={enableFeeAssignment ? 'Fee Assignment Active' : 'Skip Fee Assignment'}
-                />
-              </Box>
-
-              {loadingFeeStructure ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                  <CircularProgress />
-                </Box>
-              ) : !activeFeeStructure ? (
-                <Alert severity="warning" sx={{ mb: 3 }}>
-                  No active fee structure is currently configured for <strong>{selectedGrade?.name || 'Selected Grade'}</strong> in this academic year. You can still complete admission without a fee schedule, or configure a fee plan under <strong>Fee Management</strong>.
-                </Alert>
-              ) : (
-                enableFeeAssignment && (
-                  <Box>
-                    {/* Structure Details Card */}
-                    <Paper variant="outlined" sx={{ p: 2, mb: 3, bgcolor: 'action.hover' }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                        <Box>
-                          <Typography variant="subtitle1" fontWeight={700}>
-                            {activeFeeStructure.name}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Applicable for: Grade {selectedGrade?.name} • Session: {activeFeeStructure.academic_year_name}
-                          </Typography>
-                        </Box>
-                        <Chip label="Grade-Wise Plan Active" color="success" size="small" />
-                      </Box>
-                    </Paper>
-
-                    {/* Components Selection Table */}
-                    <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-                      Fee Components & Optional Add-ons
-                    </Typography>
-                    <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
-                      <Table size="small">
-                        <TableHead sx={{ bgcolor: 'action.hover' }}>
-                          <TableRow>
-                            <TableCell padding="checkbox">Include</TableCell>
-                            <TableCell>Component</TableCell>
-                            <TableCell>Frequency</TableCell>
-                            <TableCell>Nature</TableCell>
-                            <TableCell align="right">Amount</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {activeFeeStructure.items.map((it) => {
-                            const isMandatory = it.is_mandatory;
-                            const isChecked = isMandatory || selectedComponentIds.includes(it.fee_component_id);
-                            return (
-                              <TableRow key={it.id} hover>
-                                <TableCell padding="checkbox">
-                                  <Checkbox
-                                    checked={isChecked}
-                                    disabled={isMandatory}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setSelectedComponentIds([...selectedComponentIds, it.fee_component_id]);
-                                      } else {
-                                        setSelectedComponentIds(
-                                          selectedComponentIds.filter((id) => id !== it.fee_component_id)
-                                        );
-                                      }
-                                    }}
-                                  />
-                                </TableCell>
-                                <TableCell sx={{ fontWeight: 600 }}>{it.component_name || 'Component'}</TableCell>
-                                <TableCell sx={{ textTransform: 'capitalize' }}>{it.payment_frequency}</TableCell>
-                                <TableCell>
-                                  {isMandatory ? (
-                                    <Chip label="Mandatory" size="small" color="primary" variant="outlined" />
-                                  ) : (
-                                    <Chip label="Optional Add-on" size="small" variant="outlined" />
-                                  )}
-                                </TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 700 }}>
-                                  ₹{Number(it.amount).toLocaleString()}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-
-                    {/* Individual Student Fee Adjustments */}
-                    <Box sx={{ mb: 3 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                        <div>
-                          <Typography variant="subtitle2" fontWeight={700}>
-                            Individual Student Fee Adjustments
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Apply scholarships, sibling discounts, or custom additional charges.
-                          </Typography>
-                        </div>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<AddIcon />}
-                          onClick={handleAddAdjustment}
-                        >
-                          Add Adjustment
-                        </Button>
-                      </Box>
-
-                      {adjustments.length === 0 ? (
-                        <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>
-                          <Typography variant="body2">No individual adjustments applied for this student.</Typography>
-                        </Paper>
-                      ) : (
-                        adjustments.map((adj, idx) => (
-                          <Paper key={idx} variant="outlined" sx={{ p: 2, mb: 1.5, borderRadius: 2 }}>
-                            <Grid container spacing={2} alignItems="center">
-                              <Grid item xs={12} sm={3}>
-                                <FormControl fullWidth size="small">
-                                  <InputLabel>Adjustment Type</InputLabel>
-                                  <Select
-                                    label="Adjustment Type"
-                                    value={adj.adjustment_type}
-                                    onChange={(e) =>
-                                      handleUpdateAdjustment(idx, { adjustment_type: e.target.value })
-                                    }
-                                  >
-                                    <MenuItem value="DISCOUNT_FIXED">Discount (Fixed ₹)</MenuItem>
-                                    <MenuItem value="DISCOUNT_PERCENTAGE">Discount (Percentage %)</MenuItem>
-                                    <MenuItem value="CONCESSION_SCHOLARSHIP">Scholarship Concession</MenuItem>
-                                    <MenuItem value="CONCESSION_FINANCIAL">Financial Concession</MenuItem>
-                                    <MenuItem value="CONCESSION_SPECIAL">Special Institutional Concession</MenuItem>
-                                    <MenuItem value="ADDITIONAL_CHARGE">Additional Charge</MenuItem>
-                                  </Select>
-                                </FormControl>
-                              </Grid>
-
-                              <Grid item xs={12} sm={2}>
-                                {adj.calculation_type === 'percentage' || adj.adjustment_type === 'DISCOUNT_PERCENTAGE' ? (
-                                  <TextField
-                                    label="Rate (%)"
-                                    type="number"
-                                    size="small"
-                                    fullWidth
-                                    value={adj.rate ?? ''}
-                                    onChange={(e) =>
-                                      handleUpdateAdjustment(idx, {
-                                        calculation_type: 'percentage',
-                                        rate: parseFloat(e.target.value) || 0,
-                                      })
-                                    }
-                                    InputProps={{
-                                      endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                                    }}
-                                  />
-                                ) : (
-                                  <TextField
-                                    label="Amount (₹)"
-                                    type="number"
-                                    size="small"
-                                    fullWidth
-                                    value={adj.amount}
-                                    onChange={(e) =>
-                                      handleUpdateAdjustment(idx, {
-                                        calculation_type: 'fixed',
-                                        amount: parseFloat(e.target.value) || 0,
-                                      })
-                                    }
-                                    InputProps={{
-                                      startAdornment: <InputAdornment position="start">₹</InputAdornment>,
-                                    }}
-                                  />
-                                )}
-                              </Grid>
-
-                              <Grid item xs={12} sm={6}>
-                                <TextField
-                                  label="Reason / Description (Mandatory)"
-                                  required
-                                  size="small"
-                                  fullWidth
-                                  placeholder="e.g. Merit scholarship 10%, sibling discount..."
-                                  value={adj.description}
-                                  onChange={(e) => handleUpdateAdjustment(idx, { description: e.target.value })}
-                                />
-                              </Grid>
-
-                              <Grid item xs={12} sm={1} sx={{ textAlign: 'center' }}>
-                                <IconButton color="error" size="small" onClick={() => handleRemoveAdjustment(idx)}>
-                                  <DeleteOutlineIcon fontSize="small" />
-                                </IconButton>
-                              </Grid>
-                            </Grid>
-                          </Paper>
-                        ))
-                      )}
-                    </Box>
-
-                    {/* Payment Installment Frequency & Financial Summary */}
-                    <Grid container spacing={2.5}>
-                      <Grid item xs={12} md={5}>
-                        <Paper variant="outlined" sx={{ p: 2, height: '100%', borderRadius: 2 }}>
-                          <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-                            Installment Schedule Configuration
-                          </Typography>
-                          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-                            <InputLabel>Payment Frequency</InputLabel>
-                            <Select
-                              label="Payment Frequency"
-                              value={installmentFrequency}
-                              onChange={(e) => setInstallmentFrequency(e.target.value)}
-                            >
-                              <MenuItem value="annual">Annually (1 payment)</MenuItem>
-                              <MenuItem value="half_yearly">Half-Yearly (2 installments)</MenuItem>
-                              <MenuItem value="quarterly">Quarterly (4 installments)</MenuItem>
-                              <MenuItem value="monthly">Monthly (10 installments)</MenuItem>
-                              <MenuItem value="one_time">One-time at Admission</MenuItem>
-                            </Select>
-                          </FormControl>
-
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            Installments will reconcile to the final payable amount. Due dates are spaced automatically across the academic session.
-                          </Typography>
-                        </Paper>
-                      </Grid>
-
-                      <Grid item xs={12} md={7}>
-                        <Paper variant="outlined" sx={{ p: 2, height: '100%', borderRadius: 2, bgcolor: 'background.paper' }}>
-                          <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-                            Payable Fee Calculation
-                          </Typography>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                            <Typography variant="body2" color="text.secondary">Configured Base Fee:</Typography>
-                            <Typography variant="body2" fontWeight={600}>₹{computedFees.base.toLocaleString()}</Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, color: 'success.main' }}>
-                            <Typography variant="body2">Discounts & Concessions:</Typography>
-                            <Typography variant="body2" fontWeight={600}>-₹{computedFees.discounts.toLocaleString()}</Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, color: 'error.main' }}>
-                            <Typography variant="body2">Additional Charges:</Typography>
-                            <Typography variant="body2" fontWeight={600}>+₹{computedFees.additional.toLocaleString()}</Typography>
-                          </Box>
-                          <Divider sx={{ my: 1 }} />
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography variant="subtitle1" fontWeight={700}>Final Payable Amount:</Typography>
-                            <Typography variant="h5" fontWeight={700} color="primary.main">
-                              ₹{computedFees.final.toLocaleString()}
-                            </Typography>
-                          </Box>
-                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                            Split into {computedFees.installments.length} installment(s)
-                          </Typography>
-                        </Paper>
-                      </Grid>
-                    </Grid>
-                  </Box>
-                )
-              )}
-
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-                <Button variant="outlined" onClick={handleBack} startIcon={<ArrowBackIcon />}>
-                  Back
-                </Button>
-                <Button variant="contained" size="large" onClick={handleNext} endIcon={<ArrowForwardIcon />}>
-                  Continue to Final Review
-                </Button>
-              </Box>
-            </Card>
+            <FeeAdjustmentStep
+              enableFeeAssignment={enableFeeAssignment}
+              onToggleEnableFeeAssignment={setEnableFeeAssignment}
+              loadingFeeStructure={loadingFeeStructure}
+              activeFeeStructure={activeFeeStructure}
+              selectedGrade={selectedGrade}
+              selectedComponentIds={selectedComponentIds}
+              onToggleComponentId={(componentId, checked) => {
+                if (checked) {
+                  setSelectedComponentIds([...selectedComponentIds, componentId]);
+                } else {
+                  setSelectedComponentIds(
+                    selectedComponentIds.filter((id) => id !== componentId)
+                  );
+                }
+              }}
+              adjustments={adjustments}
+              onAddAdjustment={handleAddAdjustment}
+              onRemoveAdjustment={handleRemoveAdjustment}
+              onUpdateAdjustment={handleUpdateAdjustment}
+              installmentFrequency={installmentFrequency}
+              onInstallmentFrequencyChange={setInstallmentFrequency}
+              computedFees={computedFees}
+              onNext={handleNext}
+              onBack={handleBack}
+            />
           )}
 
           {/* Step 4: Account Setup & Final Review */}
           {activeStep === 4 && (
-            <Card sx={{ p: { xs: 2, sm: 3 } }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-                <VerifiedUserIcon color="primary" sx={{ fontSize: 28 }} />
-                <div>
-                  <Typography variant="h6" fontWeight={700}>
-                    Step 5: Account Configuration & Final Review
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Review all admission details before committing. The backend will atomically create the student record, parent links, fee schedule, and portal credentials.
-                  </Typography>
-                </div>
-              </Box>
-
-              {/* Student Portal Account Configuration */}
-              <Paper variant="outlined" sx={{ p: 2.5, mb: 3, borderRadius: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Box>
-                    <Typography variant="subtitle1" fontWeight={700}>
-                      Student Portal Account Provisioning
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Enable portal login access for the student. Students log in using their unique Enrollment Number (e.g. STU-2026-00001) or email.
-                    </Typography>
-                  </Box>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={createStudentAccount}
-                        onChange={(e) => setCreateStudentAccount(e.target.checked)}
-                        color="primary"
-                      />
-                    }
-                    label={createStudentAccount ? 'Account Enabled' : 'Disabled'}
-                  />
-                </Box>
-
-                {createStudentAccount && (
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <TextField
-                          label="Initial Student Password"
-                          fullWidth
-                          value={studentPassword}
-                          onChange={(e) => setStudentPassword(e.target.value)}
-                        />
-                        <Tooltip title="Generate secure password">
-                          <IconButton
-                            color="primary"
-                            onClick={() => setStudentPassword(generateSecurePassword())}
-                            sx={{ alignSelf: 'center', border: 1, borderColor: 'divider' }}
-                          >
-                            <AutoRenewIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </Grid>
-                  </Grid>
-                )}
-              </Paper>
-
-              {/* Review Summaries */}
-              <Grid container spacing={2.5}>
-                {/* Student Review */}
-                <Grid item xs={12} md={6}>
-                  <Paper variant="outlined" sx={{ p: 2, height: '100%', borderRadius: 2 }}>
-                    <Typography variant="subtitle2" color="primary" fontWeight={700} gutterBottom>
-                      STUDENT DETAILS
-                    </Typography>
-                    <Typography variant="body1" fontWeight={600}>
-                      {studentData.firstName} {studentData.middleName ? `${studentData.middleName} ` : ''}{studentData.lastName}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      DOB: {studentData.dob} • Gender: {studentData.gender}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Email: {studentData.email || 'Auto-generated on submission'}
-                    </Typography>
-                    {studentData.phone && (
-                      <Typography variant="body2" color="text.secondary">
-                        Phone: {studentData.phone}
-                      </Typography>
-                    )}
-                  </Paper>
-                </Grid>
-
-                {/* Academic Placement Review */}
-                <Grid item xs={12} md={6}>
-                  <Paper variant="outlined" sx={{ p: 2, height: '100%', borderRadius: 2 }}>
-                    <Typography variant="subtitle2" color="primary" fontWeight={700} gutterBottom>
-                      ACADEMIC PLACEMENT
-                    </Typography>
-                    <Typography variant="body1" fontWeight={600}>
-                      Grade: {selectedGrade?.name} — Section: {selectedSection?.name}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Admission Date: {admissionDate}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Class Teacher: {sectionTeacher?.teacher_name || 'None currently assigned'}
-                    </Typography>
-                  </Paper>
-                </Grid>
-
-                {/* Fee Assignment Review */}
-                <Grid item xs={12}>
-                  <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                      <Typography variant="subtitle2" color="primary" fontWeight={700}>
-                        FEE ASSIGNMENT SUMMARY
-                      </Typography>
-                      {enableFeeAssignment && activeFeeStructure && (
-                        <Chip
-                          label={`Payable: ₹${computedFees.final.toLocaleString()} (${installmentFrequency})`}
-                          color="primary"
-                          size="small"
-                        />
-                      )}
-                    </Box>
-
-                    {enableFeeAssignment && activeFeeStructure ? (
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} sm={4}>
-                          <Typography variant="caption" color="text.secondary">Plan:</Typography>
-                          <Typography variant="body2" fontWeight={600}>{activeFeeStructure.name}</Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={4}>
-                          <Typography variant="caption" color="text.secondary">Base / Adjustments:</Typography>
-                          <Typography variant="body2">
-                            Base: ₹{computedFees.base.toLocaleString()} • Disc: -₹{computedFees.discounts.toLocaleString()} • Add: +₹{computedFees.additional.toLocaleString()}
-                          </Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={4}>
-                          <Typography variant="caption" color="text.secondary">Schedule:</Typography>
-                          <Typography variant="body2">{computedFees.installments.length} installment(s)</Typography>
-                        </Grid>
-                      </Grid>
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">
-                        Fee assignment skipped for this admission.
-                      </Typography>
-                    )}
-                  </Paper>
-                </Grid>
-
-                {/* Parents Review */}
-                <Grid item xs={12}>
-                  <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                    <Typography variant="subtitle2" color="primary" fontWeight={700} gutterBottom>
-                      PARENTS & GUARDIANS ({parents.length})
-                    </Typography>
-                    <Grid container spacing={2}>
-                      {parents.map((p) => (
-                        <Grid item xs={12} sm={6} key={p.id}>
-                          <Box sx={{ p: 1.5, bgcolor: 'action.hover', borderRadius: 1.5 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                              <Typography variant="body2" fontWeight={700}>
-                                {p.isExisting && p.existingParent
-                                  ? `${p.existingParent.first_name} ${p.existingParent.last_name}`
-                                  : `${p.firstName} ${p.lastName}`}
-                              </Typography>
-                              <Chip label={p.relationshipType} size="small" />
-                              {p.isPrimaryGuardian && (
-                                <Chip label="Primary" color="primary" size="small" />
-                              )}
-                            </Box>
-                            <Typography variant="caption" color="text.secondary" display="block">
-                              Email: {p.isExisting && p.existingParent ? p.existingParent.email : p.email}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      ))}
-                    </Grid>
-                  </Paper>
-                </Grid>
-              </Grid>
-
-              {/* Submission CTA */}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-                <Button variant="outlined" onClick={handleBack} startIcon={<ArrowBackIcon />}>
-                  Back
-                </Button>
-                <Button
-                  variant="contained"
-                  color="success"
-                  size="large"
-                  onClick={handleSubmitAdmission}
-                  disabled={createAdmissionMutation.isPending}
-                  startIcon={
-                    createAdmissionMutation.isPending ? (
-                      <CircularProgress size={20} color="inherit" />
-                    ) : (
-                      <CheckCircleIcon />
-                    )
-                  }
-                >
-                  {createAdmissionMutation.isPending ? 'Processing Admission...' : 'Confirm & Complete Admission'}
-                </Button>
-              </Box>
-            </Card>
+            <AccountSetupReviewStep
+              createStudentAccount={createStudentAccount}
+              onToggleCreateStudentAccount={setCreateStudentAccount}
+              studentPassword={studentPassword}
+              onStudentPasswordChange={setStudentPassword}
+              generatePassword={generateSecurePassword}
+              studentData={studentData}
+              selectedGrade={selectedGrade}
+              selectedSection={selectedSection}
+              admissionDate={admissionDate}
+              sectionTeacher={sectionTeacher}
+              enableFeeAssignment={enableFeeAssignment}
+              activeFeeStructure={activeFeeStructure}
+              computedFees={computedFees}
+              installmentFrequency={installmentFrequency}
+              parents={parents}
+              onSubmit={handleSubmitAdmission}
+              isSubmitting={createAdmissionMutation.isPending}
+              onBack={handleBack}
+            />
           )}
 
           {/* Step 5: Admission Success Screen */}
           {activeStep === STEPS.length && admissionResult && (
-            <Card sx={{ p: { xs: 2, sm: 4 }, textAlign: 'center' }}>
-              <Box sx={{ display: 'inline-flex', p: 2, borderRadius: '50%', bgcolor: 'success.light', color: 'success.dark', mb: 2 }}>
-                <CheckCircleIcon sx={{ fontSize: 48 }} />
-              </Box>
-
-              <Typography variant="h4" fontWeight={700} gutterBottom>
-                Admission Completed Successfully!
-              </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto', mb: 4 }}>
-                The student has been enrolled, fee schedule assigned, and all associated accounts provisioned.
-              </Typography>
-
-              {/* Key Identifiers Cards */}
-              <Grid container spacing={2} sx={{ mb: 4, textAlign: 'left' }}>
-                <Grid item xs={12} sm={3}>
-                  <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                      ENROLLMENT NUMBER
-                    </Typography>
-                    <Typography variant="h5" fontWeight={700} color="primary.main">
-                      {admissionResult.student.enrollment_number}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Student ID
-                    </Typography>
-                  </Paper>
-                </Grid>
-
-                <Grid item xs={12} sm={3}>
-                  <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                      ADMISSION NUMBER
-                    </Typography>
-                    <Typography variant="h5" fontWeight={700}>
-                      {admissionResult.admission_number}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Registry Ref
-                    </Typography>
-                  </Paper>
-                </Grid>
-
-                <Grid item xs={12} sm={3}>
-                  <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                      CLASS & ROLL NO
-                    </Typography>
-                    <Typography variant="h5" fontWeight={700}>
-                      {admissionResult.academic.grade_name} - {admissionResult.academic.section_name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Roll No: #{admissionResult.academic.roll_no}
-                    </Typography>
-                  </Paper>
-                </Grid>
-
-                <Grid item xs={12} sm={3}>
-                  <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                      ASSIGNED FEES
-                    </Typography>
-                    <Typography variant="h5" fontWeight={700} color="success.main">
-                      {admissionResult.fee_assignment
-                        ? `₹${Number(admissionResult.fee_assignment.final_payable_amount).toLocaleString()}`
-                        : 'N/A'}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {admissionResult.fee_assignment
-                        ? `${admissionResult.fee_assignment.installments.length} installment(s)`
-                        : 'No fees assigned'}
-                    </Typography>
-                  </Paper>
-                </Grid>
-              </Grid>
-
-              {/* Login Credentials Card */}
-              <Paper
-                variant="outlined"
-                sx={{
-                  p: 3,
-                  mb: 4,
-                  borderRadius: 2,
-                  bgcolor: 'background.paper',
-                  borderColor: 'primary.light',
-                  textAlign: 'left',
-                }}
-              >
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <KeyIcon color="primary" />
-                    <Typography variant="subtitle1" fontWeight={700}>
-                      Portal Login Credentials
-                    </Typography>
-                  </Box>
-                  <Button
-                    variant="outlined"
-                    startIcon={<ContentCopyIcon />}
-                    onClick={handleCopyCredentials}
-                    size="small"
-                  >
-                    Copy All Credentials
-                  </Button>
-                </Box>
-
-                <Grid container spacing={2}>
-                  {/* Student Portal Account */}
-                  <Grid item xs={12} md={6}>
-                    <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1.5 }}>
-                      <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-                        Student Portal Access
-                      </Typography>
-                      {admissionResult.student_account.initial_password ? (
-                        <>
-                          <Typography variant="body2">
-                            <strong>Login Identifier:</strong> {admissionResult.student.enrollment_number}
-                          </Typography>
-                          <Typography variant="body2">
-                            <strong>Registered Email:</strong> {admissionResult.student_account.email}
-                          </Typography>
-                          <Typography variant="body2">
-                            <strong>Temporary Password:</strong>{' '}
-                            <code style={{ background: '#eee', padding: '2px 6px', borderRadius: 4 }}>
-                              {admissionResult.student_account.initial_password}
-                            </code>
-                          </Typography>
-                        </>
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">
-                          No student login account was requested during this admission.
-                        </Typography>
-                      )}
-                    </Box>
-                  </Grid>
-
-                  {/* Parents Portal Access */}
-                  <Grid item xs={12} md={6}>
-                    <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1.5 }}>
-                      <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-                        Parent & Guardian Portal Access
-                      </Typography>
-                      {admissionResult.parents.map((p, idx) => (
-                        <Box key={p.parent_id || idx} sx={{ mb: 1 }}>
-                          <Typography variant="body2">
-                            <strong>{p.first_name} {p.last_name} ({p.relationship_type}):</strong>
-                          </Typography>
-                          <Typography variant="caption" display="block">
-                            Email: {p.email}
-                          </Typography>
-                          {p.initial_password ? (
-                            <Typography variant="caption" display="block">
-                              Password:{' '}
-                              <code style={{ background: '#eee', padding: '1px 5px', borderRadius: 4 }}>
-                                {p.initial_password}
-                              </code>
-                            </Typography>
-                          ) : (
-                            <Typography variant="caption" color="text.secondary" display="block">
-                              Existing account linked successfully.
-                            </Typography>
-                          )}
-                        </Box>
-                      ))}
-                    </Box>
-                  </Grid>
-                </Grid>
-
-                <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <LaunchIcon fontSize="small" color="action" />
-                  <Typography variant="caption" color="text.secondary">
-                    Students and parents can log in directly at{' '}
-                    <a href="http://localhost:3001/login" target="_blank" rel="noopener noreferrer" style={{ fontWeight: 600 }}>
-                      http://localhost:3001/login
-                    </a>
-                  </Typography>
-                </Box>
-              </Paper>
-
-              {/* Action Buttons */}
-              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
-                <Button
-                  variant="outlined"
-                  size="large"
-                  onClick={handleAdmitAnother}
-                  startIcon={<AddIcon />}
-                >
-                  Admit Another Student
-                </Button>
-                <Button
-                  component={Link}
-                  href="/fees"
-                  variant="outlined"
-                  size="large"
-                  startIcon={<AccountBalanceWalletIcon />}
-                >
-                  View in Fee Management
-                </Button>
-                <Button
-                  component={Link}
-                  href="/students"
-                  variant="contained"
-                  size="large"
-                  startIcon={<SchoolIcon />}
-                >
-                  View Students Directory
-                </Button>
-              </Box>
-            </Card>
+            <AdmissionSuccessCard
+              admissionResult={admissionResult}
+              onCopyCredentials={handleCopyCredentials}
+              onAdmitAnother={handleAdmitAnother}
+            />
           )}
         </Box>
       </AppShell>
