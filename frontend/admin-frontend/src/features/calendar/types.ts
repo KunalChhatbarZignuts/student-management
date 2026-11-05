@@ -100,3 +100,6 @@ export interface MonthCalendarResponse {
   days: MonthlyCalendarDay[];
 }
 
+export type MonthlyCalendarResponse = MonthCalendarResponse;
+
+
