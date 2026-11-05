@@ -1,7 +1,6 @@
 import uuid
 from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Any
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer

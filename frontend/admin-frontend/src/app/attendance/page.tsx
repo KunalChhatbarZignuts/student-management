@@ -4,52 +4,17 @@ import * as React from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
-import Grid from '@mui/material/Grid';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
 import Alert from '@mui/material/Alert';
-import CircularProgress from '@mui/material/CircularProgress';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogContentText from '@mui/material/DialogContentText';
-import DialogActions from '@mui/material/DialogActions';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Divider from '@mui/material/Divider';
-import Tooltip from '@mui/material/Tooltip';
-import AppDatePicker from '@/components/ui/AppDatePicker';
-import IconButton from '@mui/material/IconButton';
-import Drawer from '@mui/material/Drawer';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import InputAdornment from '@mui/material/InputAdornment';
-import SearchIcon from '@mui/icons-material/Search';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import EventBusyIcon from '@mui/icons-material/EventBusy';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import HistoryIcon from '@mui/icons-material/History';
-import SendIcon from '@mui/icons-material/Send';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import EditIcon from '@mui/icons-material/Edit';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import CloseIcon from '@mui/icons-material/Close';
 
 import AppShell from '@/components/layout/AppShell';
 import RequireRole from '@/components/guards/RequireRole';
@@ -60,16 +25,24 @@ import { calendarApi } from '@/features/calendar/api';
 import { adminGradeApi } from '@/features/grades/api';
 import {
   AttendanceStatusType,
-  AssignedSectionItem,
-  SectionDailyOverviewItem,
-  StudentAttendanceHistoryResponse,
-  AttendanceAuditItemResponse,
   AttendanceRecordItem,
 } from '@/features/attendance/types';
 
+import {
+  AttendanceSummaryCards,
+  AttendanceFilterBar,
+  AttendanceRollCallTable,
+  AttendanceAdminOverview,
+  AttendanceSectionHistoryTable,
+  AttendanceAuditTable,
+  AdminEditAttendanceDialog,
+  AttendanceConfirmDialog,
+  StudentAttendanceHistoryDrawer,
+} from '@/features/attendance/components';
+
 export default function AttendancePage() {
   const queryClient = useQueryClient();
-  const { user, role } = useAuth();
+  const { role } = useAuth();
 
   const isTeacher = role === ROLES.TEACHER;
   const isAdmin = role === ROLES.ADMIN || role === ROLES.SUPER_ADMIN;
@@ -83,7 +56,7 @@ export default function AttendancePage() {
 
   // Common filters
   const [selectedDate, setSelectedDate] = React.useState<string>(todayStr);
-  const [selectedPeriod, setSelectedPeriod] = React.useState<number>(1);
+  const [selectedPeriod] = React.useState<number>(1);
   const [selectedSectionId, setSelectedSectionId] = React.useState<string>('');
   const [selectedGradeId, setSelectedGradeId] = React.useState<string>('');
 
@@ -114,7 +87,7 @@ export default function AttendancePage() {
   const [historyDrawerOpen, setHistoryDrawerOpen] = React.useState<boolean>(false);
   const [selectedStudentId, setSelectedStudentId] = React.useState<string | null>(null);
 
-  // 1. Fetch Teacher Assigned Sections (if teacher or admin testing)
+  // 1. Fetch Teacher Assigned Sections (if teacher)
   const { data: teacherSections, isLoading: loadingTeacherSections } = useQuery({
     queryKey: ['teacher', 'assigned-sections'],
     queryFn: attendanceApi.getTeacherAssignedSections,
@@ -157,11 +130,7 @@ export default function AttendancePage() {
   }, [isTeacher, isAdmin, teacherSections, adminSections, selectedSectionId]);
 
   // 3. Fetch Admin Daily Overview
-  const {
-    data: overviewData,
-    isLoading: loadingOverview,
-    refetch: refetchOverview,
-  } = useQuery({
+  const { data: overviewData, isLoading: loadingOverview } = useQuery({
     queryKey: ['admin', 'attendance-overview', selectedDate, selectedGradeId],
     queryFn: () =>
       attendanceApi.getAdminDailyOverview({
@@ -184,7 +153,8 @@ export default function AttendancePage() {
   // 4b. Check Date Working Status (School Calendar & Holidays)
   const { data: dateStatus } = useQuery({
     queryKey: ['calendar', 'date-status', selectedDate, selectedSectionId, isTeacher],
-    queryFn: () => calendarApi.checkDateStatus(selectedDate, undefined, selectedSectionId || undefined, isTeacher),
+    queryFn: () =>
+      calendarApi.checkDateStatus(selectedDate, undefined, selectedSectionId || undefined, isTeacher),
     enabled: Boolean(selectedDate),
   });
   const isNonWorkingDay = dateStatus ? !dateStatus.is_working_day : false;
@@ -415,7 +385,7 @@ export default function AttendancePage() {
         reason: vars.reason,
         remark: vars.remark || null,
       }),
-    onSuccess: (updated) => {
+    onSuccess: () => {
       setEditDialogOpen(false);
       setEditReason('');
       setEditRemark('');
@@ -470,7 +440,7 @@ export default function AttendancePage() {
             </Typography>
           </Box>
 
-          {/* Top Tabs */}
+          {/* Top Navigation Tabs */}
           <Paper sx={{ mb: 3, borderRadius: 3 }}>
             <Tabs
               value={activeTab}
@@ -523,76 +493,22 @@ export default function AttendancePage() {
             </Tabs>
           </Paper>
 
-          {/* ============================================================== */}
-          {/* TEACHER TAB 0 OR ADMIN TAB 1: ROLL CALL TABLE & SUBMISSION */}
-          {/* ============================================================== */}
+          {/* TAB: ROLL CALL TABLE & SUBMISSION (Teacher Tab 0, Admin Tab 1) */}
           {((isTeacher && activeTab === 0) || (isAdmin && activeTab === 1)) && (
             <Box>
-              {/* Filter Bar */}
-              <Paper sx={{ p: 2.5, mb: 3, borderRadius: 3 }}>
-                <Grid container spacing={2} alignItems="center">
-                  <Grid item xs={12} md={5}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel id="assigned-section-select-label">
-                        {isTeacher ? 'My Assigned Section' : 'Select Grade & Section'}
-                      </InputLabel>
-                      <Select
-                        labelId="assigned-section-select-label"
-                        value={selectedSectionId}
-                        label={isTeacher ? 'My Assigned Section' : 'Select Grade & Section'}
-                        onChange={(e) => setSelectedSectionId(e.target.value)}
-                        disabled={isTeacher ? loadingTeacherSections : false}
-                      >
-                        {isTeacher
-                          ? teacherSections?.map((s) => (
-                              <MenuItem key={s.section_id} value={s.section_id}>
-                                {s.grade_name} – Section {s.section_name} ({s.role || 'Teacher'}) [
-                                {s.enrolled_students_count} Students]
-                              </MenuItem>
-                            ))
-                          : adminSections?.map((s) => (
-                              <MenuItem key={s.id} value={s.id}>
-                                {s.name}
-                              </MenuItem>
-                            ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-
-                  <Grid item xs={12} sm={6} md={3}>
-                    <AppDatePicker
-                      size="small"
-                      label="Attendance Date"
-                      value={selectedDate}
-                      onChange={setSelectedDate}
-                      maxDate={todayStr}
-                    />
-                  </Grid>
-
-                  <Grid item xs={12} md={3} sx={{ display: 'flex', gap: 1 }}>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      color="success"
-                      fullWidth
-                      disabled={isNonWorkingDay}
-                      onClick={() => handleMarkAll('PRESENT')}
-                    >
-                      All Present
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      color="error"
-                      fullWidth
-                      disabled={isNonWorkingDay}
-                      onClick={() => handleMarkAll('ABSENT')}
-                    >
-                      All Absent
-                    </Button>
-                  </Grid>
-                </Grid>
-              </Paper>
+              <AttendanceFilterBar
+                isTeacher={isTeacher}
+                selectedSectionId={selectedSectionId}
+                onSectionChange={setSelectedSectionId}
+                teacherSections={teacherSections}
+                adminSections={adminSections}
+                loadingTeacherSections={loadingTeacherSections}
+                selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
+                todayStr={todayStr}
+                isNonWorkingDay={isNonWorkingDay}
+                onMarkAll={handleMarkAll}
+              />
 
               {/* Holiday & Non-Working Day Banner */}
               {isNonWorkingDay && (
@@ -635,1076 +551,113 @@ export default function AttendancePage() {
                 </Alert>
               )}
 
-              {/* Summary Counter Metrics Cards */}
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid item xs={6} sm={4} md={2}>
-                  <Card sx={{ borderRadius: 2, bgcolor: 'background.paper' }}>
-                    <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Total Students
-                      </Typography>
-                      <Typography variant="h5" fontWeight={700}>
-                        {summaryCounters.total}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={6} sm={4} md={2}>
-                  <Card sx={{ borderRadius: 2, bgcolor: 'success.50' }}>
-                    <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                      <Typography variant="caption" color="success.dark">
-                        Present
-                      </Typography>
-                      <Typography variant="h5" fontWeight={700} color="success.main">
-                        {summaryCounters.present}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={6} sm={4} md={2}>
-                  <Card sx={{ borderRadius: 2, bgcolor: 'error.50' }}>
-                    <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                      <Typography variant="caption" color="error.dark">
-                        Absent
-                      </Typography>
-                      <Typography variant="h5" fontWeight={700} color="error.main">
-                        {summaryCounters.absent}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={6} sm={4} md={2}>
-                  <Card sx={{ borderRadius: 2, bgcolor: 'warning.50' }}>
-                    <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                      <Typography variant="caption" color="warning.dark">
-                        Late
-                      </Typography>
-                      <Typography variant="h5" fontWeight={700} color="warning.main">
-                        {summaryCounters.late}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={6} sm={4} md={2}>
-                  <Card sx={{ borderRadius: 2, bgcolor: 'info.50' }}>
-                    <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                      <Typography variant="caption" color="info.dark">
-                        Excused
-                      </Typography>
-                      <Typography variant="h5" fontWeight={700} color="info.main">
-                        {summaryCounters.excused}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={12} sm={4} md={2}>
-                  <Card sx={{ borderRadius: 2, bgcolor: 'primary.50' }}>
-                    <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                      <Typography variant="caption" color="primary.dark">
-                        Attendance Rate
-                      </Typography>
-                      <Typography variant="h5" fontWeight={700} color="primary.main">
-                        {summaryCounters.percentage}%
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              </Grid>
+              <AttendanceSummaryCards counters={summaryCounters} />
 
-              {/* Roster & Roll Call Table */}
-              {loadingRoster || loadingSession ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-                  <CircularProgress />
-                </Box>
-              ) : !roster || roster.length === 0 ? (
-                <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 3 }}>
-                  <Typography variant="body1" color="text.secondary">
-                    No enrolled students found in the selected section.
-                  </Typography>
-                </Paper>
-              ) : (
-                <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
-                  <Box sx={{ p: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', bgcolor: 'action.hover' }}>
-                    <TextField
-                      size="small"
-                      placeholder="Search student by name, code, roll no..."
-                      value={searchStudentQuery}
-                      onChange={(e) => setSearchStudentQuery(e.target.value)}
-                      sx={{ flex: 1, minWidth: 240, bgcolor: 'background.paper', borderRadius: 1 }}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SearchIcon fontSize="small" color="action" />
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
-                    <ToggleButtonGroup
-                      size="small"
-                      value={rollCallStatusFilter}
-                      exclusive
-                      onChange={(_, val) => val && setRollCallStatusFilter(val)}
-                      sx={{ bgcolor: 'background.paper' }}
-                    >
-                      <ToggleButton value="ALL">All ({roster.length})</ToggleButton>
-                      <ToggleButton value="PRESENT" color="success">Present</ToggleButton>
-                      <ToggleButton value="ABSENT" color="error">Absent</ToggleButton>
-                      <ToggleButton value="LATE" color="warning">Late</ToggleButton>
-                      <ToggleButton value="EXCUSED" color="info">Excused</ToggleButton>
-                    </ToggleButtonGroup>
-                  </Box>
-                  <TableContainer>
-                    <Table size="small">
-                      <TableHead sx={{ bgcolor: 'action.hover' }}>
-                        <TableRow>
-                          <TableCell width="8%">
-                            <strong>Roll No</strong>
-                          </TableCell>
-                          <TableCell width="25%">
-                            <strong>Student Details</strong>
-                          </TableCell>
-                          <TableCell width="15%">
-                            <strong>Enrollment No</strong>
-                          </TableCell>
-                          <TableCell width="32%">
-                            <strong>Attendance Status</strong>
-                          </TableCell>
-                          <TableCell width="20%">
-                            <strong>Remarks</strong>
-                          </TableCell>
-                          {isAdmin && existingSession && (
-                            <TableCell width="5%" align="center">
-                              <strong>Audit</strong>
-                            </TableCell>
-                          )}
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {filteredRoster.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={isAdmin && existingSession ? 6 : 5} align="center" sx={{ py: 3, color: 'text.secondary' }}>
-                              No students match the current search or status filter.
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          filteredRoster.map((student) => {
-                          const currentMark = marks[student.student_id] || {
-                            status: 'PRESENT',
-                            remark: '',
-                          };
-                          const existingRecord = existingSession?.records.find(
-                            (r) => r.student_id === student.student_id
-                          );
-
-                          return (
-                            <TableRow key={student.student_id} hover>
-                              <TableCell sx={{ fontWeight: 600 }}>
-                                {student.roll_no != null ? `#${student.roll_no}` : '—'}
-                              </TableCell>
-                              <TableCell>
-                                <Typography variant="body2" fontWeight={600}>
-                                  {student.student_name}
-                                </Typography>
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                  sx={{ fontFamily: 'monospace' }}
-                                >
-                                  {student.student_code}
-                                </Typography>
-                              </TableCell>
-                              <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
-                                {student.enrollment_number || '—'}
-                              </TableCell>
-                              <TableCell>
-                                <ToggleButtonGroup
-                                  size="small"
-                                  value={currentMark.status}
-                                  exclusive
-                                  onChange={(_, val) => handleStatusChange(student.student_id, val)}
-                                >
-                                  <ToggleButton
-                                    value="PRESENT"
-                                    sx={{
-                                      px: 1.5,
-                                      py: 0.5,
-                                      fontWeight: currentMark.status === 'PRESENT' ? 700 : 500,
-                                      bgcolor:
-                                        currentMark.status === 'PRESENT' ? 'success.100' : undefined,
-                                      color:
-                                        currentMark.status === 'PRESENT'
-                                          ? 'success.dark'
-                                          : 'text.secondary',
-                                    }}
-                                  >
-                                    Present
-                                  </ToggleButton>
-                                  <ToggleButton
-                                    value="ABSENT"
-                                    sx={{
-                                      px: 1.5,
-                                      py: 0.5,
-                                      fontWeight: currentMark.status === 'ABSENT' ? 700 : 500,
-                                      bgcolor:
-                                        currentMark.status === 'ABSENT' ? 'error.100' : undefined,
-                                      color:
-                                        currentMark.status === 'ABSENT'
-                                          ? 'error.dark'
-                                          : 'text.secondary',
-                                    }}
-                                  >
-                                    Absent
-                                  </ToggleButton>
-                                  <ToggleButton
-                                    value="LATE"
-                                    sx={{
-                                      px: 1.5,
-                                      py: 0.5,
-                                      fontWeight: currentMark.status === 'LATE' ? 700 : 500,
-                                      bgcolor:
-                                        currentMark.status === 'LATE' ? 'warning.100' : undefined,
-                                      color:
-                                        currentMark.status === 'LATE'
-                                          ? 'warning.dark'
-                                          : 'text.secondary',
-                                    }}
-                                  >
-                                    Late
-                                  </ToggleButton>
-                                  <ToggleButton
-                                    value="EXCUSED"
-                                    sx={{
-                                      px: 1.5,
-                                      py: 0.5,
-                                      fontWeight: currentMark.status === 'EXCUSED' ? 700 : 500,
-                                      bgcolor:
-                                        currentMark.status === 'EXCUSED' ? 'info.100' : undefined,
-                                      color:
-                                        currentMark.status === 'EXCUSED'
-                                          ? 'info.dark'
-                                          : 'text.secondary',
-                                    }}
-                                  >
-                                    Excused
-                                  </ToggleButton>
-                                </ToggleButtonGroup>
-                              </TableCell>
-                              <TableCell>
-                                <TextField
-                                  size="small"
-                                  placeholder="Note (optional)"
-                                  value={currentMark.remark}
-                                  onChange={(e) =>
-                                    handleRemarkChange(student.student_id, e.target.value)
-                                  }
-                                  fullWidth
-                                />
-                              </TableCell>
-                              {isAdmin && existingSession && (
-                                <TableCell align="center">
-                                  {existingRecord && (
-                                    <Tooltip title="Correct Attendance with Reason">
-                                      <IconButton
-                                        size="small"
-                                        color="primary"
-                                        onClick={() => handleOpenEdit(existingRecord)}
-                                      >
-                                        <EditIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
-                                  )}
-                                </TableCell>
-                              )}
-                            </TableRow>
-                          );
-                        }))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-
-                  {/* Submission Footer */}
-                  <Box
-                    sx={{
-                      p: 2.5,
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      bgcolor: 'background.default',
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Ready to submit: <strong>{summaryCounters.total}</strong> students marked.
-                      </Typography>
-                    </Box>
-                    <Button
-                      variant="contained"
-                      size="large"
-                      startIcon={<SendIcon />}
-                      onClick={handlePromptSubmit}
-                      disabled={submitMutation.isPending || isNonWorkingDay}
-                      color={isNonWorkingDay ? 'inherit' : 'primary'}
-                    >
-                      {isNonWorkingDay
-                        ? 'Disabled (Non-Working Day / Holiday)'
-                        : submitMutation.isPending
-                        ? 'Submitting...'
-                        : 'Submit Attendance Session'}
-                    </Button>
-                  </Box>
-                </Paper>
-              )}
+              <AttendanceRollCallTable
+                loadingRoster={loadingRoster}
+                loadingSession={loadingSession}
+                roster={roster}
+                filteredRoster={filteredRoster}
+                searchStudentQuery={searchStudentQuery}
+                onSearchQueryChange={setSearchStudentQuery}
+                rollCallStatusFilter={rollCallStatusFilter}
+                onRollCallStatusFilterChange={setRollCallStatusFilter}
+                marks={marks}
+                existingSession={existingSession}
+                isAdmin={isAdmin}
+                isNonWorkingDay={isNonWorkingDay}
+                summaryCounters={summaryCounters}
+                onStatusChange={handleStatusChange}
+                onRemarkChange={handleRemarkChange}
+                onOpenEdit={handleOpenEdit}
+                onPromptSubmit={handlePromptSubmit}
+                isSubmitting={submitMutation.isPending}
+              />
             </Box>
           )}
 
-          {/* ============================================================== */}
-          {/* TEACHER TAB 1: SECTION ATTENDANCE HISTORY */}
-          {/* ============================================================== */}
+          {/* TAB: TEACHER SECTION HISTORY (Teacher Tab 1) */}
           {isTeacher && activeTab === 1 && (
-            <Box>
-              <Paper sx={{ p: 2.5, mb: 3, borderRadius: 3 }}>
-                <FormControl sx={{ minWidth: 320 }} size="small">
-                  <InputLabel id="history-section-select-label">Select Assigned Section</InputLabel>
-                  <Select
-                    labelId="history-section-select-label"
-                    value={selectedSectionId}
-                    label="Select Assigned Section"
-                    onChange={(e) => setSelectedSectionId(e.target.value)}
-                  >
-                    {teacherSections?.map((s) => (
-                      <MenuItem key={s.section_id} value={s.section_id}>
-                        {s.grade_name} – Section {s.section_name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Paper>
-
-              {loadingHistory ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                  <CircularProgress />
-                </Box>
-              ) : !sectionHistory || sectionHistory.length === 0 ? (
-                <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 3 }}>
-                  <Typography variant="body1" color="text.secondary">
-                    No historical attendance sessions recorded yet for this section.
-                  </Typography>
-                </Paper>
-              ) : (
-                <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
-                  <TableContainer>
-                    <Table size="small">
-                      <TableHead sx={{ bgcolor: 'action.hover' }}>
-                        <TableRow>
-                          <TableCell>
-                            <strong>Date</strong>
-                          </TableCell>
-                          <TableCell align="center">
-                            <strong>Total</strong>
-                          </TableCell>
-                          <TableCell align="center">
-                            <strong>Present</strong>
-                          </TableCell>
-                          <TableCell align="center">
-                            <strong>Absent</strong>
-                          </TableCell>
-                          <TableCell align="center">
-                            <strong>Late</strong>
-                          </TableCell>
-                          <TableCell align="center">
-                            <strong>Excused</strong>
-                          </TableCell>
-                          <TableCell align="center">
-                            <strong>Attendance Rate</strong>
-                          </TableCell>
-                          <TableCell>
-                            <strong>Marked By</strong>
-                          </TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {sectionHistory.map((s) => {
-                          const denom = Math.max(1, s.present_count + s.absent_count + s.late_count);
-                          const rate = Math.round(((s.present_count + s.late_count) / denom) * 1000) / 10;
-                          return (
-                            <TableRow key={s.id} hover>
-                              <TableCell sx={{ fontWeight: 600 }}>{s.date}</TableCell>
-                              <TableCell align="center">{s.total_students}</TableCell>
-                              <TableCell align="center" sx={{ color: 'success.main', fontWeight: 600 }}>
-                                {s.present_count}
-                              </TableCell>
-                              <TableCell align="center" sx={{ color: s.absent_count > 0 ? 'error.main' : 'inherit' }}>
-                                {s.absent_count}
-                              </TableCell>
-                              <TableCell align="center">{s.late_count}</TableCell>
-                              <TableCell align="center">{s.excused_count}</TableCell>
-                              <TableCell align="center">
-                                <Chip
-                                  label={`${rate}%`}
-                                  size="small"
-                                  color={rate >= 80 ? 'success' : rate >= 60 ? 'warning' : 'error'}
-                                />
-                              </TableCell>
-                              <TableCell>{s.teacher_name || 'Staff'}</TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </Paper>
-              )}
-            </Box>
+            <AttendanceSectionHistoryTable
+              selectedSectionId={selectedSectionId}
+              onSelectSectionId={setSelectedSectionId}
+              teacherSections={teacherSections}
+              loadingHistory={loadingHistory}
+              sectionHistory={sectionHistory}
+            />
           )}
 
-          {/* ============================================================== */}
-          {/* ADMIN TAB 0: INSTITUTIONAL DAILY OVERVIEW */}
-          {/* ============================================================== */}
+          {/* TAB: ADMIN INSTITUTIONAL OVERVIEW (Admin Tab 0) */}
           {isAdmin && activeTab === 0 && (
-            <Box>
-              {/* Filter controls */}
-              <Paper sx={{ p: 2.5, mb: 3, borderRadius: 3 }}>
-                <Grid container spacing={2} alignItems="center">
-                  <Grid item xs={12} sm={6} md={3}>
-                    <AppDatePicker
-                      size="small"
-                      label="Select Overview Date"
-                      value={selectedDate}
-                      onChange={setSelectedDate}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel id="grade-filter-label">Filter by Grade</InputLabel>
-                      <Select
-                        labelId="grade-filter-label"
-                        value={selectedGradeId}
-                        label="Filter by Grade"
-                        onChange={(e) => setSelectedGradeId(e.target.value)}
-                      >
-                        <MenuItem value="">All Grades</MenuItem>
-                        {adminGrades?.map((g: any) => (
-                          <MenuItem key={g.id} value={g.id}>
-                            {g.name}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel id="status-filter-label">Attendance Status</InputLabel>
-                      <Select
-                        labelId="status-filter-label"
-                        value={overviewStatusFilter}
-                        label="Attendance Status"
-                        onChange={(e) => setOverviewStatusFilter(e.target.value)}
-                      >
-                        <MenuItem value="ALL">All Sections (Marked & Unmarked)</MenuItem>
-                        <MenuItem value="Marked">Marked Only</MenuItem>
-                        <MenuItem value="Unmarked">Unmarked Only</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      placeholder="Search section or grade..."
-                      value={searchSectionQuery}
-                      onChange={(e) => setSearchSectionQuery(e.target.value)}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SearchIcon fontSize="small" color="action" />
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
-                  </Grid>
-                </Grid>
-              </Paper>
-
-              {loadingOverview ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-                  <CircularProgress />
-                </Box>
-              ) : !overviewData ? (
-                <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 3 }}>
-                  <Typography variant="body1" color="text.secondary">
-                    No overview data available.
-                  </Typography>
-                </Paper>
-              ) : (
-                <Box>
-                  {/* Overview Cards */}
-                  <Grid container spacing={2} sx={{ mb: 3 }}>
-                    <Grid item xs={6} sm={4} md={2}>
-                      <Card sx={{ borderRadius: 2 }}>
-                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                          <Typography variant="caption" color="text.secondary">
-                            Total Sections
-                          </Typography>
-                          <Typography variant="h5" fontWeight={700}>
-                            {overviewData.total_sections}
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                    <Grid item xs={6} sm={4} md={2}>
-                      <Card sx={{ borderRadius: 2, bgcolor: 'primary.50' }}>
-                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                          <Typography variant="caption" color="primary.dark">
-                            Marked Sections
-                          </Typography>
-                          <Typography variant="h5" fontWeight={700} color="primary.main">
-                            {overviewData.marked_sections} / {overviewData.total_sections}
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                    <Grid item xs={6} sm={4} md={2}>
-                      <Card sx={{ borderRadius: 2 }}>
-                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                          <Typography variant="caption" color="text.secondary">
-                            Enrolled Students
-                          </Typography>
-                          <Typography variant="h5" fontWeight={700}>
-                            {overviewData.total_students}
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                    <Grid item xs={6} sm={4} md={2}>
-                      <Card sx={{ borderRadius: 2, bgcolor: 'success.50' }}>
-                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                          <Typography variant="caption" color="success.dark">
-                            Present
-                          </Typography>
-                          <Typography variant="h5" fontWeight={700} color="success.main">
-                            {overviewData.total_present}
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                    <Grid item xs={6} sm={4} md={2}>
-                      <Card sx={{ borderRadius: 2, bgcolor: 'error.50' }}>
-                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                          <Typography variant="caption" color="error.dark">
-                            Absent
-                          </Typography>
-                          <Typography variant="h5" fontWeight={700} color="error.main">
-                            {overviewData.total_absent}
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                    <Grid item xs={12} sm={4} md={2}>
-                      <Card sx={{ borderRadius: 2, bgcolor: 'info.50' }}>
-                        <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-                          <Typography variant="caption" color="info.dark">
-                            Overall Attendance %
-                          </Typography>
-                          <Typography variant="h5" fontWeight={700} color="info.main">
-                            {overviewData.overall_percentage}%
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  </Grid>
-
-                  {/* Section-Wise Status Table */}
-                  <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
-                    <TableContainer>
-                      <Table size="small">
-                        <TableHead sx={{ bgcolor: 'action.hover' }}>
-                          <TableRow>
-                            <TableCell>
-                              <strong>Grade & Section</strong>
-                            </TableCell>
-                            <TableCell align="center">
-                              <strong>Status</strong>
-                            </TableCell>
-                            <TableCell align="center">
-                              <strong>Students</strong>
-                            </TableCell>
-                            <TableCell align="center">
-                              <strong>Present</strong>
-                            </TableCell>
-                            <TableCell align="center">
-                              <strong>Absent</strong>
-                            </TableCell>
-                            <TableCell align="center">
-                              <strong>Late</strong>
-                            </TableCell>
-                            <TableCell align="center">
-                              <strong>Excused</strong>
-                            </TableCell>
-                            <TableCell align="center">
-                              <strong>Attendance %</strong>
-                            </TableCell>
-                            <TableCell>
-                              <strong>Marked By</strong>
-                            </TableCell>
-                            <TableCell align="center">
-                              <strong>Action</strong>
-                            </TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {filteredOverviewSections.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={10} align="center" sx={{ py: 3, color: 'text.secondary' }}>
-                                No sections match the selected filter criteria.
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            filteredOverviewSections.map((item) => (
-                              <TableRow key={item.section_id} hover>
-                              <TableCell sx={{ fontWeight: 600 }}>
-                                {item.grade_name} – Section {item.section_name}
-                              </TableCell>
-                              <TableCell align="center">
-                                <Chip
-                                  label={item.status}
-                                  size="small"
-                                  color={item.status === 'Marked' ? 'success' : 'warning'}
-                                />
-                              </TableCell>
-                              <TableCell align="center">{item.total_students}</TableCell>
-                              <TableCell align="center" sx={{ color: 'success.main', fontWeight: 600 }}>
-                                {item.present}
-                              </TableCell>
-                              <TableCell align="center" sx={{ color: item.absent > 0 ? 'error.main' : 'inherit' }}>
-                                {item.absent}
-                              </TableCell>
-                              <TableCell align="center">{item.late}</TableCell>
-                              <TableCell align="center">{item.excused}</TableCell>
-                              <TableCell align="center">
-                                <Chip
-                                  label={`${item.attendance_percentage}%`}
-                                  size="small"
-                                  variant="outlined"
-                                  color={
-                                    item.attendance_percentage >= 80
-                                      ? 'success'
-                                      : item.attendance_percentage >= 60
-                                      ? 'warning'
-                                      : 'default'
-                                  }
-                                />
-                              </TableCell>
-                              <TableCell>{item.marked_by || '—'}</TableCell>
-                              <TableCell align="center">
-                                <Button
-                                  size="small"
-                                  variant="text"
-                                  onClick={() => {
-                                    setSelectedSectionId(item.section_id);
-                                    setActiveTab(1);
-                                  }}
-                                >
-                                  {item.status === 'Marked' ? 'View / Edit' : 'Take Attendance'}
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          )))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Paper>
-                </Box>
-              )}
-            </Box>
+            <AttendanceAdminOverview
+              selectedDate={selectedDate}
+              onDateChange={setSelectedDate}
+              selectedGradeId={selectedGradeId}
+              onGradeChange={setSelectedGradeId}
+              grades={adminGrades}
+              overviewStatusFilter={overviewStatusFilter}
+              onOverviewStatusFilterChange={setOverviewStatusFilter}
+              searchSectionQuery={searchSectionQuery}
+              onSearchSectionQueryChange={setSearchSectionQuery}
+              loadingOverview={loadingOverview}
+              overviewData={overviewData}
+              filteredSections={filteredOverviewSections}
+              onSelectSection={(sectionId) => {
+                setSelectedSectionId(sectionId);
+                setActiveTab(1);
+              }}
+            />
           )}
 
-          {/* ============================================================== */}
-          {/* ADMIN TAB 2: AUDIT TRAIL & STUDENT ATTENDANCE HISTORY */}
-          {/* ============================================================== */}
+          {/* TAB: ADMIN AUDIT TRAIL & CORRECTIONS (Admin Tab 2) */}
           {isAdmin && activeTab === 2 && (
-            <Box>
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="h6" fontWeight={700} gutterBottom>
-                  Attendance Audit Trail
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Immutable record of all corrections made to attendance records, including the previous status, new status, modifier, and mandatory reason.
-                </Typography>
-              </Box>
-
-              {loadingAudits ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                  <CircularProgress />
-                </Box>
-              ) : !auditLogs || auditLogs.length === 0 ? (
-                <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 3 }}>
-                  <Typography variant="body1" color="text.secondary">
-                    No attendance corrections recorded in the audit trail yet.
-                  </Typography>
-                </Paper>
-              ) : (
-                <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
-                  <Box sx={{ p: 2, bgcolor: 'action.hover' }}>
-                    <TextField
-                      size="small"
-                      placeholder="Search audit trail by student, reason, or admin..."
-                      value={searchAuditQuery}
-                      onChange={(e) => setSearchAuditQuery(e.target.value)}
-                      sx={{ maxWidth: 450, width: '100%', bgcolor: 'background.paper', borderRadius: 1 }}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SearchIcon fontSize="small" color="action" />
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
-                  </Box>
-                  <TableContainer>
-                    <Table size="small">
-                      <TableHead sx={{ bgcolor: 'action.hover' }}>
-                        <TableRow>
-                          <TableCell>
-                            <strong>Timestamp</strong>
-                          </TableCell>
-                          <TableCell>
-                            <strong>Student</strong>
-                          </TableCell>
-                          <TableCell align="center">
-                            <strong>Previous</strong>
-                          </TableCell>
-                          <TableCell align="center">
-                            <strong>Corrected To</strong>
-                          </TableCell>
-                          <TableCell width="35%">
-                            <strong>Mandatory Reason</strong>
-                          </TableCell>
-                          <TableCell>
-                            <strong>Modified By</strong>
-                          </TableCell>
-                          <TableCell align="center">
-                            <strong>Student History</strong>
-                          </TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {filteredAuditLogs.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'text.secondary' }}>
-                              No audit logs match the search query.
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          filteredAuditLogs.map((log) => (
-                            <TableRow key={log.id} hover>
-                            <TableCell sx={{ fontSize: '0.85rem' }}>
-                              {new Date(log.created_at).toLocaleString()}
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" fontWeight={600}>
-                                {log.student_name}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {log.enrollment_number || ''}
-                              </Typography>
-                            </TableCell>
-                            <TableCell align="center">
-                              <Chip label={log.previous_status} size="small" variant="outlined" />
-                            </TableCell>
-                            <TableCell align="center">
-                              <Chip
-                                label={log.new_status}
-                                size="small"
-                                color={
-                                  log.new_status === 'PRESENT'
-                                    ? 'success'
-                                    : log.new_status === 'ABSENT'
-                                    ? 'error'
-                                    : 'info'
-                                }
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2">{log.reason}</Typography>
-                            </TableCell>
-                            <TableCell>{log.modified_by_name || 'Admin'}</TableCell>
-                            <TableCell align="center">
-                              <Tooltip title="View Student Attendance History">
-                                <IconButton
-                                  size="small"
-                                  onClick={() => {
-                                    setSelectedStudentId(log.student_id);
-                                    setHistoryDrawerOpen(true);
-                                  }}
-                                >
-                                  <VisibilityIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            </TableCell>
-                          </TableRow>
-                        )))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </Paper>
-              )}
-            </Box>
+            <AttendanceAuditTable
+              loadingAudits={loadingAudits}
+              auditLogs={auditLogs}
+              filteredAuditLogs={filteredAuditLogs}
+              searchAuditQuery={searchAuditQuery}
+              onSearchAuditQueryChange={setSearchAuditQuery}
+              onViewStudentHistory={(studentId) => {
+                setSelectedStudentId(studentId);
+                setHistoryDrawerOpen(true);
+              }}
+            />
           )}
 
-          {/* ============================================================== */}
-          {/* CONFIRMATION DIALOG (Mandatory Step 7) */}
-          {/* ============================================================== */}
-          <Dialog
+          {/* Confirmation Dialog */}
+          <AttendanceConfirmDialog
             open={confirmDialogOpen}
             onClose={() => setConfirmDialogOpen(false)}
-            maxWidth="xs"
-            fullWidth
-          >
-            <DialogTitle fontWeight={700}>Confirm Attendance Submission</DialogTitle>
-            <DialogContent>
-              <DialogContentText sx={{ mb: 2 }}>
-                Please review the attendance summary before submitting for Section on {selectedDate}:
-              </DialogContentText>
-              <Box sx={{ bgcolor: 'action.hover', p: 2, borderRadius: 2, mb: 1 }}>
-                <Typography variant="body2">
-                  Total Students: <strong>{summaryCounters.total}</strong>
-                </Typography>
-                <Typography variant="body2" color="success.main">
-                  Present: <strong>{summaryCounters.present}</strong>
-                </Typography>
-                <Typography variant="body2" color="error.main">
-                  Absent: <strong>{summaryCounters.absent}</strong>
-                </Typography>
-                <Typography variant="body2" color="warning.main">
-                  Late: <strong>{summaryCounters.late}</strong>
-                </Typography>
-                <Typography variant="body2" color="info.main">
-                  Excused: <strong>{summaryCounters.excused}</strong>
-                </Typography>
-                <Divider sx={{ my: 1 }} />
-                <Typography variant="body2" fontWeight={700}>
-                  Calculated Attendance Rate: {summaryCounters.percentage}%
-                </Typography>
-              </Box>
-            </DialogContent>
-            <DialogActions sx={{ p: 2 }}>
-              <Button onClick={() => setConfirmDialogOpen(false)}>Cancel</Button>
-              <Button
-                variant="contained"
-                onClick={executeSubmission}
-                disabled={submitMutation.isPending}
-              >
-                {submitMutation.isPending ? 'Submitting...' : 'Confirm & Save'}
-              </Button>
-            </DialogActions>
-          </Dialog>
+            selectedDate={selectedDate}
+            summaryCounters={summaryCounters}
+            onConfirm={executeSubmission}
+            isSubmitting={submitMutation.isPending}
+          />
 
-          {/* ============================================================== */}
-          {/* EDIT RECORD MODAL WITH MANDATORY REASON */}
-          {/* ============================================================== */}
-          <Dialog
+          {/* Edit Record Modal with Mandatory Reason */}
+          <AdminEditAttendanceDialog
             open={editDialogOpen}
             onClose={() => setEditDialogOpen(false)}
-            maxWidth="sm"
-            fullWidth
-          >
-            <DialogTitle fontWeight={700}>Correct Attendance Record</DialogTitle>
-            <DialogContent>
-              {editError && (
-                <Alert severity="error" sx={{ mb: 2 }} onClose={() => setEditError(null)}>
-                  {editError}
-                </Alert>
-              )}
-              {recordToEdit && (
-                <Box sx={{ pt: 1 }}>
-                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Student: <strong>{recordToEdit.student_name}</strong> (
-                    {recordToEdit.enrollment_number || recordToEdit.student_code})
-                  </Typography>
+            recordToEdit={recordToEdit}
+            editStatus={editStatus}
+            onStatusChange={setEditStatus}
+            editReason={editReason}
+            onReasonChange={setEditReason}
+            editRemark={editRemark}
+            onRemarkChange={setEditRemark}
+            editError={editError}
+            onClearError={() => setEditError(null)}
+            onSave={handleSaveEdit}
+            isSaving={editMutation.isPending}
+          />
 
-                  <Box sx={{ my: 2 }}>
-                    <Typography variant="caption" display="block" gutterBottom>
-                      New Attendance Status:
-                    </Typography>
-                    <ToggleButtonGroup
-                      size="small"
-                      value={editStatus}
-                      exclusive
-                      onChange={(_, val) => val && setEditStatus(val)}
-                      fullWidth
-                    >
-                      <ToggleButton value="PRESENT" color="success">
-                        Present
-                      </ToggleButton>
-                      <ToggleButton value="ABSENT" color="error">
-                        Absent
-                      </ToggleButton>
-                      <ToggleButton value="LATE" color="warning">
-                        Late
-                      </ToggleButton>
-                      <ToggleButton value="EXCUSED" color="info">
-                        Excused
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                  </Box>
-
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Mandatory Reason for Correction *"
-                    placeholder="e.g. Doctor's medical certificate submitted by parent"
-                    value={editReason}
-                    onChange={(e) => setEditReason(e.target.value)}
-                    sx={{ mb: 2 }}
-                    required
-                  />
-
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Optional Remark"
-                    placeholder="e.g. Approved medical leave"
-                    value={editRemark}
-                    onChange={(e) => setEditRemark(e.target.value)}
-                  />
-                </Box>
-              )}
-            </DialogContent>
-            <DialogActions sx={{ p: 2 }}>
-              <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-              <Button
-                variant="contained"
-                onClick={handleSaveEdit}
-                disabled={editMutation.isPending || !editReason.trim()}
-              >
-                {editMutation.isPending ? 'Saving...' : 'Save Correction'}
-              </Button>
-            </DialogActions>
-          </Dialog>
-
-          {/* ============================================================== */}
-          {/* STUDENT ATTENDANCE HISTORY DRAWER */}
-          {/* ============================================================== */}
-          <Drawer
-            anchor="right"
+          {/* Student Attendance History Drawer */}
+          <StudentAttendanceHistoryDrawer
             open={historyDrawerOpen}
             onClose={() => setHistoryDrawerOpen(false)}
-            PaperProps={{ sx: { width: { xs: '100%', sm: 500 }, p: 3 } }}
-          >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" fontWeight={700}>
-                Student Attendance History
-              </Typography>
-              <IconButton onClick={() => setHistoryDrawerOpen(false)} size="small">
-                <CloseIcon />
-              </IconButton>
-            </Box>
-            <Divider sx={{ mb: 2 }} />
-
-            {loadingStudentHistory ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-                <CircularProgress />
-              </Box>
-            ) : !studentHistory ? (
-              <Typography variant="body2" color="text.secondary">
-                No attendance records found for this student.
-              </Typography>
-            ) : (
-              <Box>
-                <Box sx={{ mb: 3 }}>
-                  <Typography variant="h6">{studentHistory.student_name}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {studentHistory.grade_name} – {studentHistory.section_name} |{' '}
-                    {studentHistory.enrollment_number || studentHistory.student_code}
-                  </Typography>
-                </Box>
-
-                {/* Metrics */}
-                <Grid container spacing={1} sx={{ mb: 3 }}>
-                  <Grid item xs={4}>
-                    <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'action.hover' }}>
-                      <Typography variant="caption">Total Sessions</Typography>
-                      <Typography variant="h6" fontWeight={700}>
-                        {studentHistory.total_working_days}
-                      </Typography>
-                    </Paper>
-                  </Grid>
-                  <Grid item xs={4}>
-                    <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'success.50' }}>
-                      <Typography variant="caption" color="success.dark">
-                        Present
-                      </Typography>
-                      <Typography variant="h6" fontWeight={700} color="success.main">
-                        {studentHistory.present_days}
-                      </Typography>
-                    </Paper>
-                  </Grid>
-                  <Grid item xs={4}>
-                    <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'error.50' }}>
-                      <Typography variant="caption" color="error.dark">
-                        Absent
-                      </Typography>
-                      <Typography variant="h6" fontWeight={700} color="error.main">
-                        {studentHistory.absent_days}
-                      </Typography>
-                    </Paper>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'primary.50' }}>
-                      <Typography variant="caption" color="primary.dark">
-                        Overall Attendance Percentage
-                      </Typography>
-                      <Typography variant="h5" fontWeight={700} color="primary.main">
-                        {studentHistory.attendance_percentage}%
-                      </Typography>
-                    </Paper>
-                  </Grid>
-                </Grid>
-
-                <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-                  Session Timeline
-                </Typography>
-                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 350 }}>
-                  <Table size="small">
-                    <TableHead sx={{ bgcolor: 'action.hover' }}>
-                      <TableRow>
-                        <TableCell>
-                          <strong>Date</strong>
-                        </TableCell>
-                        <TableCell align="center">
-                          <strong>Status</strong>
-                        </TableCell>
-                        <TableCell>
-                          <strong>Remarks</strong>
-                        </TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {studentHistory.records.map((r, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell sx={{ fontSize: '0.85rem' }}>{r.date}</TableCell>
-                          <TableCell align="center">
-                            <Chip
-                              label={r.status}
-                              size="small"
-                              color={
-                                r.status === 'PRESENT'
-                                ? 'success'
-                                : r.status === 'ABSENT'
-                                ? 'error'
-                                : 'warning'
-                              }
-                            />
-                          </TableCell>
-                          <TableCell sx={{ fontSize: '0.85rem' }}>{r.remark || '—'}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Box>
-            )}
-          </Drawer>
+            loading={loadingStudentHistory}
+            studentHistory={studentHistory}
+          />
         </Box>
       </AppShell>
     </RequireRole>

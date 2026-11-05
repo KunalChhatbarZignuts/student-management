@@ -6,7 +6,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.email import get_email_backend
-from app.models.academic_structure import AcademicYear, Grade, Section, StudentEnrollment
+from app.models.academic_structure import Grade, Section, StudentEnrollment
 from app.models.classroom import TeacherAssignment
 from app.models.leave import LeaveStatus, LeaveSubmissionRole, StudentLeaveApplication
 from app.models.parent import Parent, ParentStudentLink

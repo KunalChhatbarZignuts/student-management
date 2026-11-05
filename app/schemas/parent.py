@@ -2,8 +2,6 @@ import uuid
 from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.schemas.student import StudentResponse
-
 
 class ParentCreate(BaseModel):
     email: EmailStr

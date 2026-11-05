@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
@@ -17,7 +16,6 @@ from app.core.rate_limit import limiter
 from app.core.security import (
     create_access_token,
     create_restricted_token,
-    decode_token,
     generate_secure_token,
     hash_password,
     hash_token,
@@ -26,7 +24,7 @@ from app.core.security import (
 )
 from app.models.invite import Invite
 from app.models.password_reset import PasswordReset
-from app.models.user import User, UserRole, UserStatus
+from app.models.user import User, UserStatus
 from app.schemas.auth import (
     AcceptInviteRequest,
     ChangePasswordRequest,

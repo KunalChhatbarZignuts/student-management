@@ -1,12 +1,9 @@
 import uuid
-from decimal import Decimal
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.academic_structure import (
-    AcademicYear,
-    Grade,
     Period,
     Section,
     StudentEnrollment,
@@ -15,12 +12,11 @@ from app.models.academic_structure import (
     TimetableEntry,
 )
 from app.models.admission import Admission
-from app.models.attendance import AttendanceRecord, AttendanceSession
+from app.models.attendance import AttendanceRecord
 from app.models.classroom import Subject, TeacherAssignment
 from app.models.fee import (
     FeeInstallment,
     FeePayment,
-    FeeStructure,
     StudentFeeAssignment,
 )
 from app.models.leave import StudentLeaveApplication

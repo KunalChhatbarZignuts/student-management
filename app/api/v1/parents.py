@@ -10,9 +10,10 @@ from app.core.config import settings
 from app.core.deps import get_client_ip, get_db, require_roles
 from app.core.email import send_invite_email
 from app.core.security import generate_secure_token, hash_token, hash_password
-from app.models.academic import AttendanceRecord, FeeInvoice, StudentMark
+from app.models.academic import FeeInvoice, StudentMark
+from app.models.attendance import AttendanceRecord
 from app.models.academic_structure import AcademicYear, Grade, Section, StudentEnrollment
-from app.models.classroom import Class, Subject, TeacherAssignment
+from app.models.classroom import Class, TeacherAssignment
 from app.models.invite import Invite
 from app.models.parent import Parent, ParentStudentLink
 from app.models.student import Student
@@ -27,7 +28,6 @@ from app.schemas.parent import (
     LinkChildPayload,
     LinkedChildDetail,
     LinkedParentDetail,
-    LinkedStudentSummary,
     PaginatedParentsResponse,
     ParentCreate,
     ParentLinkResponse,
@@ -40,7 +40,6 @@ from app.schemas.parent import (
     ParentWithChildrenResponse,
     UpdateRelationshipPayload,
 )
-from app.schemas.student import StudentResponse
 from app.services.audit_service import log_action
 
 router = APIRouter(tags=["Parents & Guardian Management"])

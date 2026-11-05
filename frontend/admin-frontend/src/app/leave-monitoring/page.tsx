@@ -5,8 +5,6 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
 import Grid from '@mui/material/Grid';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import Table from '@mui/material/Table';
@@ -18,21 +16,24 @@ import TableRow from '@mui/material/TableRow';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
-import Stack from '@mui/material/Stack';
+import PersonIcon from '@mui/icons-material/Person';
+import FamilyRestroomIcon from '@mui/icons-material/FamilyRestroom';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
-import PersonIcon from '@mui/icons-material/Person';
-import FamilyRestroomIcon from '@mui/icons-material/FamilyRestroom';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { useQuery } from '@tanstack/react-query';
 
 import AppShell from '@/components/layout/AppShell';
 import RequireRole from '@/components/guards/RequireRole';
+import PageHeader from '@/components/ui/PageHeader';
+import SearchFilterBar from '@/components/ui/SearchFilterBar';
+import EmptyState from '@/components/ui/EmptyState';
 import { ROLES } from '@/lib/constants';
 import { leaveApi, leaveKeys } from '@/features/leaves/api';
 import { LeaveMonitoringFilters } from '@/features/leaves/types';
 import { formatErrorMessage } from '@/lib/errorMapper';
+import LeaveMonitoringStats from '@/features/leaves/components/LeaveMonitoringStats';
 
 export default function LeaveMonitoringPage() {
   const [statusFilter, setStatusFilter] = React.useState<string>('');
@@ -67,67 +68,18 @@ export default function LeaveMonitoringPage() {
     <RequireRole roles={[ROLES.ADMIN, ROLES.SUPER_ADMIN]}>
       <AppShell>
         <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
-          {/* Header */}
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="h4" fontWeight={700} gutterBottom>
-              Student Leave Monitoring
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Central institutional oversight for all student leave applications, tracking Class Teacher approval status and workflow compliance.
-            </Typography>
-          </Box>
+          <PageHeader
+            title="Student Leave Monitoring"
+            subtitle="Central institutional oversight for all student leave applications, tracking Class Teacher approval status and workflow compliance."
+          />
 
           {/* Metric Overview Cards */}
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card sx={{ borderRadius: 2, border: 1, borderColor: 'divider', boxShadow: 0 }}>
-                <CardContent sx={{ py: 2 }}>
-                  <Typography variant="caption" color="text.secondary" fontWeight={600} textTransform="uppercase">
-                    Total Applications
-                  </Typography>
-                  <Typography variant="h4" fontWeight={700} color="primary.main">
-                    {data?.total || 0}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card sx={{ borderRadius: 2, border: 1, borderColor: 'warning.light', bgcolor: 'warning.50', boxShadow: 0 }}>
-                <CardContent sx={{ py: 2 }}>
-                  <Typography variant="caption" color="warning.dark" fontWeight={600} textTransform="uppercase">
-                    Pending Review
-                  </Typography>
-                  <Typography variant="h4" fontWeight={700} color="warning.dark">
-                    {data?.pending_count || 0}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card sx={{ borderRadius: 2, border: 1, borderColor: 'success.light', bgcolor: 'success.50', boxShadow: 0 }}>
-                <CardContent sx={{ py: 2 }}>
-                  <Typography variant="caption" color="success.dark" fontWeight={600} textTransform="uppercase">
-                    Approved Leaves
-                  </Typography>
-                  <Typography variant="h4" fontWeight={700} color="success.dark">
-                    {data?.approved_count || 0}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card sx={{ borderRadius: 2, border: 1, borderColor: 'error.light', bgcolor: 'error.50', boxShadow: 0 }}>
-                <CardContent sx={{ py: 2 }}>
-                  <Typography variant="caption" color="error.dark" fontWeight={600} textTransform="uppercase">
-                    Rejected Leaves
-                  </Typography>
-                  <Typography variant="h4" fontWeight={700} color="error.dark">
-                    {data?.rejected_count || 0}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
+          <LeaveMonitoringStats
+            total={data?.total || 0}
+            pending={data?.pending_count || 0}
+            approved={data?.approved_count || 0}
+            unassigned={unassignedCount}
+          />
 
           {unassignedCount > 0 && (
             <Alert severity="warning" icon={<WarningAmberIcon />} sx={{ mb: 3 }}>
@@ -136,13 +88,18 @@ export default function LeaveMonitoringPage() {
           )}
 
           {/* Filter Bar */}
-          <Paper sx={{ p: 2, mb: 3, borderRadius: 2 }}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+          <SearchFilterBar
+            search={searchQuery}
+            onSearchChange={setSearchQuery}
+            placeholder="Search student by name, code, or enrollment..."
+            searchGridProps={{ xs: 12, sm: 8, md: 8 }}
+          >
+            <Grid item xs={12} sm={4} md={4}>
               <TextField
                 select
-                label="Application Status"
+                fullWidth
                 size="small"
-                sx={{ minWidth: 180 }}
+                label="Application Status"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
@@ -151,17 +108,8 @@ export default function LeaveMonitoringPage() {
                 <MenuItem value="approved">Approved</MenuItem>
                 <MenuItem value="rejected">Rejected</MenuItem>
               </TextField>
-
-              <TextField
-                label="Search Student"
-                placeholder="Search name, code, or enrollment..."
-                size="small"
-                fullWidth
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </Stack>
-          </Paper>
+            </Grid>
+          </SearchFilterBar>
 
           {error && (
             <Alert severity="error" sx={{ mb: 3 }}>
@@ -170,9 +118,9 @@ export default function LeaveMonitoringPage() {
           )}
 
           {/* Table */}
-          <TableContainer component={Paper} sx={{ borderRadius: 3, overflow: 'hidden' }}>
+          <TableContainer component={Paper} elevation={0} variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden' }}>
             <Table>
-              <TableHead sx={{ bgcolor: 'grey.50' }}>
+              <TableHead sx={{ bgcolor: 'action.hover' }}>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 700 }}>Student</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Class / Section</TableCell>
@@ -193,8 +141,11 @@ export default function LeaveMonitoringPage() {
                   </TableRow>
                 ) : !data?.items || data.items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                      No leave applications match the selected criteria.
+                    <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                      <EmptyState
+                        title="No leave applications found"
+                        description="No student leave applications match the selected status or query."
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -280,18 +231,18 @@ export default function LeaveMonitoringPage() {
                             />
                           )}
                         </TableCell>
-                        <TableCell sx={{ maxWidth: 220 }}>
+                        <TableCell>
                           {item.teacher_remarks ? (
-                            <Typography variant="body2" title={item.teacher_remarks}>
+                            <Typography variant="caption" color="text.secondary" display="block">
                               {item.teacher_remarks}
                             </Typography>
-                          ) : isPending ? (
+                          ) : item.decided_at ? (
                             <Typography variant="caption" color="text.secondary">
-                              Awaiting teacher decision
+                              Decided on {new Date(item.decided_at).toLocaleDateString()}
                             </Typography>
                           ) : (
                             <Typography variant="caption" color="text.secondary">
-                              No remarks recorded
+                              Awaiting review
                             </Typography>
                           )}
                         </TableCell>
@@ -307,4 +258,3 @@ export default function LeaveMonitoringPage() {
     </RequireRole>
   );
 }
-

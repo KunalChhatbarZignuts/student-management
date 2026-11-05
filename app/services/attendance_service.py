@@ -1,6 +1,5 @@
 import uuid
 from datetime import date, datetime, timedelta, timezone
-from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select
@@ -19,8 +18,6 @@ from app.schemas.attendance import (
     AttendanceSessionUpdate,
     ClassAttendanceSummaryResponse,
     StudentAttendanceSummaryItem,
-    StudentMeAttendanceRecord,
-    StudentMeAttendanceResponse,
 )
 from app.services.audit_service import log_action
 
@@ -449,68 +446,6 @@ def get_class_attendance_summary(
         to_date=to_date,
         total_sessions=total_sessions,
         items=items,
-    )
-
-
-def get_student_self_attendance(
-    student_id: uuid.UUID,
-    db: Session,
-) -> StudentMeAttendanceResponse:
-    student = db.get(Student, student_id)
-    if not student:
-        raise HTTPException(status_code=404, detail="Student profile not found")
-
-    records = db.execute(
-        select(AttendanceRecord)
-        .where(AttendanceRecord.student_id == student_id)
-        .order_by(AttendanceRecord.created_at.desc())
-    ).scalars().all()
-
-    me_records: list[StudentMeAttendanceRecord] = []
-    attended_count = 0
-    excused_count = 0
-
-    for r in records:
-        r_date = r.date
-        period = None
-        subject_name = None
-        if r.session_id:
-            session = db.get(AttendanceSession, r.session_id)
-            if session:
-                r_date = session.date
-                period = session.period
-                sub = db.get(Subject, session.subject_id)
-                if sub:
-                    subject_name = sub.name
-
-        st_lower = r.status.lower()
-        if st_lower in ("present", "late", "excused"):
-            attended_count += 1
-        if st_lower == "excused":
-            excused_count += 1
-
-        me_records.append(
-            StudentMeAttendanceRecord(
-                id=r.id,
-                date=r_date or datetime.now(timezone.utc).date(),
-                period=period,
-                subject_name=subject_name,
-                status=r.status.upper(),
-                remark=r.remark or r.notes,
-            )
-        )
-
-    total = len(me_records)
-    pct = round((attended_count / total * 100), 1) if total > 0 else 100.0
-
-    return StudentMeAttendanceResponse(
-        student_id=student.id,
-        student_code=student.student_code,
-        total_classes=total,
-        attended_classes=attended_count,
-        percentage=pct,
-        excused_absences=excused_count,
-        records=me_records,
     )
 
 

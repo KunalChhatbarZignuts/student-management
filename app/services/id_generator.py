@@ -39,7 +39,7 @@ def generate_enrollment_number(db: Session, admission_year: int) -> str:
     existing_counter = db.get(IdCounter, counter_name)
     if not existing_counter:
         from app.models.student import Student
-        from sqlalchemy import func, select
+        from sqlalchemy import select
         prefix = f"STU-{admission_year}-%"
         max_existing = db.execute(
             select(Student.enrollment_number)

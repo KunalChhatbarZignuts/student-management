@@ -1,6 +1,4 @@
-import uuid
-from datetime import datetime
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 class TokenResponse(BaseModel):

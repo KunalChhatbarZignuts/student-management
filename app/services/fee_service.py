@@ -23,7 +23,6 @@ from app.models.fee import (
     StudentFeeAssignmentItem,
 )
 from app.models.student import Student
-from app.models.user import User
 from app.services.id_generator import get_next_sequence_value
 from app.schemas.fee import (
     AdmissionFeeAssignmentPayload,
@@ -37,7 +36,6 @@ from app.schemas.fee import (
     FeeStructureCreate,
     FeeStructureListItem,
     FeeStructureResponse,
-    FeeStructureUpdate,
     InstallmentSchedulePreview,
     PaginatedFeeAssignmentsResponse,
     StudentFeeAdjustmentCreate,

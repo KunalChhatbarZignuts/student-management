@@ -1,4 +1,3 @@
-import datetime as dt
 import uuid
 
 from fastapi import HTTPException, status
@@ -14,11 +13,10 @@ from app.models.academic_structure import (
 )
 from app.models.classroom import Subject, TeacherAssignment
 from app.models.teacher import Teacher
-from app.models.user import User, UserRole, UserStatus
+from app.models.user import User, UserStatus
 from app.schemas.teacher_subject import (
     TeacherProfileAssignedSection,
     TeacherProfileWithSubjectsResponse,
-    TeacherSubjectAssignmentCreate,
     TeacherSubjectBulkCreate,
     TeacherSubjectResponse,
     TeacherSubjectTeacherItem,

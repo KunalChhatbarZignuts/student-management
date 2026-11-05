@@ -94,6 +94,7 @@ export interface SectionListResponse {
 export interface GradeDetailResponse extends Grade {
   sections: Section[];
 }
+export type GradeDetail = GradeDetailResponse;
 
 export interface TeacherAssignmentItem {
   id: string;

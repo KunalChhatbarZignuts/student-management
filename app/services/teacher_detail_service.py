@@ -1,6 +1,6 @@
 import uuid
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.academic_structure import (

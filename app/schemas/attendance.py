@@ -216,22 +216,3 @@ class ClassAttendanceSummaryResponse(BaseModel):
     to_date: date
     total_sessions: int
     items: list[StudentAttendanceSummaryItem]
-
-
-class StudentMeAttendanceRecord(BaseModel):
-    id: uuid.UUID
-    date: date
-    period: int | None = None
-    subject_name: str | None = None
-    status: str
-    remark: str | None = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class StudentMeAttendanceResponse(BaseModel):
-    student_id: uuid.UUID
-    student_code: str
-    total_classes: int
-    attended_classes: int
-    percentage: float

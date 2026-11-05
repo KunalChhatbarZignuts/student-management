@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_client_ip, get_current_user, get_db, require_roles
+from app.core.deps import get_client_ip, get_db, require_roles
 from app.models.academic_structure import AcademicYear
 from app.models.user import User, UserRole
 from app.schemas.grade_section import (

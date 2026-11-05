@@ -1,8 +1,7 @@
 import datetime as dt
 import uuid
-from decimal import Decimal
 from fastapi import HTTPException, status
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.academic_structure import (
@@ -12,11 +11,9 @@ from app.models.academic_structure import (
     Section,
     Shift,
     StudentEnrollment,
-    TeacherSubject,
     Timetable,
     TimetableEntry,
 )
-from app.models.classroom import Subject, TeacherAssignment
 from app.models.parent import Parent, ParentStudentLink
 from app.models.student import Student
 from app.models.teacher import Teacher
