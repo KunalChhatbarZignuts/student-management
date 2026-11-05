@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
@@ -34,6 +35,7 @@ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import PeopleIcon from '@mui/icons-material/People';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 import AppShell from '@/components/layout/AppShell';
 import RequireRole from '@/components/guards/RequireRole';
@@ -60,6 +62,7 @@ const createTeacherSchema = z.object({
 type CreateTeacherFormData = z.infer<typeof createTeacherSchema>;
 
 export default function TeachersManagementPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { showSnackbar } = useSnackbar();
 
@@ -241,6 +244,15 @@ export default function TeachersManagementPage() {
           <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
             {u.teacher && (
               <>
+                <Tooltip title="View Comprehensive Details">
+                  <IconButton
+                    size="small"
+                    color="primary"
+                    onClick={() => router.push(`/teachers/${u.teacher.id}`)}
+                  >
+                    <VisibilityIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
                 <Tooltip title="View Profile & Subjects">
                   <IconButton
                     size="small"

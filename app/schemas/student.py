@@ -29,9 +29,21 @@ class StudentCreate(BaseModel):
 
 class StudentUpdatePayload(BaseModel):
     first_name: str | None = Field(None, min_length=1, max_length=100)
+    middle_name: str | None = Field(None, max_length=100)
     last_name: str | None = Field(None, min_length=1, max_length=100)
     dob: date | None = None
+    gender: str | None = Field(None, pattern="^(male|female|other|Male|Female|Other)$")
+    phone: str | None = Field(None, max_length=30)
+    alternate_phone: str | None = Field(None, max_length=30)
     department: str | None = Field(None, min_length=1, max_length=50)
+    address: str | None = Field(None, max_length=255)
+    city: str | None = Field(None, max_length=100)
+    state: str | None = Field(None, max_length=100)
+    country: str | None = Field(None, max_length=100)
+    postal_code: str | None = Field(None, max_length=20)
+    previous_school_name: str | None = Field(None, max_length=200)
+    previous_school_details: str | None = Field(None, max_length=500)
+    admission_date: date | None = None
     guardian_name: str | None = None
     guardian_phone: str | None = None
     guardian_email: EmailStr | None = None

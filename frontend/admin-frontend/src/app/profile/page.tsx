@@ -13,12 +13,12 @@ import Avatar from '@mui/material/Avatar';
 import LockResetIcon from '@mui/icons-material/LockReset';
 import DevicesOtherIcon from '@mui/icons-material/DevicesOther';
 
-import { AppShell } from '@/components/layout/AppShell';
-import { RequireRole } from '@/components/guards/RequireRole';
+import AppShell from '@/components/layout/AppShell';
+import RequireRole from '@/components/guards/RequireRole';
 import { useAuth } from '@/features/auth/hooks';
 import { ROLES } from '@/lib/constants';
 import { useSnackbar } from '@/components/ui/SnackbarProvider';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 const ADMIN_ALLOWED_ROLES = [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.TEACHER];
 

@@ -132,6 +132,7 @@ export default function StudentAdmissionWizardPage() {
     postalCode: '',
     previousSchoolName: '',
     previousSchoolDetails: '',
+    department: 'General',
   });
 
   // --- Step 1: Parent & Guardian Details State ---
@@ -573,6 +574,7 @@ export default function StudentAdmissionWizardPage() {
         postal_code: studentData.postalCode.trim() || undefined,
         previous_school_name: studentData.previousSchoolName.trim() || undefined,
         previous_school_details: studentData.previousSchoolDetails.trim() || undefined,
+        department: studentData.department.trim() || 'General',
         password: createStudentAccount ? studentPassword : undefined,
       },
       parents: parentPayloads,
@@ -662,6 +664,7 @@ export default function StudentAdmissionWizardPage() {
       postalCode: '',
       previousSchoolName: '',
       previousSchoolDetails: '',
+      department: 'General',
     });
     setParents([
       {
@@ -817,6 +820,23 @@ export default function StudentAdmissionWizardPage() {
                     value={studentData.alternatePhone}
                     onChange={(e) => setStudentData({ ...studentData, alternatePhone: e.target.value })}
                   />
+                </Grid>
+
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>Department / Stream</InputLabel>
+                    <Select
+                      label="Department / Stream"
+                      value={studentData.department || 'General'}
+                      onChange={(e) => setStudentData({ ...studentData, department: e.target.value })}
+                    >
+                      <MenuItem value="General">General</MenuItem>
+                      <MenuItem value="Science">Science</MenuItem>
+                      <MenuItem value="Commerce">Commerce</MenuItem>
+                      <MenuItem value="Arts">Arts</MenuItem>
+                      <MenuItem value="Humanities">Humanities</MenuItem>
+                    </Select>
+                  </FormControl>
                 </Grid>
 
                 <Grid item xs={12}>

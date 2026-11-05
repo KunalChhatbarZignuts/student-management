@@ -27,9 +27,11 @@ from app.schemas.grade_section import (
     StudentEnrollmentHistoryItem,
 )
 from app.models.academic_structure import AcademicYear, Grade, Section, StudentEnrollment
+from app.schemas.student_detail import ComprehensiveStudentDetailResponse
 from app.services import enrollment_service
 from app.services.audit_service import log_action
 from app.services.id_generator import generate_enrollment_number, generate_student_code
+from app.services.student_detail_service import get_student_comprehensive_details
 
 router = APIRouter(prefix="/admin/students", tags=["Admin - Students"])
 
@@ -273,16 +275,40 @@ def update_student(
     # 1. Update personal details
     if payload.first_name is not None:
         student.first_name = payload.first_name.strip()
+    if payload.middle_name is not None:
+        student.middle_name = payload.middle_name.strip() or None
     if payload.last_name is not None:
         student.last_name = payload.last_name.strip()
     if payload.dob is not None:
         student.dob = payload.dob
+    if payload.gender is not None:
+        student.gender = payload.gender
+    if payload.phone is not None:
+        student.phone = payload.phone.strip() or None
+    if payload.alternate_phone is not None:
+        student.alternate_phone = payload.alternate_phone.strip() or None
     if payload.department is not None:
         student.department = payload.department.strip()
+    if payload.address is not None:
+        student.address = payload.address.strip() or None
+    if payload.city is not None:
+        student.city = payload.city.strip() or None
+    if payload.state is not None:
+        student.state = payload.state.strip() or None
+    if payload.country is not None:
+        student.country = payload.country.strip() or None
+    if payload.postal_code is not None:
+        student.postal_code = payload.postal_code.strip() or None
+    if payload.previous_school_name is not None:
+        student.previous_school_name = payload.previous_school_name.strip() or None
+    if payload.previous_school_details is not None:
+        student.previous_school_details = payload.previous_school_details.strip() or None
+    if payload.admission_date is not None:
+        student.admission_date = payload.admission_date
     if payload.guardian_name is not None:
-        student.guardian_name = payload.guardian_name.strip()
+        student.guardian_name = payload.guardian_name.strip() or None
     if payload.guardian_phone is not None:
-        student.guardian_phone = payload.guardian_phone.strip()
+        student.guardian_phone = payload.guardian_phone.strip() or None
     if payload.guardian_email is not None:
         student.guardian_email = payload.guardian_email
     if payload.status is not None:
@@ -437,3 +463,14 @@ def get_student_enrollments(
 ):
     """View complete academic enrollment history of a student."""
     return enrollment_service.get_student_enrollments(student_id, db)
+
+
+@router.get("/{student_id}/details", response_model=ComprehensiveStudentDetailResponse)
+def get_student_details(
+    student_id: uuid.UUID,
+    current_user: User = Depends(require_roles(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value)),
+    db: Session = Depends(get_db),
+):
+    """Admin centralized 360-degree view of all student records across all domains."""
+    return get_student_comprehensive_details(student_id, db)
+

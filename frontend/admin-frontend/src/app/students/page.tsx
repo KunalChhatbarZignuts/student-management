@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
@@ -33,6 +34,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import CheckIcon from '@mui/icons-material/Check';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 import AppShell from '@/components/layout/AppShell';
 import RequireRole from '@/components/guards/RequireRole';
@@ -73,6 +75,7 @@ type CreateStudentFormData = z.infer<typeof createStudentSchema>;
 type EditStudentFormData = z.infer<typeof editStudentSchema>;
 
 export default function StudentsManagementPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { showSnackbar } = useSnackbar();
 
@@ -410,15 +413,27 @@ export default function StudentsManagementPage() {
         return (
           <Box sx={{ display: 'flex', gap: 0.5 }}>
             {u.student && (
-              <Tooltip title="Edit Student & Enrollment">
-                <IconButton
-                  size="small"
-                  color="info"
-                  onClick={() => openEditModal(u.student)}
-                >
-                  <EditIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
+              <>
+                <Tooltip title="View Comprehensive Details">
+                  <IconButton
+                    size="small"
+                    color="primary"
+                    onClick={() => router.push(`/students/${u.student.id}`)}
+                  >
+                    <VisibilityIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+
+                <Tooltip title="Edit Student & Enrollment">
+                  <IconButton
+                    size="small"
+                    color="info"
+                    onClick={() => openEditModal(u.student)}
+                  >
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </>
             )}
 
             {u.status === 'invited' && (
