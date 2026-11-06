@@ -43,6 +43,16 @@ export const adminStudentApi = {
     return res.data;
   },
 
+  transferSection: async (studentId: string, payload: {
+    target_section_id: string;
+    target_grade_id?: string;
+    transfer_date?: string;
+    reason: string;
+  }) => {
+    const res = await apiClient.post(`/admin/students/${studentId}/transfer-section`, payload);
+    return res.data;
+  },
+
   suspendUser: async (userId: string) => {
     const res = await apiClient.patch(`/admin/users/${userId}/suspend`);
     return res.data;

@@ -11,6 +11,11 @@ class StudentPersonalDetails(BaseModel):
     dob: date
     gender: str | None = None
     blood_group: str | None = None
+    allergies: str | None = None
+    medical_conditions: str | None = None
+    emergency_contact_name: str | None = None
+    emergency_contact_phone: str | None = None
+    authorized_pickup_info: str | None = None
     phone: str | None = None
     alternate_phone: str | None = None
     email: EmailStr | None = None
@@ -56,6 +61,8 @@ class StudentAcademicDetails(BaseModel):
     current_academic_year: str | None = None
     current_grade: str | None = None
     current_section: str | None = None
+    grade_id: uuid.UUID | None = None
+    section_id: uuid.UUID | None = None
     current_roll_number: str | None = None
     current_enrollment_number: str | None = None
     class_teacher_name: str | None = None

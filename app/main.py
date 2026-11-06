@@ -16,6 +16,7 @@ from app.api.v1 import (
     audit_logs,
     auth,
     calendar,
+    examinations,
     fees,
     leaves,
     parents,
@@ -72,6 +73,7 @@ app.include_router(teacher_subjects.router, prefix="/api/v1")
 app.include_router(students.router, prefix="/api/v1")
 app.include_router(applications.router, prefix="/api/v1")
 app.include_router(leaves.router, prefix="/api/v1")
+app.include_router(examinations.router, prefix="/api/v1")
 app.include_router(timetables.router, prefix="/api/v1")
 
 
@@ -79,7 +81,9 @@ app.include_router(timetables.router, prefix="/api/v1")
 def root() -> dict:
     return {
         "message": f"{settings.PROJECT_NAME} is running",
+        "health": "/health",
         "docs": "/docs",
+        "redoc": "/redoc",
     }
 
 

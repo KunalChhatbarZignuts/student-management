@@ -23,6 +23,21 @@ import { useAuth } from '@/features/auth/hooks';
 import { attendanceApi } from '@/features/attendance/api';
 import { calendarApi } from '@/features/calendar/api';
 import { adminGradeApi } from '@/features/grades/api';
+import { formatErrorMessage } from '@/lib/errorMapper';
+
+function toISODateString(val: string): string {
+  if (!val) return new Date().toISOString().split('T')[0];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+  const parts = val.split('/');
+  if (parts.length === 3 && parts[2].length === 4) {
+    const month = parts[0].padStart(2, '0');
+    const day = parts[1].padStart(2, '0');
+    const year = parts[2];
+    return `${year}-${month}-${day}`;
+  }
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? val : d.toISOString().split('T')[0];
+}
 import {
   AttendanceStatusType,
   AttendanceRecordItem,
@@ -37,6 +52,7 @@ import {
   AttendanceAuditTable,
   AdminEditAttendanceDialog,
   AttendanceConfirmDialog,
+  TeacherAttendanceCorrectionDialog,
   StudentAttendanceHistoryDrawer,
 } from '@/features/attendance/components';
 
@@ -74,6 +90,11 @@ export default function AttendancePage() {
   const [confirmDialogOpen, setConfirmDialogOpen] = React.useState<boolean>(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = React.useState<string | null>(null);
+
+  // Teacher Grace Window & Amendment State
+  const [remainingSeconds, setRemainingSeconds] = React.useState<number>(0);
+  const [correctionDialogOpen, setCorrectionDialogOpen] = React.useState<boolean>(false);
+  const [changedRecordsCount, setChangedRecordsCount] = React.useState<number>(0);
 
   // Admin Edit Record Dialog State
   const [editDialogOpen, setEditDialogOpen] = React.useState<boolean>(false);
@@ -192,6 +213,23 @@ export default function AttendancePage() {
     }
   }, [existingSession, roster]);
 
+  // Sync and decrement remaining grace window seconds for teachers
+  React.useEffect(() => {
+    if (existingSession && typeof existingSession.edit_window_remaining_seconds === 'number') {
+      setRemainingSeconds(existingSession.edit_window_remaining_seconds);
+    } else {
+      setRemainingSeconds(0);
+    }
+  }, [existingSession]);
+
+  React.useEffect(() => {
+    if (remainingSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setRemainingSeconds((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [remainingSeconds]);
+
   // Live Summary Counters
   const summaryCounters = React.useMemo(() => {
     const list = Object.values(marks);
@@ -297,7 +335,29 @@ export default function AttendancePage() {
     },
     onError: (err: any) => {
       setConfirmDialogOpen(false);
-      const msg = err.response?.data?.detail || 'Failed to submit attendance. Please try again.';
+      const msg = formatErrorMessage(err, 'Failed to submit attendance. Please try again.');
+      setSubmitError(msg);
+      setSubmitSuccess(null);
+    },
+  });
+
+  // Amendment Mutation for Teachers within Grace Window
+  const amendMutation = useMutation({
+    mutationFn: (payload: { sessionId: string; records: any[]; correction_remark: string }) =>
+      attendanceApi.updateAttendanceSession(payload.sessionId, {
+        records: payload.records,
+        correction_remark: payload.correction_remark,
+      }),
+    onSuccess: () => {
+      setCorrectionDialogOpen(false);
+      setSubmitSuccess('Attendance amendments saved and recorded to school audit registry!');
+      setSubmitError(null);
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'attendance-overview'] });
+    },
+    onError: (err: any) => {
+      setCorrectionDialogOpen(false);
+      const msg = formatErrorMessage(err, 'Failed to save attendance amendments.');
       setSubmitError(msg);
       setSubmitSuccess(null);
     },
@@ -322,6 +382,34 @@ export default function AttendancePage() {
       setSubmitError('No students found to mark attendance for.');
       return;
     }
+
+    // If teacher is modifying an existing recorded session within grace window
+    if (isTeacher && existingSession) {
+      if (!existingSession.can_teacher_edit || remainingSeconds <= 0) {
+        setSubmitError(
+          'The 30-minute self-correction window for this session has expired. Contact an administrator to amend records.'
+        );
+        return;
+      }
+      const existingMap: Record<string, string> = {};
+      existingSession.records.forEach((r) => {
+        existingMap[r.student_id] = r.status;
+      });
+      let changed = 0;
+      Object.entries(marks).forEach(([studentId, data]) => {
+        if (!existingMap[studentId] || existingMap[studentId] !== data.status) {
+          changed++;
+        }
+      });
+      if (changed === 0) {
+        setSubmitError('No changes detected in student attendance statuses.');
+        return;
+      }
+      setChangedRecordsCount(changed);
+      setCorrectionDialogOpen(true);
+      return;
+    }
+
     setConfirmDialogOpen(true);
   };
 
@@ -333,9 +421,24 @@ export default function AttendancePage() {
     }));
 
     submitMutation.mutate({
-      date: selectedDate,
+      date: toISODateString(selectedDate),
       period: selectedPeriod,
       records: recordsPayload,
+    });
+  };
+
+  const executeAmendment = (remark: string) => {
+    if (!existingSession) return;
+    const recordsPayload = Object.entries(marks).map(([studentId, data]) => ({
+      student_id: studentId,
+      status: data.status,
+      remark: data.remark?.trim() || null,
+    }));
+
+    amendMutation.mutate({
+      sessionId: existingSession.id,
+      records: recordsPayload,
+      correction_remark: remark,
     });
   };
 
@@ -397,7 +500,7 @@ export default function AttendancePage() {
       }
     },
     onError: (err: any) => {
-      setEditError(err.response?.data?.detail || 'Failed to update record.');
+      setEditError(formatErrorMessage(err, 'Failed to update record.'));
     },
   });
 
@@ -565,13 +668,16 @@ export default function AttendancePage() {
                 marks={marks}
                 existingSession={existingSession}
                 isAdmin={isAdmin}
+                isTeacher={isTeacher}
+                canTeacherEdit={Boolean(existingSession?.can_teacher_edit && remainingSeconds > 0)}
+                remainingSeconds={remainingSeconds}
                 isNonWorkingDay={isNonWorkingDay}
                 summaryCounters={summaryCounters}
                 onStatusChange={handleStatusChange}
                 onRemarkChange={handleRemarkChange}
                 onOpenEdit={handleOpenEdit}
                 onPromptSubmit={handlePromptSubmit}
-                isSubmitting={submitMutation.isPending}
+                isSubmitting={submitMutation.isPending || amendMutation.isPending}
               />
             </Box>
           )}
@@ -657,6 +763,16 @@ export default function AttendancePage() {
             onClose={() => setHistoryDrawerOpen(false)}
             loading={loadingStudentHistory}
             studentHistory={studentHistory}
+          />
+
+          {/* Teacher Grace Window Self-Correction Modal */}
+          <TeacherAttendanceCorrectionDialog
+            open={correctionDialogOpen}
+            onClose={() => setCorrectionDialogOpen(false)}
+            onConfirm={executeAmendment}
+            isSubmitting={amendMutation.isPending}
+            changedCount={changedRecordsCount}
+            remainingSeconds={remainingSeconds}
           />
         </Box>
       </AppShell>

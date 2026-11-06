@@ -123,6 +123,14 @@ def create_student(
         dob=payload.dob,
         class_name=grade.name,
         section=section.name,
+        current_grade_id=grade.id,
+        current_section_id=section.id,
+        blood_group=payload.blood_group,
+        allergies=payload.allergies,
+        medical_conditions=payload.medical_conditions,
+        emergency_contact_name=payload.emergency_contact_name,
+        emergency_contact_phone=payload.emergency_contact_phone,
+        authorized_pickup_info=payload.authorized_pickup_info,
         department=department,
         admission_date=payload.admission_date,
         guardian_name=payload.guardian_name,
@@ -313,6 +321,18 @@ def update_student(
         student.guardian_email = payload.guardian_email
     if payload.status is not None:
         student.status = payload.status
+    if payload.blood_group is not None:
+        student.blood_group = payload.blood_group.strip() or None
+    if payload.allergies is not None:
+        student.allergies = payload.allergies.strip() or None
+    if payload.medical_conditions is not None:
+        student.medical_conditions = payload.medical_conditions.strip() or None
+    if payload.emergency_contact_name is not None:
+        student.emergency_contact_name = payload.emergency_contact_name.strip() or None
+    if payload.emergency_contact_phone is not None:
+        student.emergency_contact_phone = payload.emergency_contact_phone.strip() or None
+    if payload.authorized_pickup_info is not None:
+        student.authorized_pickup_info = payload.authorized_pickup_info.strip() or None
 
     # 2. Check if enrollment transfer is requested
     if payload.target_section_id:
@@ -406,6 +426,14 @@ def get_student_profile_admin(
         guardian_phone=student.guardian_phone,
         guardian_email=student.guardian_email,
         status=student.status,
+        current_grade_id=student.current_grade_id,
+        current_section_id=student.current_section_id,
+        blood_group=student.blood_group,
+        allergies=student.allergies,
+        medical_conditions=student.medical_conditions,
+        emergency_contact_name=student.emergency_contact_name,
+        emergency_contact_phone=student.emergency_contact_phone,
+        authorized_pickup_info=student.authorized_pickup_info,
         created_at=student.created_at,
         email=user.email if user else None,
         user_status=user.status if user else None,
@@ -430,6 +458,7 @@ def enroll_student(
 
 
 @router.post("/{student_id}/transfer", response_model=StudentEnrollmentHistoryItem)
+@router.post("/{student_id}/transfer-section", response_model=StudentEnrollmentHistoryItem)
 def transfer_student(
     student_id: uuid.UUID,
     payload: StudentTransferPayload,

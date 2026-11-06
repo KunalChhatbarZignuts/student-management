@@ -19,6 +19,10 @@ import InputAdornment from '@mui/material/InputAdornment';
 import SearchIcon from '@mui/icons-material/Search';
 import SendIcon from '@mui/icons-material/Send';
 import EditIcon from '@mui/icons-material/Edit';
+import TimerIcon from '@mui/icons-material/Timer';
+import LockIcon from '@mui/icons-material/Lock';
+import Alert from '@mui/material/Alert';
+import Chip from '@mui/material/Chip';
 
 import {
   AttendanceStatusType,
@@ -39,6 +43,9 @@ export interface AttendanceRollCallTableProps {
   marks: Record<string, { status: AttendanceStatusType; remark: string }>;
   existingSession?: AttendanceSessionResponse | null;
   isAdmin: boolean;
+  isTeacher?: boolean;
+  canTeacherEdit?: boolean;
+  remainingSeconds?: number;
   isNonWorkingDay: boolean;
   summaryCounters: {
     total: number;
@@ -67,6 +74,9 @@ export const AttendanceRollCallTable: React.FC<AttendanceRollCallTableProps> = (
   marks,
   existingSession,
   isAdmin,
+  isTeacher,
+  canTeacherEdit,
+  remainingSeconds = 0,
   isNonWorkingDay,
   summaryCounters,
   onStatusChange,
@@ -75,6 +85,14 @@ export const AttendanceRollCallTable: React.FC<AttendanceRollCallTableProps> = (
   onPromptSubmit,
   isSubmitting,
 }) => {
+  const formatRemaining = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  const isTeacherLocked = Boolean(existingSession) && isTeacher && !canTeacherEdit;
+  const isTeacherAmending = Boolean(existingSession) && isTeacher && Boolean(canTeacherEdit);
   if (loadingRoster || loadingSession) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
@@ -95,6 +113,35 @@ export const AttendanceRollCallTable: React.FC<AttendanceRollCallTableProps> = (
 
   return (
     <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
+      {/* Grace Window Live Countdown / Locked Status for Teachers */}
+      {isTeacherAmending && (
+        <Alert
+          severity="warning"
+          icon={<TimerIcon fontSize="inherit" />}
+          sx={{ m: 2, mb: 1, borderRadius: 2, fontWeight: 600 }}
+          action={
+            <Chip
+              label={`${formatRemaining(remainingSeconds)} left`}
+              color={remainingSeconds < 300 ? 'error' : 'warning'}
+              size="small"
+              sx={{ fontWeight: 700 }}
+            />
+          }
+        >
+          Attendance Self-Correction Active: You have {formatRemaining(remainingSeconds)} remaining to amend this roll call. Mandatory reason required on submit.
+        </Alert>
+      )}
+
+      {isTeacherLocked && (
+        <Alert
+          severity="info"
+          icon={<LockIcon fontSize="inherit" />}
+          sx={{ m: 2, mb: 1, borderRadius: 2, fontWeight: 500 }}
+        >
+          Session Locked: The 30-minute self-correction window for this roll call has ended. To make amendments, please contact your school administrator.
+        </Alert>
+      )}
+
       {/* Quick Search & Status Filter bar */}
       <Box
         sx={{
@@ -209,7 +256,7 @@ export const AttendanceRollCallTable: React.FC<AttendanceRollCallTableProps> = (
                         value={currentMark.status}
                         exclusive
                         onChange={(_, val) => onStatusChange(student.student_id, val)}
-                        disabled={isNonWorkingDay}
+                        disabled={isNonWorkingDay || isTeacherLocked}
                       >
                         <ToggleButton
                           value="PRESENT"
@@ -284,7 +331,7 @@ export const AttendanceRollCallTable: React.FC<AttendanceRollCallTableProps> = (
                         value={currentMark.remark}
                         onChange={(e) => onRemarkChange(student.student_id, e.target.value)}
                         fullWidth
-                        disabled={isNonWorkingDay}
+                        disabled={isNonWorkingDay || isTeacherLocked}
                       />
                     </TableCell>
                     {isAdmin && existingSession && (
@@ -328,13 +375,17 @@ export const AttendanceRollCallTable: React.FC<AttendanceRollCallTableProps> = (
         <Button
           variant="contained"
           size="large"
-          startIcon={<SendIcon />}
+          startIcon={isTeacherLocked ? <LockIcon /> : <SendIcon />}
           onClick={onPromptSubmit}
-          disabled={isSubmitting || isNonWorkingDay}
-          color={isNonWorkingDay ? 'inherit' : 'primary'}
+          disabled={isSubmitting || isNonWorkingDay || isTeacherLocked}
+          color={isNonWorkingDay || isTeacherLocked ? 'inherit' : 'primary'}
         >
           {isNonWorkingDay
             ? 'Disabled (Non-Working Day / Holiday)'
+            : isTeacherLocked
+            ? 'Attendance Locked (Grace Window Expired)'
+            : isTeacherAmending
+            ? `Submit Amendments (${formatRemaining(remainingSeconds)})`
             : isSubmitting
             ? 'Submitting...'
             : 'Submit Attendance Session'}

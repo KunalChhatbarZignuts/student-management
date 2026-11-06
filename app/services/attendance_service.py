@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import settings
 from app.models.academic_structure import AcademicYear, Grade, Section, StudentEnrollment
-from app.models.attendance import AttendanceRecord, AttendanceSession, AttendanceStatus
+from app.models.attendance import AttendanceAuditHistory, AttendanceRecord, AttendanceSession, AttendanceStatus
 from app.models.classroom import Class, Subject, TeacherAssignment
 from app.models.student import Student
 from app.models.teacher import Teacher
@@ -236,6 +236,11 @@ def get_teacher_attendance(
                     student_code=st.student_code if st else None,
                 )
             )
+        now_utc = datetime.now(timezone.utc)
+        s_created = s.created_at if s.created_at.tzinfo else s.created_at.replace(tzinfo=timezone.utc)
+        rem_secs = max(0, int((s_created + timedelta(minutes=settings.TEACHER_ATTENDANCE_GRACE_MINUTES) - now_utc).total_seconds()))
+        can_edit = s.locked_at is None and rem_secs > 0
+
         results.append(
             AttendanceSessionResponse(
                 id=s.id,
@@ -247,6 +252,8 @@ def get_teacher_attendance(
                 locked_at=s.locked_at,
                 created_at=s.created_at,
                 updated_at=s.updated_at,
+                can_teacher_edit=can_edit,
+                edit_window_remaining_seconds=rem_secs,
                 class_name=classroom.name,
                 section=classroom.section,
                 subject_name=sub.name if sub else None,
@@ -275,15 +282,21 @@ def update_attendance_session(
             raise HTTPException(status_code=403, detail="Forbidden")
         _verify_teacher_class_access(teacher.id, session.class_id, db)
 
-    # Check edit window (default 24h)
-    edit_window = timedelta(hours=settings.ATTENDANCE_EDIT_WINDOW_HOURS)
+    # Check edit window (30-minute grace window for teachers; settings.ATTENDANCE_EDIT_WINDOW_HOURS for admins)
     now = datetime.now(timezone.utc)
-    # Ensure session.created_at is tz-aware for comparison
     created_at = session.created_at if session.created_at.tzinfo else session.created_at.replace(tzinfo=timezone.utc)
-    if not is_admin and (now - created_at > edit_window or session.locked_at is not None):
+    
+    if not is_admin:
+        grace_window = timedelta(minutes=settings.TEACHER_ATTENDANCE_GRACE_MINUTES)
+        if now - created_at > grace_window or session.locked_at is not None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Attendance edit window ({settings.TEACHER_ATTENDANCE_GRACE_MINUTES}m) has expired. Only administrators can modify locked records.",
+            )
+    elif session.locked_at is not None and not is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Attendance edit window ({settings.ATTENDANCE_EDIT_WINDOW_HOURS}h) has expired. Only administrators can modify locked records.",
+            detail="Attendance session is locked and cannot be modified.",
         )
 
     classroom = db.get(Class, session.class_id)
@@ -292,22 +305,70 @@ def update_attendance_session(
     # Map existing records by student_id
     existing_records = {r.student_id: r for r in session.records}
 
-    # Update or insert
+    # Verify mandatory correction remark for teachers when amending statuses
+    if not is_admin:
+        has_status_change = False
+        for item in payload.records:
+            rec = existing_records.get(item.student_id)
+            status_val = item.status.value if isinstance(item.status, AttendanceStatus) else item.status
+            if not rec or rec.status != status_val:
+                has_status_change = True
+                break
+
+        if has_status_change:
+            effective_remark = (payload.correction_remark or "").strip()
+            if not effective_remark:
+                has_item_remark = any(
+                    bool(item.remark and item.remark.strip())
+                    for item in payload.records
+                    if not existing_records.get(item.student_id)
+                    or existing_records[item.student_id].status != (item.status.value if isinstance(item.status, AttendanceStatus) else item.status)
+                )
+                if not has_item_remark:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="A non-empty correction remark is mandatory when amending roll call within the grace window.",
+                    )
+
+    # Update or insert, writing audit log for changes
     for item in payload.records:
         rec = existing_records.get(item.student_id)
         status_val = item.status.value if isinstance(item.status, AttendanceStatus) else item.status
+        reason = (payload.correction_remark or item.remark or ("Teacher self-correction within grace window" if not is_admin else "Admin amendment")).strip()
         if rec:
+            if rec.status != status_val:
+                audit = AttendanceAuditHistory(
+                    record_id=rec.id,
+                    session_id=session.id,
+                    student_id=rec.student_id,
+                    previous_status=rec.status,
+                    new_status=status_val,
+                    reason=reason,
+                    modified_by_user_id=actor_user_id,
+                )
+                db.add(audit)
             rec.status = status_val
-            rec.remark = item.remark
+            rec.remark = item.remark or rec.remark
         else:
             new_rec = AttendanceRecord(
                 session_id=session.id,
                 student_id=item.student_id,
                 status=status_val,
-                remark=item.remark,
+                remark=item.remark or payload.correction_remark,
                 date=session.date,
             )
             db.add(new_rec)
+            db.flush()
+            audit = AttendanceAuditHistory(
+                record_id=new_rec.id,
+                session_id=session.id,
+                student_id=item.student_id,
+                previous_status="UNRECORDED",
+                new_status=status_val,
+                reason=reason,
+                modified_by_user_id=actor_user_id,
+            )
+            db.add(audit)
 
     db.commit()
     db.refresh(session)
@@ -341,6 +402,9 @@ def update_attendance_session(
             )
         )
 
+    rem_secs = max(0, int((created_at + timedelta(minutes=settings.TEACHER_ATTENDANCE_GRACE_MINUTES) - now).total_seconds()))
+    can_teacher_edit = session.locked_at is None and rem_secs > 0
+
     return AttendanceSessionResponse(
         id=session.id,
         class_id=session.class_id,
@@ -351,6 +415,8 @@ def update_attendance_session(
         locked_at=session.locked_at,
         created_at=session.created_at,
         updated_at=session.updated_at,
+        can_teacher_edit=can_teacher_edit,
+        edit_window_remaining_seconds=rem_secs,
         class_name=classroom.name if classroom else None,
         section=classroom.section if classroom else None,
         subject_name=subject.name if subject else None,
@@ -834,6 +900,11 @@ def get_section_attendance(
             )
         )
 
+    now_utc = datetime.now(timezone.utc)
+    s_created = session.created_at if session.created_at.tzinfo else session.created_at.replace(tzinfo=timezone.utc)
+    rem_secs = max(0, int((s_created + timedelta(minutes=settings.TEACHER_ATTENDANCE_GRACE_MINUTES) - now_utc).total_seconds()))
+    can_edit = session.locked_at is None and rem_secs > 0
+
     return AttendanceSessionResponse(
         id=session.id,
         academic_year_id=session.academic_year_id,
@@ -851,6 +922,8 @@ def get_section_attendance(
         absent_count=a_cnt,
         late_count=l_cnt,
         excused_count=e_cnt,
+        can_teacher_edit=can_edit,
+        edit_window_remaining_seconds=rem_secs,
         created_at=session.created_at,
         updated_at=session.updated_at,
         records=records_out,

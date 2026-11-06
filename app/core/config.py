@@ -30,6 +30,7 @@ class Settings(BaseSettings):
 
     # Attendance
     ATTENDANCE_EDIT_WINDOW_HOURS: int = 24
+    TEACHER_ATTENDANCE_GRACE_MINUTES: int = 30
 
     # Feature flags
     ENABLE_ONLINE_APPLICATIONS: bool = False

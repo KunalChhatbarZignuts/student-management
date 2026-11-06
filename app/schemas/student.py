@@ -14,6 +14,14 @@ class StudentCreate(BaseModel):
     guardian_phone: str | None = None
     guardian_email: EmailStr | None = None
 
+    # Medical & Emergency Pickup Fields
+    blood_group: str | None = Field(None, max_length=10)
+    allergies: str | None = Field(None, max_length=500)
+    medical_conditions: str | None = Field(None, max_length=500)
+    emergency_contact_name: str | None = Field(None, max_length=100)
+    emergency_contact_phone: str | None = Field(None, max_length=30)
+    authorized_pickup_info: str | None = Field(None, max_length=500)
+
     # Mandatory Academic Structure references for atomic initial enrollment
     academic_year_id: uuid.UUID = Field(..., description="Academic year ID for initial enrollment")
     grade_id: uuid.UUID = Field(..., description="Grade ID for initial enrollment")
@@ -49,6 +57,14 @@ class StudentUpdatePayload(BaseModel):
     guardian_email: EmailStr | None = None
     status: str | None = None
 
+    # Medical & Emergency Pickup Fields
+    blood_group: str | None = Field(None, max_length=10)
+    allergies: str | None = Field(None, max_length=500)
+    medical_conditions: str | None = Field(None, max_length=500)
+    emergency_contact_name: str | None = Field(None, max_length=100)
+    emergency_contact_phone: str | None = Field(None, max_length=30)
+    authorized_pickup_info: str | None = Field(None, max_length=500)
+
     # Optional transfer fields to update enrollment while preserving history
     target_academic_year_id: uuid.UUID | None = None
     target_grade_id: uuid.UUID | None = None
@@ -72,6 +88,14 @@ class StudentResponse(BaseModel):
     guardian_phone: str | None = None
     guardian_email: str | None = None
     status: str
+    current_grade_id: uuid.UUID | None = None
+    current_section_id: uuid.UUID | None = None
+    blood_group: str | None = None
+    allergies: str | None = None
+    medical_conditions: str | None = None
+    emergency_contact_name: str | None = None
+    emergency_contact_phone: str | None = None
+    authorized_pickup_info: str | None = None
     created_at: datetime
     initial_password: str | None = None
     login_identifier: str | None = None
@@ -103,4 +127,11 @@ class StudentCreateResponse(BaseModel):
     invite_token: str  # returned on creation in dev so admin can distribute/inspect
     initial_password: str | None = None
     login_identifier: str | None = None
+
+
+class SectionTransferPayload(BaseModel):
+    target_section_id: uuid.UUID = Field(..., description="Target section ID to transfer student into")
+    effective_date: date = Field(default_factory=date.today, description="Effective date of transfer")
+    reason: str = Field(..., min_length=3, max_length=500, description="Reason for section transfer")
+
 

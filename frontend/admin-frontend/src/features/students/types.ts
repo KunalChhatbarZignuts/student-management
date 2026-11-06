@@ -30,6 +30,12 @@ export interface StudentCreatePayload {
   guardian_phone?: string;
   guardian_email?: string;
   password?: string;
+  blood_group?: string;
+  allergies?: string;
+  medical_conditions?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  authorized_pickup_info?: string;
 }
 
 export interface StudentCreateResponse {
@@ -63,6 +69,12 @@ export interface StudentUpdatePayload {
   guardian_phone?: string;
   guardian_email?: string;
   status?: string;
+  blood_group?: string;
+  allergies?: string;
+  medical_conditions?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  authorized_pickup_info?: string;
   target_academic_year_id?: string;
   target_grade_id?: string;
   target_section_id?: string;
@@ -95,6 +107,11 @@ export interface StudentPersonalDetails {
   dob: string;
   gender?: string | null;
   blood_group?: string | null;
+  allergies?: string | null;
+  medical_conditions?: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
+  authorized_pickup_info?: string | null;
   phone?: string | null;
   alternate_phone?: string | null;
   email?: string | null;
@@ -137,6 +154,8 @@ export interface StudentAcademicDetails {
   current_academic_year?: string | null;
   current_grade?: string | null;
   current_section?: string | null;
+  grade_id?: string | null;
+  section_id?: string | null;
   current_roll_number?: string | null;
   current_enrollment_number?: string | null;
   class_teacher_name?: string | null;

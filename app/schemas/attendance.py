@@ -39,6 +39,7 @@ class AttendanceRecordItemUpdate(BaseModel):
 
 class AttendanceSessionUpdate(BaseModel):
     records: list[AttendanceRecordItemUpdate] = Field(..., min_length=1)
+    correction_remark: str | None = Field(None, max_length=500, description="Mandatory correction remark if edited by teacher")
 
 
 class AttendanceRecordResponse(BaseModel):
@@ -77,6 +78,8 @@ class AttendanceSessionResponse(BaseModel):
     excused_count: int = 0
     locked_at: datetime | None = None
     created_at: datetime
+    can_teacher_edit: bool = False
+    edit_window_remaining_seconds: int = 0
     updated_at: datetime
     class_name: str | None = None
     section: str | None = None

@@ -41,6 +41,8 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
 
 import { useAuth } from '@/features/auth/hooks';
 import { useUiStore } from '@/store/uiStore';
@@ -98,6 +100,12 @@ const navItems: NavItem[] = [
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
   },
   {
+    label: 'Examinations',
+    href: '/examinations',
+    icon: <AssignmentIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
     label: 'User Accounts',
     href: '/users',
     icon: <AdminPanelSettingsIcon />,
@@ -137,6 +145,12 @@ const navItems: NavItem[] = [
     label: 'My Timetable',
     href: '/my-timetable',
     icon: <ScheduleIcon />,
+    roles: [ROLES.TEACHER],
+  },
+  {
+    label: 'My Examinations',
+    href: '/my-examinations',
+    icon: <FactCheckIcon />,
     roles: [ROLES.TEACHER],
   },
   {

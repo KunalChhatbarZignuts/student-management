@@ -31,6 +31,7 @@ import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -65,6 +66,11 @@ const navItems: NavItem[] = [
     href: '/children',
     icon: <FamilyRestroomIcon />,
     roles: [ROLES.PARENT],
+  },
+  {
+    label: 'Examinations & Results',
+    href: '/examinations',
+    icon: <FactCheckIcon />,
   },
   {
     label: 'Marks & Grades',

@@ -153,6 +153,7 @@ def list_parents(
             or_(
                 Parent.first_name.ilike(term),
                 Parent.last_name.ilike(term),
+                func.concat(Parent.first_name, " ", Parent.last_name).ilike(term),
                 Parent.phone.ilike(term),
                 User.email.ilike(term),
             )

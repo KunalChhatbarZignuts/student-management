@@ -3,6 +3,14 @@
 All notable changes to the Student Management System will be documented in this file.
 
 ## [Unreleased]
+- feat(examinations-and-report-cards): implemented offline Examination & Report Card Management System across Admin, Teacher, Student, and Parent roles. Includes examination cycle setup, subject scheduling, conflict detection, holiday validation, Class Teacher marks entry workspace with draft autosave and live grade calculation, administrative review and publication gate, and downloadable official school Report Card PDFs generated dynamically via ReportLab.
+- feat(student-relational-keys): added relational current_grade_id and current_section_id foreign keys to Student model with zero-downtime dual-write and full data backfill across all 76 student records.
+- feat(section-transfer): implemented student section transfer endpoint, enrollment status transition handling, and audit logging with admin dialog UI.
+- feat(student-medical-registry): added emergency contact, blood group, allergies, conditions, and authorized pickup fields with Student Details tab and profile integration.
+- feat(teacher-attendance-grace-window): implemented 30-minute self-correction window for teachers with mandatory correction remarks, audit history logging, and countdown timer UI.
+- fix(parents-search): added full name concatenation search matching multi-token queries in parents list endpoint (BUG-MAN-001).
+- fix(modal-accessibility): added autoFocus to dialog action button to eliminate WAI-ARIA aria-hidden focus warnings (BUG-MAN-002).
+- fix(parent-fees-empty-state): differentiated unassigned fee session from settled balance in student portal fee summary (BUG-MAN-003).
 - feat(student-leave-management): implemented Student Leave Application Management with strict Class Teacher approval, attendance EXCUSED integration, and multi-portal interfaces for Student, Parent, Teacher, and Admin.
 - feat(timetable-weekly-dummy-data): generated balanced Monday-Saturday timetables across all 15 grades and 37 sections (1,272 slots, 0 clashes) with strict teacher_subjects certification compliance and full weekly workload distribution.
 - refactor(remove-bulk-import): completely removed Bulk CSV User Import feature from backend router, import service, frontend navigation, and dashboard.

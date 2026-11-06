@@ -20,6 +20,8 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import EditIcon from '@mui/icons-material/Edit';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 
 import RequireRole from '@/components/guards/RequireRole';
 import AppShell from '@/components/layout/AppShell';
@@ -37,7 +39,9 @@ import StudentParentsTab from '@/features/students/components/details/StudentPar
 import StudentAdmissionsTab from '@/features/students/components/details/StudentAdmissionsTab';
 import StudentAttendanceTab from '@/features/students/components/details/StudentAttendanceTab';
 import StudentFeesTab from '@/features/students/components/details/StudentFeesTab';
+import StudentMedicalTab from '@/features/students/components/details/StudentMedicalTab';
 import StudentFullEditDialog from '@/features/students/components/details/StudentFullEditDialog';
+import TransferSectionDialog from '@/features/students/components/dialogs/TransferSectionDialog';
 
 function TabPanel(props: { children?: React.ReactNode; index: number; value: number }) {
   const { children, value, index, ...other } = props;
@@ -65,6 +69,7 @@ export default function StudentDetailsPage() {
 
   // Edit Modal State
   const [isEditOpen, setIsEditOpen] = React.useState(false);
+  const [isTransferOpen, setIsTransferOpen] = React.useState(false);
   const [editFormData, setEditFormData] = React.useState({
     first_name: '',
     middle_name: '',
@@ -85,6 +90,12 @@ export default function StudentDetailsPage() {
     guardian_name: '',
     guardian_phone: '',
     guardian_email: '',
+    blood_group: '',
+    allergies: '',
+    medical_conditions: '',
+    emergency_contact_name: '',
+    emergency_contact_phone: '',
+    authorized_pickup_info: '',
     target_academic_year_id: '',
     target_grade_id: '',
     target_section_id: '',
@@ -157,6 +168,12 @@ export default function StudentDetailsPage() {
       guardian_name: p?.guardian_name || '',
       guardian_phone: p?.guardian_phone || '',
       guardian_email: p?.guardian_email || '',
+      blood_group: p?.blood_group || '',
+      allergies: p?.allergies || '',
+      medical_conditions: p?.medical_conditions || '',
+      emergency_contact_name: p?.emergency_contact_name || '',
+      emergency_contact_phone: p?.emergency_contact_phone || '',
+      authorized_pickup_info: p?.authorized_pickup_info || '',
       target_academic_year_id: '',
       target_grade_id: '',
       target_section_id: '',
@@ -200,6 +217,12 @@ export default function StudentDetailsPage() {
       guardian_name: editFormData.guardian_name || undefined,
       guardian_phone: editFormData.guardian_phone || undefined,
       guardian_email: editFormData.guardian_email || undefined,
+      blood_group: editFormData.blood_group || undefined,
+      allergies: editFormData.allergies || undefined,
+      medical_conditions: editFormData.medical_conditions || undefined,
+      emergency_contact_name: editFormData.emergency_contact_name || undefined,
+      emergency_contact_phone: editFormData.emergency_contact_phone || undefined,
+      authorized_pickup_info: editFormData.authorized_pickup_info || undefined,
       target_academic_year_id: editFormData.target_academic_year_id || undefined,
       target_grade_id: editFormData.target_grade_id || undefined,
       target_section_id: editFormData.target_section_id || undefined,
@@ -223,6 +246,15 @@ export default function StudentDetailsPage() {
               Back to Students
             </Button>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Button
+                variant="outlined"
+                color="primary"
+                startIcon={<SwapHorizIcon />}
+                onClick={() => setIsTransferOpen(true)}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              >
+                Transfer Section
+              </Button>
               <Button
                 variant="contained"
                 color="primary"
@@ -283,6 +315,7 @@ export default function StudentDetailsPage() {
                     <Tab icon={<AssignmentIcon />} iconPosition="start" label="Admissions" />
                     <Tab icon={<EventAvailableIcon />} iconPosition="start" label="Attendance & Leaves" />
                     <Tab icon={<PaymentsIcon />} iconPosition="start" label="Fees & Ledger" />
+                    <Tab icon={<MedicalServicesIcon />} iconPosition="start" label="Medical & Emergency" />
                   </Tabs>
                 </Box>
 
@@ -318,6 +351,10 @@ export default function StudentDetailsPage() {
                   <TabPanel value={currentTab} index={5}>
                     <StudentFeesTab feeInfo={fee} />
                   </TabPanel>
+
+                  <TabPanel value={currentTab} index={6}>
+                    <StudentMedicalTab personalInfo={p} onOpenEdit={handleOpenEdit} />
+                  </TabPanel>
                 </Box>
               </Paper>
 
@@ -334,6 +371,19 @@ export default function StudentDetailsPage() {
                 academicYears={academicYears}
                 gradesList={gradesList}
                 sectionsList={sectionsList}
+              />
+
+              {/* Section Transfer Dialog */}
+              <TransferSectionDialog
+                open={isTransferOpen}
+                onClose={() => setIsTransferOpen(false)}
+                studentId={studentId}
+                studentName={`${p.first_name} ${p.last_name}`}
+                studentCode={studentData.student_code}
+                currentGradeName={a?.current_grade || p.class_name}
+                currentSectionName={a?.current_section || p.section}
+                currentGradeId={a?.grade_id}
+                currentSectionId={a?.section_id}
               />
             </>
           )}

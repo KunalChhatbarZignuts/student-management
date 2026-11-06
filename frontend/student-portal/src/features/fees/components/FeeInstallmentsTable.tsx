@@ -54,7 +54,14 @@ export const FeeInstallmentsTable: React.FC<FeeInstallmentsTableProps> = ({
             </TableRow>
           </TableHead>
           <TableBody>
-            {installments.map((inst) => (
+            {installments.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                  No fee installments scheduled for this academic term.
+                </TableCell>
+              </TableRow>
+            ) : (
+              installments.map((inst) => (
               <TableRow key={inst.id} hover>
                 <TableCell sx={{ fontWeight: 600 }}>{inst.installment_name}</TableCell>
                 <TableCell>{inst.due_date}</TableCell>
@@ -106,7 +113,8 @@ export const FeeInstallmentsTable: React.FC<FeeInstallmentsTableProps> = ({
                   </Box>
                 </TableCell>
               </TableRow>
-            ))}
+            ))
+          )}
           </TableBody>
         </Table>
       </TableContainer>

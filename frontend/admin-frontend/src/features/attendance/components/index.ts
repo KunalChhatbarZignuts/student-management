@@ -6,5 +6,7 @@ export * from './AttendanceSectionHistoryTable';
 export * from './AttendanceAuditTable';
 export * from './dialogs/AdminEditAttendanceDialog';
 export * from './dialogs/AttendanceConfirmDialog';
+export { default as TeacherAttendanceCorrectionDialog } from './dialogs/TeacherAttendanceCorrectionDialog';
+export * from './dialogs/TeacherAttendanceCorrectionDialog';
 export * from './drawers/StudentAttendanceHistoryDrawer';
 

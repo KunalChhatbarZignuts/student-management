@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
@@ -40,10 +41,20 @@ export default function MarksPage() {
     <RequireRole roles={STUDENT_PORTAL_ALLOWED_ROLES}>
       <AppShell>
         <Box sx={{ maxWidth: 960, mx: 'auto' }}>
-          <PageHeader
-            title="Marks & Academic Evaluation"
-            subtitle="Current term grading reports and subject evaluation breakdowns."
-          />
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2, mb: 1 }}>
+            <PageHeader
+              title="Marks & Academic Evaluation"
+              subtitle="Current term grading reports and subject evaluation breakdowns."
+            />
+            <Button
+              variant="contained"
+              color="primary"
+              href="/examinations"
+              sx={{ fontWeight: 600, mt: { xs: 0, sm: 2 } }}
+            >
+              Official Report Cards & Exam Timetable →
+            </Button>
+          </Box>
 
           {isParent && children && children.length > 1 && (
             <Tabs

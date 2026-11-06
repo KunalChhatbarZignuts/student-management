@@ -2,6 +2,18 @@
 
 from app.models.academic import FeeInvoice, StudentMark
 from app.models.admission import Admission
+from app.models.examination import (
+    ExamStatus,
+    ExamType,
+    Examination,
+    ExaminationNotification,
+    ExaminationSchedule,
+    GradingScale,
+    MarksStatus,
+    ResultStatus,
+    StudentExamMark,
+    StudentExamResult,
+)
 from app.models.fee import (
     FeeComponent,
     FeeInstallment,
@@ -66,6 +78,11 @@ __all__ = [
     "CalendarSpecialWorkingDay",
     "Class",
     "EnrollmentStatus",
+    "ExamStatus",
+    "ExamType",
+    "Examination",
+    "ExaminationNotification",
+    "ExaminationSchedule",
     "FeeComponent",
     "FeeInstallment",
     "FeeInvoice",
@@ -73,6 +90,7 @@ __all__ = [
     "FeeStructure",
     "FeeStructureItem",
     "Grade",
+    "GradingScale",
     "HolidayAuditHistory",
     "HolidayCategory",
     "IdCounter",
@@ -96,6 +114,10 @@ __all__ = [
     "StudentLeaveApplication",
     "LeaveStatus",
     "LeaveSubmissionRole",
+    "MarksStatus",
+    "ResultStatus",
+    "StudentExamMark",
+    "StudentExamResult",
     "StudentMark",
     "Subject",
     "Teacher",

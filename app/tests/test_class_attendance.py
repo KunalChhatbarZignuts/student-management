@@ -282,7 +282,10 @@ def test_mark_and_retrieve_section_attendance(client: TestClient, class_attendan
 def test_future_date_attendance_rejected(client: TestClient, class_attendance_fixture):
     fix = class_attendance_fixture
     t1_token = _create_token(fix["teacher_1_user"])
-    future_date = (dt.date.today() + dt.timedelta(days=2)).isoformat()
+    future_dt = dt.date.today() + dt.timedelta(days=1)
+    while future_dt.weekday() in (5, 6):  # ensure working day (not Sunday/Saturday)
+        future_dt += dt.timedelta(days=1)
+    future_date = future_dt.isoformat()
 
     payload = {
         "date": future_date,

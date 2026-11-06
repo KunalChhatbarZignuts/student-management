@@ -88,6 +88,8 @@ export const StudentFeeSummaryCards: React.FC<StudentFeeSummaryCardsProps> = ({ 
             <Typography variant="caption" color="text.secondary">
               {totalOutstanding > 0
                 ? 'Due across scheduled installments'
+                : totalPayable === 0 && totalPaid === 0
+                ? 'No fee structure assigned for this session'
                 : 'All installments fully paid!'}
             </Typography>
           </CardContent>

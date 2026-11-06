@@ -112,6 +112,8 @@ def enroll_student(
     # Synchronize student.class_name and student.section for backward compatibility
     student.class_name = grade.name
     student.section = section.name
+    student.current_grade_id = grade.id
+    student.current_section_id = section.id
 
     db.commit()
     db.refresh(enrollment)
@@ -220,6 +222,8 @@ def transfer_student(
     # Sync student record
     student.class_name = target_grade.name
     student.section = target_section.name
+    student.current_grade_id = target_grade.id
+    student.current_section_id = target_section.id
 
     db.commit()
     db.refresh(new_enrollment)
@@ -302,6 +306,8 @@ def promote_student(
 
     student.class_name = target_grade.name
     student.section = target_section.name
+    student.current_grade_id = target_grade.id
+    student.current_section_id = target_section.id
 
     db.commit()
     db.refresh(new_enrollment)

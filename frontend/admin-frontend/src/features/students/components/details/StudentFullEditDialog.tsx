@@ -84,7 +84,7 @@ export default function StudentFullEditDialog({
             <Tab label="Personal Details" />
             <Tab label="Address & Contact" />
             <Tab label="Prior Education" />
-            <Tab label="Emergency Guardian" />
+            <Tab label="Medical & Emergency" />
             <Tab label="Academic Transfer" />
           </Tabs>
         </Box>
@@ -261,27 +261,75 @@ export default function StudentFullEditDialog({
             </Grid>
           )}
 
-          {/* EDIT TAB 3: EMERGENCY GUARDIAN */}
+          {/* EDIT TAB 3: MEDICAL & EMERGENCY */}
           {editTab === 3 && (
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <Alert severity="info" sx={{ mb: 1 }}>
-                  These contacts serve as the immediate emergency fallback on the student record.
+                  Manage the student's medical alerts, blood group, emergency hotline, and authorized dismissal/pickup contacts.
                 </Alert>
               </Grid>
-              <Grid item xs={12}>
+
+              {/* Blood Group */}
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Blood Group</InputLabel>
+                  <Select
+                    label="Blood Group"
+                    value={editFormData.blood_group || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, blood_group: e.target.value })}
+                  >
+                    <MenuItem value="">Not Specified</MenuItem>
+                    <MenuItem value="A+">A+</MenuItem>
+                    <MenuItem value="A-">A-</MenuItem>
+                    <MenuItem value="B+">B+</MenuItem>
+                    <MenuItem value="B-">B-</MenuItem>
+                    <MenuItem value="AB+">AB+</MenuItem>
+                    <MenuItem value="AB-">AB-</MenuItem>
+                    <MenuItem value="O+">O+</MenuItem>
+                    <MenuItem value="O-">O-</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              {/* Emergency Contact Name */}
+              <Grid item xs={12} sm={6}>
                 <TextField
-                  label="Emergency Guardian Name"
+                  label="Emergency Contact Name"
                   fullWidth
-                  value={editFormData.guardian_name}
+                  placeholder="e.g. Mary Babbage (Mother)"
+                  value={editFormData.emergency_contact_name || ''}
+                  onChange={(e) => setEditFormData({ ...editFormData, emergency_contact_name: e.target.value })}
+                />
+              </Grid>
+
+              {/* Emergency Contact Phone */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Emergency Phone / Hotline"
+                  fullWidth
+                  placeholder="+1-555-0199"
+                  value={editFormData.emergency_contact_phone || ''}
+                  onChange={(e) => setEditFormData({ ...editFormData, emergency_contact_phone: e.target.value })}
+                />
+              </Grid>
+
+              {/* Guardian Name */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Primary Guardian Name"
+                  fullWidth
+                  value={editFormData.guardian_name || ''}
                   onChange={(e) => setEditFormData({ ...editFormData, guardian_name: e.target.value })}
                 />
               </Grid>
+
+              {/* Guardian Phone & Email */}
               <Grid item xs={12} sm={6}>
                 <TextField
                   label="Guardian Phone"
                   fullWidth
-                  value={editFormData.guardian_phone}
+                  value={editFormData.guardian_phone || ''}
                   onChange={(e) => setEditFormData({ ...editFormData, guardian_phone: e.target.value })}
                 />
               </Grid>
@@ -290,8 +338,47 @@ export default function StudentFullEditDialog({
                   label="Guardian Email"
                   type="email"
                   fullWidth
-                  value={editFormData.guardian_email}
+                  value={editFormData.guardian_email || ''}
                   onChange={(e) => setEditFormData({ ...editFormData, guardian_email: e.target.value })}
+                />
+              </Grid>
+
+              {/* Known Allergies */}
+              <Grid item xs={12}>
+                <TextField
+                  label="Documented Allergies"
+                  fullWidth
+                  placeholder="e.g. Peanuts, Penicillin, Bee stings (Leave blank if none)"
+                  value={editFormData.allergies || ''}
+                  onChange={(e) => setEditFormData({ ...editFormData, allergies: e.target.value })}
+                  helperText="High-priority alert displayed to teachers, school clinic, and staff."
+                />
+              </Grid>
+
+              {/* Medical Conditions */}
+              <Grid item xs={12}>
+                <TextField
+                  label="Medical Conditions / Special Instructions"
+                  fullWidth
+                  multiline
+                  rows={2}
+                  placeholder="e.g. Mild asthma, carries inhaler; requires glucose check before sports"
+                  value={editFormData.medical_conditions || ''}
+                  onChange={(e) => setEditFormData({ ...editFormData, medical_conditions: e.target.value })}
+                />
+              </Grid>
+
+              {/* Authorized Pickup List */}
+              <Grid item xs={12}>
+                <TextField
+                  label="Authorized Dismissal & Pickup Registry"
+                  fullWidth
+                  multiline
+                  rows={2}
+                  placeholder="e.g. Parents (Mary & John), Grandfather (Robert Lovelace with ID)"
+                  value={editFormData.authorized_pickup_info || ''}
+                  onChange={(e) => setEditFormData({ ...editFormData, authorized_pickup_info: e.target.value })}
+                  helperText="List of individuals authorized to pick up student at school dismissal."
                 />
               </Grid>
             </Grid>
