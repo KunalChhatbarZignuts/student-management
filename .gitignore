@@ -222,3 +222,7 @@ __marimo__/
 # Probe test credentials
 .env.probe
 probe_report.json
+
+
+./reports/
+./tasks/
