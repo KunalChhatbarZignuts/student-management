@@ -129,11 +129,19 @@ def get_current_restricted_user(
 
 def require_roles(*allowed_roles: str) -> Callable[[User], User]:
     """Dependency factory checking if current user has one of the allowed roles."""
+    if len(allowed_roles) == 1 and isinstance(allowed_roles[0], (list, tuple, set)):
+        roles_set = {str(r).lower() for r in allowed_roles[0]}
+        roles_display = ", ".join(str(r) for r in allowed_roles[0])
+    else:
+        roles_set = {str(r).lower() for r in allowed_roles}
+        roles_display = ", ".join(str(r) for r in allowed_roles)
+
     def role_checker(current_user: User = Depends(get_current_user)) -> User:
-        if current_user.role not in allowed_roles:
+        user_role_str = str(current_user.role).lower()
+        if user_role_str not in roles_set:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Operation not permitted. Required role: {', '.join(allowed_roles)}",
+                detail=f"Operation not permitted. Required role: {roles_display}",
             )
         return current_user
 

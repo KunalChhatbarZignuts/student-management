@@ -9,6 +9,7 @@ const nextConfig = {
       '@mui/icons-material',
       '@mui/x-data-grid',
       '@mui/x-date-pickers',
+      '@tanstack/react-query',
     ],
   },
   async rewrites() {

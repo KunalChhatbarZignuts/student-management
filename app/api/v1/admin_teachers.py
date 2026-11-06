@@ -24,6 +24,16 @@ from app.services.teacher_detail_service import get_teacher_comprehensive_detail
 router = APIRouter(prefix="/admin/teachers", tags=["Admin - Teachers"])
 
 
+@router.get("", response_model=list[TeacherResponse])
+def list_teachers(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value, UserRole.TEACHER.value)),
+):
+    """List all teachers."""
+    teachers = db.execute(select(Teacher).order_by(Teacher.first_name, Teacher.last_name)).scalars().all()
+    return teachers
+
+
 @router.post("", response_model=TeacherCreateResponse, status_code=status.HTTP_201_CREATED)
 def create_teacher(
     request: Request,

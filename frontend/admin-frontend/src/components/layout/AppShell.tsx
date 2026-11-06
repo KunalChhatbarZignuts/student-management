@@ -43,6 +43,10 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
+import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
+import PublishedWithChangesIcon from '@mui/icons-material/PublishedWithChanges';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 
 import { useAuth } from '@/features/auth/hooks';
 import { useUiStore } from '@/store/uiStore';
@@ -88,15 +92,45 @@ const navItems: NavItem[] = [
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
   },
   {
+    label: 'Academic Enrollments',
+    href: '/enrollments',
+    icon: <HistoryEduIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
+    label: 'Academic Rollover',
+    href: '/enrollments/rollover',
+    icon: <PublishedWithChangesIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
+    label: 'Fee Counter POS',
+    href: '/fees/pos',
+    icon: <PointOfSaleIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
     label: 'Fee Management',
     href: '/fees',
     icon: <AccountBalanceWalletIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
   },
   {
+    label: 'Teacher Substitutions',
+    href: '/timetable/substitutions',
+    icon: <SwapHorizIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
     label: 'Timetables',
     href: '/timetable',
     icon: <ScheduleIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
+    label: 'Absence Notifications',
+    href: '/attendance/notifications',
+    icon: <NotificationsActiveIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
   },
   {
@@ -110,12 +144,6 @@ const navItems: NavItem[] = [
     href: '/users',
     icon: <AdminPanelSettingsIcon />,
     roles: [ROLES.SUPER_ADMIN],
-  },
-  {
-    label: 'Applications',
-    href: '/applications',
-    icon: <AssignmentTurnedInIcon />,
-    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
   },
   {
     label: 'Parents & Guardians',
@@ -255,6 +283,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <ListItemButton
                 component={Link}
                 href={item.href}
+                prefetch={false}
                 selected={isActive}
                 onClick={() => setMobileOpen(false)}
                 sx={{

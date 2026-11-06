@@ -19,6 +19,7 @@ from app.schemas.attendance import (
     ClassAttendanceSummaryResponse,
     StudentAttendanceSummaryItem,
 )
+from app.services.absence_notification_service import dispatch_absence_notifications_for_session
 from app.services.audit_service import log_action
 
 
@@ -806,6 +807,13 @@ def record_section_attendance(
 
     db.commit()
     db.refresh(session)
+
+    # Automated absence notification hook
+    if absent_count > 0:
+        try:
+            dispatch_absence_notifications_for_session(db, session.id)
+        except Exception:
+            pass
 
     # Log action
     log_action(

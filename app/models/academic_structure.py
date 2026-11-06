@@ -3,7 +3,7 @@ import enum
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Time, UniqueConstraint, Uuid, text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text, Time, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from app.models.classroom import Subject, TeacherAssignment
     from app.models.student import Student
     from app.models.teacher import Teacher
+    from app.models.user import User
 
 
 class EnrollmentStatus(str, enum.Enum):
@@ -179,6 +180,14 @@ class StudentEnrollment(TimestampMixin, Base):
     enrollment_date: Mapped[dt.date] = mapped_column(Date, nullable=False, default=dt.date.today)
     joined_on: Mapped[dt.date] = mapped_column(Date, nullable=False, default=dt.date.today)
     left_on: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    remarks: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    transfer_from_enrollment_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("student_enrollments.id", ondelete="SET NULL"), nullable=True,
+    )
+    enrolled_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
+    )
 
     # Relationships
     student: Mapped["Student"] = relationship("Student")
@@ -198,10 +207,70 @@ class StudentEnrollment(TimestampMixin, Base):
         Index("ix_student_enrollments_section", "section_id"),
         Index("ix_student_enrollments_grade", "grade_id"),
         Index("ix_student_enrollments_student", "student_id"),
+        Index("ix_student_enrollments_transfer_from", "transfer_from_enrollment_id"),
     )
 
     def __repr__(self) -> str:
         return f"<StudentEnrollment student={self.student_id} section={self.section_id} status={self.status}>"
+
+
+class StudentTransferRecord(TimestampMixin, Base):
+    __tablename__ = "student_transfer_records"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("students.id", ondelete="CASCADE"), nullable=False,
+    )
+    from_academic_year_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("academic_years.id", ondelete="RESTRICT"), nullable=False,
+    )
+    to_academic_year_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("academic_years.id", ondelete="RESTRICT"), nullable=False,
+    )
+    from_grade_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("grades.id", ondelete="SET NULL"), nullable=True,
+    )
+    to_grade_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("grades.id", ondelete="SET NULL"), nullable=True,
+    )
+    from_section_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("sections.id", ondelete="SET NULL"), nullable=True,
+    )
+    to_section_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("sections.id", ondelete="SET NULL"), nullable=True,
+    )
+    from_enrollment_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("student_enrollments.id", ondelete="SET NULL"), nullable=True,
+    )
+    to_enrollment_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("student_enrollments.id", ondelete="SET NULL"), nullable=True,
+    )
+    transfer_date: Mapped[dt.date] = mapped_column(Date, nullable=False, default=dt.date.today)
+    transfer_type: Mapped[str] = mapped_column(String(50), nullable=False)  # SECTION_TRANSFER, GRADE_TRANSFER, YEAR_TRANSITION
+    reason: Mapped[str] = mapped_column(String(255), nullable=False)
+    remarks: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    performed_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
+    )
+
+    # Relationships
+    student: Mapped["Student"] = relationship("Student")
+    from_academic_year: Mapped["AcademicYear"] = relationship("AcademicYear", foreign_keys=[from_academic_year_id])
+    to_academic_year: Mapped["AcademicYear"] = relationship("AcademicYear", foreign_keys=[to_academic_year_id])
+    from_grade: Mapped["Grade | None"] = relationship("Grade", foreign_keys=[from_grade_id])
+    to_grade: Mapped["Grade | None"] = relationship("Grade", foreign_keys=[to_grade_id])
+    from_section: Mapped["Section | None"] = relationship("Section", foreign_keys=[from_section_id])
+    to_section: Mapped["Section | None"] = relationship("Section", foreign_keys=[to_section_id])
+
+    __table_args__ = (
+        Index("ix_transfer_records_student", "student_id"),
+        Index("ix_transfer_records_date", "transfer_date"),
+        Index("ix_transfer_records_from_section", "from_section_id"),
+        Index("ix_transfer_records_to_section", "to_section_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<StudentTransferRecord student={self.student_id} from={self.from_section_id} to={self.to_section_id} type={self.transfer_type}>"
 
 
 class TeacherSubject(TimestampMixin, Base):
@@ -329,5 +398,45 @@ class TimetableEntry(TimestampMixin, Base):
 
     def __repr__(self) -> str:
         return f"<TimetableEntry day={self.day_of_week} period={self.period_id} subject={self.subject_id} teacher={self.teacher_id}>"
+
+
+class TeacherSubstitution(TimestampMixin, Base):
+    __tablename__ = "teacher_substitutions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    date: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    timetable_entry_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("timetable_entries.id", ondelete="CASCADE"), nullable=False
+    )
+    original_teacher_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False
+    )
+    substitute_teacher_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="ASSIGNED")  # ASSIGNED, COMPLETED, CANCELLED
+    reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    assigned_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+    # Relationships
+    timetable_entry: Mapped["TimetableEntry"] = relationship("TimetableEntry")
+    original_teacher: Mapped["Teacher"] = relationship("Teacher", foreign_keys=[original_teacher_id])
+    substitute_teacher: Mapped["Teacher"] = relationship("Teacher", foreign_keys=[substitute_teacher_id])
+    assigned_by: Mapped["User | None"] = relationship("User", foreign_keys=[assigned_by_user_id])
+
+    __table_args__ = (
+        UniqueConstraint("date", "timetable_entry_id", name="uq_sub_date_entry"),
+        Index("ix_teacher_substitutions_date", "date"),
+        Index("ix_teacher_substitutions_substitute", "date", "substitute_teacher_id"),
+        Index("ix_teacher_substitutions_original", "date", "original_teacher_id"),
+        Index("ix_teacher_substitutions_status", "status"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<TeacherSubstitution date={self.date} orig={self.original_teacher_id} sub={self.substitute_teacher_id} status={self.status}>"
+
 
 

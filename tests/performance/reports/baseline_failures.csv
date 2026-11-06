@@ -1,0 +1,58 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+POST,[admin] POST /auth/login,"CatchResponseError('Login failed: 429 {""detail"":""Rate limit exceeded: 5 per 1 minute""}')",4,2026-11-06T09:39:03Z,2026-11-06T09:39:57Z
+GET,[student] GET /students/me/fees,HTTPError('401 Client Error: Unauthorized for url: [student] GET /students/me/fees'),23,2026-11-06T09:39:12Z,2026-11-06T09:40:43Z
+GET,[admin] GET /admin/students,HTTPError('401 Client Error: Unauthorized for url: [admin] GET /admin/students'),12,2026-11-06T09:39:03Z,2026-11-06T09:40:53Z
+GET,[admin] GET /admin/attendance/overview,HTTPError('422 Client Error: Unprocessable Entity for url: [admin] GET /admin/attendance/overview'),7,2026-11-06T09:39:18Z,2026-11-06T09:40:46Z
+GET,[parent] GET /parent/notifications,HTTPError('404 Client Error: Not Found for url: [parent] GET /parent/notifications'),3,2026-11-06T09:39:01Z,2026-11-06T09:40:05Z
+GET,[teacher] GET /teacher/attendance/summary,HTTPError('404 Client Error: Not Found for url: [teacher] GET /teacher/attendance/summary'),5,2026-11-06T09:39:15Z,2026-11-06T09:40:19Z
+GET,[student] GET /students/me/attendance,HTTPError('404 Client Error: Not Found for url: [student] GET /students/me/attendance'),14,2026-11-06T09:39:23Z,2026-11-06T09:40:12Z
+GET,[admin] GET /admin/parents,HTTPError('401 Client Error: Unauthorized for url: [admin] GET /admin/parents'),2,2026-11-06T09:40:25Z,2026-11-06T09:40:28Z
+GET,[teacher] GET /teacher/my-subjects,HTTPError('401 Client Error: Unauthorized for url: [teacher] GET /teacher/my-subjects'),5,2026-11-06T09:39:04Z,2026-11-06T09:40:56Z
+GET,[admin] GET /admin/grades,HTTPError('401 Client Error: Unauthorized for url: [admin] GET /admin/grades'),11,2026-11-06T09:39:04Z,2026-11-06T09:40:48Z
+GET,[teacher] GET /teacher/my-sections,HTTPError('404 Client Error: Not Found for url: [teacher] GET /teacher/my-sections'),16,2026-11-06T09:39:07Z,2026-11-06T09:40:23Z
+GET,[parent] GET /parents/me/children,HTTPError('401 Client Error: Unauthorized for url: [parent] GET /parents/me/children'),9,2026-11-06T09:39:09Z,2026-11-06T09:40:56Z
+GET,[admin] GET /admin/attendance/overview,HTTPError('401 Client Error: Unauthorized for url: [admin] GET /admin/attendance/overview'),10,2026-11-06T09:39:13Z,2026-11-06T09:40:58Z
+GET,[admin] GET /admin/fees/dashboard,HTTPError('401 Client Error: Unauthorized for url: [admin] GET /admin/fees/dashboard'),6,2026-11-06T09:39:09Z,2026-11-06T09:40:20Z
+GET,[student] GET /students/me/enrollments,HTTPError('404 Client Error: Not Found for url: [student] GET /students/me/enrollments'),9,2026-11-06T09:39:00Z,2026-11-06T09:40:05Z
+GET,[teacher] GET /teacher/my-sections,HTTPError('401 Client Error: Unauthorized for url: [teacher] GET /teacher/my-sections'),10,2026-11-06T09:39:12Z,2026-11-06T09:40:58Z
+GET,[teacher] GET /teacher/my-profile,HTTPError('401 Client Error: Unauthorized for url: [teacher] GET /teacher/my-profile'),2,2026-11-06T09:40:34Z,2026-11-06T09:40:52Z
+GET,[teacher] GET /teacher/classes,HTTPError('401 Client Error: Unauthorized for url: [teacher] GET /teacher/classes'),6,2026-11-06T09:39:16Z,2026-11-06T09:40:41Z
+POST,[student] POST /auth/login,"CatchResponseError('Login failed: 429 {""detail"":""Rate limit exceeded: 5 per 1 minute""}')",2,2026-11-06T09:39:02Z,2026-11-06T09:39:03Z
+GET,[student] GET /students/me/examinations/results,HTTPError('401 Client Error: Unauthorized for url: [student] GET /students/me/examinations/results'),18,2026-11-06T09:39:04Z,2026-11-06T09:40:59Z
+GET,[admin] GET /admin/academic-years,HTTPError('401 Client Error: Unauthorized for url: [admin] GET /admin/academic-years'),2,2026-11-06T09:40:04Z,2026-11-06T09:40:43Z
+GET,[admin] GET /admin/audit-logs,HTTPError('401 Client Error: Unauthorized for url: [admin] GET /admin/audit-logs'),1,2026-11-06T09:40:51Z,2026-11-06T09:40:51Z
+GET,[parent] GET /parent/me,HTTPError('500 Server Error: Internal Server Error for url: [parent] GET /parent/me'),4,2026-11-06T09:40:24Z,2026-11-06T09:40:58Z
+POST,[parent] POST /auth/login,"CatchResponseError('Login failed: 429 {""detail"":""Rate limit exceeded: 5 per 1 minute""}')",1,2026-11-06T09:39:04Z,2026-11-06T09:39:04Z
+GET,[parent] GET /parent/notifications,HTTPError('401 Client Error: Unauthorized for url: [parent] GET /parent/notifications'),8,2026-11-06T09:39:14Z,2026-11-06T09:40:44Z
+GET,[parent] GET /parent/me,HTTPError('404 Client Error: Not Found for url: [parent] GET /parent/me'),9,2026-11-06T09:39:10Z,2026-11-06T09:40:21Z
+GET,[student] GET /students/me/marks,HTTPError('401 Client Error: Unauthorized for url: [student] GET /students/me/marks'),12,2026-11-06T09:39:05Z,2026-11-06T09:40:47Z
+GET,[student] GET /students/me/enrollments,HTTPError('401 Client Error: Unauthorized for url: [student] GET /students/me/enrollments'),8,2026-11-06T09:39:02Z,2026-11-06T09:40:51Z
+GET,[teacher] GET /teacher/attendance/summary,HTTPError('401 Client Error: Unauthorized for url: [teacher] GET /teacher/attendance/summary'),4,2026-11-06T09:39:14Z,2026-11-06T09:40:49Z
+GET,[parent] GET /parent/me,HTTPError('401 Client Error: Unauthorized for url: [parent] GET /parent/me'),7,2026-11-06T09:39:22Z,2026-11-06T09:40:59Z
+GET,[student] GET /student/timetable/me,HTTPError('404 Client Error: Not Found for url: [student] GET /student/timetable/me'),13,2026-11-06T09:39:08Z,2026-11-06T09:40:58Z
+GET,[admin] GET /admin/teachers,HTTPError('401 Client Error: Unauthorized for url: [admin] GET /admin/teachers'),4,2026-11-06T09:39:30Z,2026-11-06T09:40:44Z
+GET,[teacher] GET /teacher/attendance/sections,HTTPError('401 Client Error: Unauthorized for url: [teacher] GET /teacher/attendance/sections'),7,2026-11-06T09:39:37Z,2026-11-06T09:40:47Z
+GET,[teacher] GET /teacher/timetable/me,HTTPError('401 Client Error: Unauthorized for url: [teacher] GET /teacher/timetable/me'),8,2026-11-06T09:39:05Z,2026-11-06T09:40:39Z
+GET,[parent] GET /parents/me/children (setup),HTTPError('404 Client Error: Not Found for url: [parent] GET /parents/me/children (setup)'),1,2026-11-06T09:39:01Z,2026-11-06T09:39:01Z
+GET,[student] GET /students/me/examinations/upcoming,HTTPError('404 Client Error: Not Found for url: [student] GET /students/me/examinations/upcoming'),4,2026-11-06T09:39:24Z,2026-11-06T09:40:07Z
+GET,[student] GET /students/me/examinations/upcoming,HTTPError('401 Client Error: Unauthorized for url: [student] GET /students/me/examinations/upcoming'),19,2026-11-06T09:39:08Z,2026-11-06T09:40:58Z
+GET,[parent] GET /parents/me/children,HTTPError('404 Client Error: Not Found for url: [parent] GET /parents/me/children'),3,2026-11-06T09:39:34Z,2026-11-06T09:40:16Z
+GET,[student] GET /student/timetable/me,HTTPError('401 Client Error: Unauthorized for url: [student] GET /student/timetable/me'),36,2026-11-06T09:39:03Z,2026-11-06T09:40:56Z
+GET,[teacher] GET /teacher/attendance/summary,HTTPError('422 Client Error: Unprocessable Entity for url: [teacher] GET /teacher/attendance/summary'),1,2026-11-06T09:40:28Z,2026-11-06T09:40:28Z
+GET,[teacher] GET /teacher/my-subjects,HTTPError('404 Client Error: Not Found for url: [teacher] GET /teacher/my-subjects'),3,2026-11-06T09:39:54Z,2026-11-06T09:40:00Z
+GET,[student] GET /students/me/fees,HTTPError('404 Client Error: Not Found for url: [student] GET /students/me/fees'),6,2026-11-06T09:39:15Z,2026-11-06T09:40:13Z
+GET,[teacher] GET /teacher/my-profile,HTTPError('404 Client Error: Not Found for url: [teacher] GET /teacher/my-profile'),5,2026-11-06T09:39:04Z,2026-11-06T09:40:21Z
+GET,[admin] GET /admin/sections,HTTPError('401 Client Error: Unauthorized for url: [admin] GET /admin/sections'),5,2026-11-06T09:39:11Z,2026-11-06T09:40:36Z
+GET,[teacher] GET /teacher/timetable/me,HTTPError('404 Client Error: Not Found for url: [teacher] GET /teacher/timetable/me'),13,2026-11-06T09:39:00Z,2026-11-06T09:40:17Z
+GET,[student] GET /students/me/marks,HTTPError('404 Client Error: Not Found for url: [student] GET /students/me/marks'),3,2026-11-06T09:39:32Z,2026-11-06T09:40:21Z
+GET,[student] GET /students/me,HTTPError('401 Client Error: Unauthorized for url: [student] GET /students/me'),46,2026-11-06T09:39:03Z,2026-11-06T09:40:59Z
+GET,[teacher] GET /teacher/examinations,HTTPError('401 Client Error: Unauthorized for url: [teacher] GET /teacher/examinations'),3,2026-11-06T09:39:33Z,2026-11-06T09:40:28Z
+GET,[parent] GET /parents/me/children (setup),HTTPError('401 Client Error: Unauthorized for url: [parent] GET /parents/me/children (setup)'),1,2026-11-06T09:39:04Z,2026-11-06T09:39:04Z
+GET,[student] GET /students/me/examinations/results,HTTPError('404 Client Error: Not Found for url: [student] GET /students/me/examinations/results'),8,2026-11-06T09:39:03Z,2026-11-06T09:40:19Z
+POST,[teacher] POST /auth/login,"CatchResponseError('Login failed: 429 {""detail"":""Rate limit exceeded: 5 per 1 minute""}')",1,2026-11-06T09:39:04Z,2026-11-06T09:39:04Z
+GET,[student] GET /students/me/attendance,HTTPError('401 Client Error: Unauthorized for url: [student] GET /students/me/attendance'),28,2026-11-06T09:39:03Z,2026-11-06T09:40:58Z
+GET,[teacher] GET /teacher/attendance/sections,HTTPError('404 Client Error: Not Found for url: [teacher] GET /teacher/attendance/sections'),11,2026-11-06T09:39:02Z,2026-11-06T09:39:58Z
+GET,[teacher] GET /teacher/calendar/holidays,HTTPError('401 Client Error: Unauthorized for url: [teacher] GET /teacher/calendar/holidays'),2,2026-11-06T09:39:29Z,2026-11-06T09:39:45Z
+GET,[student] GET /students/me,HTTPError('404 Client Error: Not Found for url: [student] GET /students/me'),11,2026-11-06T09:39:04Z,2026-11-06T09:40:22Z
+GET,[admin] GET /admin/examinations/dashboard-metrics,HTTPError('401 Client Error: Unauthorized for url: [admin] GET /admin/examinations/dashboard-metrics'),5,2026-11-06T09:39:08Z,2026-11-06T09:40:46Z
+GET,[teacher] GET /teacher/classes,HTTPError('404 Client Error: Not Found for url: [teacher] GET /teacher/classes'),9,2026-11-06T09:39:02Z,2026-11-06T09:40:22Z

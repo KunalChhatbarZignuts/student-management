@@ -35,7 +35,7 @@ export const DashboardQuickNavigation: React.FC<DashboardQuickNavigationProps> =
               <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
                 View personal records, contact information, and manage account security.
               </Typography>
-              <Button component={Link} href="/profile" size="small" variant="text" sx={{ alignSelf: 'flex-start' }}>
+              <Button component={Link} href="/profile" prefetch={false} size="small" variant="text" sx={{ alignSelf: 'flex-start' }}>
                 Open Profile →
               </Button>
             </CardContent>
@@ -52,7 +52,7 @@ export const DashboardQuickNavigation: React.FC<DashboardQuickNavigationProps> =
               <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
                 Check term reports, graded assessments, and academic transcripts.
               </Typography>
-              <Button component={Link} href="/marks" size="small" variant="text" sx={{ alignSelf: 'flex-start' }}>
+              <Button component={Link} href="/marks" prefetch={false} size="small" variant="text" sx={{ alignSelf: 'flex-start' }}>
                 View Marks →
               </Button>
             </CardContent>
@@ -69,7 +69,7 @@ export const DashboardQuickNavigation: React.FC<DashboardQuickNavigationProps> =
               <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
                 Review month-by-month presence, leaves, and absence logs.
               </Typography>
-              <Button component={Link} href="/attendance" size="small" variant="text" sx={{ alignSelf: 'flex-start' }}>
+              <Button component={Link} href="/attendance" prefetch={false} size="small" variant="text" sx={{ alignSelf: 'flex-start' }}>
                 View Attendance →
               </Button>
             </CardContent>
@@ -87,7 +87,7 @@ export const DashboardQuickNavigation: React.FC<DashboardQuickNavigationProps> =
                 <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
                   Inspect tuition fee schedules, payment receipts, and balance dues.
                 </Typography>
-                <Button component={Link} href="/fees" size="small" variant="text" sx={{ alignSelf: 'flex-start' }}>
+                <Button component={Link} href="/fees" prefetch={false} size="small" variant="text" sx={{ alignSelf: 'flex-start' }}>
                   Check Fees →
                 </Button>
               </CardContent>
@@ -104,7 +104,7 @@ export const DashboardQuickNavigation: React.FC<DashboardQuickNavigationProps> =
                 <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
                   Review weekly class schedules, timings, and teachers.
                 </Typography>
-                <Button component={Link} href="/timetable" size="small" variant="text" sx={{ alignSelf: 'flex-start' }}>
+                <Button component={Link} href="/timetable" prefetch={false} size="small" variant="text" sx={{ alignSelf: 'flex-start' }}>
                   View Timetable →
                 </Button>
               </CardContent>

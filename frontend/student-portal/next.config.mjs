@@ -1,6 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    optimizePackageImports: [
+      '@mui/material',
+      '@mui/icons-material',
+      '@mui/x-data-grid',
+      '@mui/x-date-pickers',
+    ],
+  },
   async rewrites() {
     const apiUrl = process.env.API_URL || 'http://localhost:8000';
     return [

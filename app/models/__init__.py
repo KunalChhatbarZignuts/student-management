@@ -34,12 +34,14 @@ from app.models.academic_structure import (
     Section,
     Shift,
     StudentEnrollment,
+    StudentTransferRecord,
     TeacherSubject,
+    TeacherSubstitution,
     Timetable,
     TimetableEntry,
 )
-from app.models.application import Application
 from app.models.attendance import (
+    AbsenceNotificationLog,
     AttendanceAuditHistory,
     AttendanceRecord,
     AttendanceSession,
@@ -67,9 +69,9 @@ from app.models.teacher import Teacher
 from app.models.user import User
 
 __all__ = [
+    "AbsenceNotificationLog",
     "AcademicYear",
     "Admission",
-    "Application",
     "AttendanceAuditHistory",
     "AttendanceRecord",
     "AttendanceSession",
@@ -108,6 +110,7 @@ __all__ = [
     "Shift",
     "Student",
     "StudentEnrollment",
+    "StudentTransferRecord",
     "StudentFeeAdjustment",
     "StudentFeeAssignment",
     "StudentFeeAssignmentItem",
@@ -123,6 +126,7 @@ __all__ = [
     "Teacher",
     "TeacherAssignment",
     "TeacherSubject",
+    "TeacherSubstitution",
     "Timetable",
     "TimetableEntry",
     "User",

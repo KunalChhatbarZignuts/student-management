@@ -164,6 +164,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <ListItemButton
                 component={Link}
                 href={item.href}
+                prefetch={false}
                 selected={isActive}
                 onClick={() => setMobileOpen(false)}
                 sx={{

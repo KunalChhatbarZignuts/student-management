@@ -42,6 +42,7 @@ import StudentFeesTab from '@/features/students/components/details/StudentFeesTa
 import StudentMedicalTab from '@/features/students/components/details/StudentMedicalTab';
 import StudentFullEditDialog from '@/features/students/components/details/StudentFullEditDialog';
 import TransferSectionDialog from '@/features/students/components/dialogs/TransferSectionDialog';
+import { EnrollmentHistoryTimeline } from '@/features/enrollments/components';
 
 function TabPanel(props: { children?: React.ReactNode; index: number; value: number }) {
   const { children, value, index, ...other } = props;
@@ -331,6 +332,7 @@ export default function StudentDetailsPage() {
                       currentGrade={studentData.academic_details?.current_grade}
                       currentSection={studentData.academic_details?.current_section}
                     />
+                    <EnrollmentHistoryTimeline studentId={studentId} />
                   </TabPanel>
 
                   <TabPanel value={currentTab} index={2}>

@@ -28,7 +28,7 @@ import { useAuth } from '@/features/auth/hooks';
 import { ADMIN_ALLOWED_ROLES, ROLES } from '@/lib/constants';
 import { adminStudentApi } from '@/features/students/api';
 import { adminTeacherApi } from '@/features/teachers/api';
-import { adminApplicationApi } from '@/features/applications/api';
+import { enrollmentsApi } from '@/features/enrollments/api';
 import { teacherPortalApi } from '@/features/teacher-portal/api';
 
 export default function AdminDashboardPage() {
@@ -54,9 +54,9 @@ export default function AdminDashboardPage() {
     enabled: !isTeacher,
   });
 
-  const { data: applications, isLoading: loadingApps } = useQuery({
-    queryKey: ['dashboard', 'applications-count'],
-    queryFn: adminApplicationApi.listApplications,
+  const { data: enrollmentMetrics, isLoading: loadingEnrollments } = useQuery({
+    queryKey: ['dashboard', 'enrollment-metrics'],
+    queryFn: () => enrollmentsApi.getDashboardMetrics(),
     enabled: !isTeacher,
   });
 
@@ -67,7 +67,7 @@ export default function AdminDashboardPage() {
     enabled: isTeacher,
   });
 
-  const pendingAppsCount = applications?.filter((a) => a.status === 'pending').length || 0;
+  const enrolledCount = enrollmentMetrics?.total_enrolled ?? 0;
 
   return (
     <RequireRole roles={ADMIN_ALLOWED_ROLES}>
@@ -81,7 +81,7 @@ export default function AdminDashboardPage() {
               <Typography variant="body1" color="text.secondary">
                 {isTeacher
                   ? 'Access your scheduled classes, manage student presence, and submit attendance notifications.'
-                  : 'System overview: enrollment records, staff management, and application queues.'}
+                  : 'System overview: student directory, staff management, and academic operations.'}
               </Typography>
             </Box>
             <Chip
@@ -115,7 +115,7 @@ export default function AdminDashboardPage() {
                       </Typography>
                     )}
                     <Box sx={{ mt: 1 }}>
-                      <Link href="/students" style={{ textDecoration: 'none' }}>
+                      <Link href="/students" prefetch={false} style={{ textDecoration: 'none' }}>
                         <Typography variant="caption" color="primary.main" fontWeight={600}>
                           Manage Students →
                         </Typography>
@@ -144,7 +144,7 @@ export default function AdminDashboardPage() {
                       </Typography>
                     )}
                     <Box sx={{ mt: 1 }}>
-                      <Link href="/teachers" style={{ textDecoration: 'none' }}>
+                      <Link href="/teachers" prefetch={false} style={{ textDecoration: 'none' }}>
                         <Typography variant="caption" color="secondary.main" fontWeight={600}>
                           View Faculty →
                         </Typography>
@@ -184,23 +184,23 @@ export default function AdminDashboardPage() {
                   <CardContent>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                       <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                        PENDING APPLICATIONS
+                        ACTIVE ENROLLMENTS
                       </Typography>
                       <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'primary.dark', color: '#fff' }}>
-                        <AssignmentTurnedInIcon fontSize="small" />
+                        <HowToRegIcon fontSize="small" />
                       </Box>
                     </Box>
-                    {loadingApps ? (
+                    {loadingEnrollments ? (
                       <Skeleton width={80} height={40} />
                     ) : (
                       <Typography variant="h4" fontWeight={700} color="primary.main">
-                        {pendingAppsCount}
+                        {enrolledCount}
                       </Typography>
                     )}
                     <Box sx={{ mt: 1 }}>
-                      <Link href="/applications" style={{ textDecoration: 'none' }}>
+                      <Link href="/enrollments" prefetch={false} style={{ textDecoration: 'none' }}>
                         <Typography variant="caption" color="primary.main" fontWeight={600}>
-                          Review Queue →
+                          Manage Enrollments →
                         </Typography>
                       </Link>
                     </Box>
