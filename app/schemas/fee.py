@@ -448,6 +448,7 @@ class StudentPortalFeeScheduleResponse(BaseModel):
     final_payable_amount: Decimal = Decimal("0.00")
     total_paid_amount: Decimal = Decimal("0.00")
     total_outstanding_amount: Decimal = Decimal("0.00")
+    overpaid_amount: Decimal = Decimal("0.00")
     currency: str = "INR"
     components: list[StudentFeeAssignmentItemResponse] = Field(default_factory=list)
     adjustments: list[StudentFeeAdjustmentResponse] = Field(default_factory=list)

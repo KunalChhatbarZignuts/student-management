@@ -189,3 +189,128 @@ def test_student_medical_and_emergency_details_update_and_read(client, db):
     academic = details["academic_details"]
     assert academic["grade_id"] == str(grade9.id)
     assert academic["section_id"] == str(sec_a.id)
+
+
+def test_update_student_auto_enrolls_when_no_active_enrollment(client, db):
+    """Test PATCH /api/v1/admin/students/{id} automatically enrolls when student has no active enrollment."""
+    admin, headers = _create_admin_and_token(db, email="admin.autoenroll@school.edu")
+
+    ay = AcademicYear(name="AY Auto Enroll", start_date=date(2026, 4, 1), end_date=date(2027, 3, 31), status="active")
+    db.add(ay)
+    db.commit()
+
+    grade = Grade(name="Grade 8", code="G8", academic_year_id=ay.id, status="active")
+    db.add(grade)
+    db.commit()
+
+    section = Section(name="8-A", grade_id=grade.id, academic_year_id=ay.id, status="active")
+    db.add(section)
+    db.commit()
+
+    stu_user = User(
+        email="student.autoenroll@school.edu",
+        password_hash=hash_password("StudentPass123!"),
+        role=UserRole.STUDENT.value,
+        status=UserStatus.ACTIVE.value,
+    )
+    db.add(stu_user)
+    db.commit()
+
+    student = Student(
+        user_id=stu_user.id,
+        student_code="STU-AUTOENROLL-01",
+        enrollment_number="ENR-2026-AUTO",
+        first_name="Charles",
+        last_name="Babbage",
+        dob=date(2011, 5, 20),
+        class_name="Unassigned",
+        section="Unassigned",
+        department="General",
+        admission_date=date(2026, 4, 1),
+        status="active",
+        gender="Male",
+    )
+    db.add(student)
+    db.commit()
+
+    # Student has 0 active enrollments. Sending target_section_id should NOT fail with 400.
+    payload = {
+        "first_name": "Charles",
+        "last_name": "Babbage",
+        "dob": "2011-05-20",
+        "gender": "Male",
+        "department": "General",
+        "status": "active",
+        "target_academic_year_id": str(ay.id),
+        "target_grade_id": str(grade.id),
+        "target_section_id": str(section.id),
+        "transfer_reason": "Initial section assignment",
+    }
+    patch_res = client.patch(f"/api/v1/admin/students/{student.id}", json=payload, headers=headers)
+    assert patch_res.status_code == 200, patch_res.text
+    patch_data = patch_res.json()
+    assert patch_data["current_grade"] == "Grade 8"
+    assert patch_data["current_section"] == "8-A"
+
+    # Subsequent update with same section should be a no-op and succeed without 400
+    update_res = client.patch(
+        f"/api/v1/admin/students/{student.id}",
+        json={"target_section_id": str(section.id), "phone": "+1-555-4321"},
+        headers=headers,
+    )
+    assert update_res.status_code == 200, update_res.text
+
+
+def test_transfer_section_endpoint_assigns_when_no_active_enrollment(client, db):
+    """Test POST /api/v1/admin/students/{id}/transfer-section assigns section when student has no active enrollment."""
+    admin, headers = _create_admin_and_token(db, email="admin.assignsec@school.edu")
+
+    ay = AcademicYear(name="AY Assign Section", start_date=date(2026, 4, 1), end_date=date(2027, 3, 31), status="active")
+    db.add(ay)
+    db.commit()
+
+    grade = Grade(name="Grade 7", code="G7", academic_year_id=ay.id, status="active")
+    db.add(grade)
+    db.commit()
+
+    section = Section(name="7-A", grade_id=grade.id, academic_year_id=ay.id, status="active")
+    db.add(section)
+    db.commit()
+
+    stu_user = User(
+        email="student.assignsec@school.edu",
+        password_hash=hash_password("StudentPass123!"),
+        role=UserRole.STUDENT.value,
+        status=UserStatus.ACTIVE.value,
+    )
+    db.add(stu_user)
+    db.commit()
+
+    student = Student(
+        user_id=stu_user.id,
+        student_code="STU-ASSIGNSEC-01",
+        enrollment_number="ENR-2026-ASSIGN",
+        first_name="Grace",
+        last_name="Hopper",
+        dob=date(2012, 1, 15),
+        class_name="Unassigned",
+        section="Unassigned",
+        department="General",
+        admission_date=date(2026, 4, 1),
+        status="active",
+        gender="Female",
+    )
+    db.add(student)
+    db.commit()
+
+    transfer_res = client.post(
+        f"/api/v1/admin/students/{student.id}/transfer-section",
+        json={"target_section_id": str(section.id), "reason": "New section assignment"},
+        headers=headers,
+    )
+    assert transfer_res.status_code == 200, transfer_res.text
+    transfer_data = transfer_res.json()
+    assert transfer_data["section_name"] == "7-A"
+    assert transfer_data["grade_name"] == "Grade 7"
+    assert transfer_data["status"] == "ACTIVE"
+

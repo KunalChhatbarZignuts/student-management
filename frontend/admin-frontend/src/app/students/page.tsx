@@ -239,6 +239,21 @@ export default function StudentsManagementPage() {
     },
   });
 
+  // Delete Student Mutation
+  const [studentToDelete, setStudentToDelete] = React.useState<{ id: string; name: string } | null>(null);
+
+  const deleteStudentMutation = useMutation({
+    mutationFn: (studentId: string) => adminStudentApi.deleteStudent(studentId),
+    onSuccess: (res) => {
+      showSnackbar(res.message || 'Student deleted successfully and portal access revoked', 'success');
+      queryClient.invalidateQueries({ queryKey: studentKeys.all });
+      setStudentToDelete(null);
+    },
+    onError: (err) => {
+      showSnackbar(formatErrorMessage(err, 'Failed to delete student'), 'error');
+    },
+  });
+
   return (
     <RequireRole roles={[ROLES.SUPER_ADMIN, ROLES.ADMIN]}>
       <AppShell>
@@ -284,6 +299,9 @@ export default function StudentsManagementPage() {
           }
           onPasswordReset={(userId, userName) =>
             setConfirmAction({ type: 'password-reset', userId, userName })
+          }
+          onDelete={(studentId, studentName) =>
+            setStudentToDelete({ id: studentId, name: studentName })
           }
         />
 
@@ -359,6 +377,20 @@ export default function StudentsManagementPage() {
               })
             }
             onClose={() => setConfirmAction(null)}
+          />
+        )}
+
+        {/* Delete Student Confirmation Dialog */}
+        {studentToDelete && (
+          <ConfirmDialog
+            open={Boolean(studentToDelete)}
+            title="Delete Student & Revoke Portal Access"
+            description={`Are you sure you want to delete ${studentToDelete.name}? This will immediately revoke their Student Portal access, terminate active sessions, and unlink them from parent accounts.`}
+            confirmLabel="Delete Student"
+            confirmColor="error"
+            loading={deleteStudentMutation.isPending}
+            onConfirm={() => deleteStudentMutation.mutate(studentToDelete.id)}
+            onClose={() => setStudentToDelete(null)}
           />
         )}
       </AppShell>

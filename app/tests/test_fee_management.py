@@ -613,3 +613,147 @@ def test_remove_student_fee_adjustment(client: TestClient, fee_setup: dict):
     assert float(del_data["final_payable_amount"]) == 40000.0
     assert float(del_data["total_additional"]) == 0.0
     assert len(del_data["adjustments"]) == 0
+
+
+def test_student_update_grade_syncs_fee_assignment_and_installments(client: TestClient, fee_setup: dict, db: Session):
+    """When a student's grade/section is updated via patch, their fee assignment and installments must synchronize in-place."""
+    token = fee_setup["admin_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    ay_id = str(fee_setup["academic_year"].id)
+    g2_id = str(fee_setup["grade_2"].id)
+    s2a_id = str(fee_setup["section_2a"].id)
+    g3_id = str(fee_setup["grade_3"].id)
+    s3a_id = str(fee_setup["section_3a"].id)
+
+    # 1. Create fee component
+    comp = client.post(
+        "/api/v1/admin/fees/components",
+        headers=headers,
+        json={"name": "Tuition Fee Sync", "code": f"TUI_{uuid.uuid4().hex[:4].upper()}", "is_mandatory": True},
+    ).json()
+
+    # 2. Create Grade 2 Fee Structure: ₹40,000 (quarterly)
+    struct_g2 = client.post(
+        "/api/v1/admin/fees/structures",
+        headers=headers,
+        json={
+            "name": f"G2 Structure {uuid.uuid4().hex[:4]}",
+            "academic_year_id": ay_id,
+            "grade_id": g2_id,
+            "installment_frequency": "quarterly",
+            "items": [{"fee_component_id": comp["id"], "amount": 40000.0, "is_mandatory": True}],
+        },
+    ).json()
+
+    # 3. Create Grade 3 Fee Structure: ₹60,000 (bi-annual)
+    struct_g3 = client.post(
+        "/api/v1/admin/fees/structures",
+        headers=headers,
+        json={
+            "name": f"G3 Structure {uuid.uuid4().hex[:4]}",
+            "academic_year_id": ay_id,
+            "grade_id": g3_id,
+            "installment_frequency": "bi-annual",
+            "items": [{"fee_component_id": comp["id"], "amount": 60000.0, "is_mandatory": True}],
+        },
+    ).json()
+
+    # 4. Admit student into Grade 2
+    p_email = f"parent_sync_{uuid.uuid4().hex[:6]}@example.com"
+    adm_res = client.post(
+        "/api/v1/admin/admissions",
+        headers=headers,
+        json={
+            "student": {
+                "first_name": "DevSync",
+                "last_name": "Tester",
+                "dob": "2018-01-01",
+                "gender": "Male",
+                "department": "Primary",
+            },
+            "parents": [
+                {
+                    "first_name": "Parent",
+                    "last_name": "Tester",
+                    "email": p_email,
+                    "phone": "9998887776",
+                    "relationship": "Father",
+                    "is_emergency_contact": True,
+                }
+            ],
+            "academic_year_id": ay_id,
+            "grade_id": g2_id,
+            "section_id": s2a_id,
+            "admission_date": "2026-04-01",
+            "fee_assignment": {
+                "fee_structure_id": struct_g2["id"],
+                "selected_component_ids": [comp["id"]],
+                "installment_frequency": "quarterly",
+            },
+        },
+    )
+    assert adm_res.status_code == 201
+    student_id = adm_res.json()["student"]["id"]
+
+    # Verify initial fee assignment is Grade 2, ₹40,000
+    det_res = client.get(f"/api/v1/admin/students/{student_id}/details", headers=headers)
+    assert det_res.status_code == 200
+    det_data = det_res.json()
+    assert float(det_data["fees"]["net_amount"]) == 40000.0
+    assert len(det_data["fees"]["installments"]) == 4
+
+    # 5. Update student to Grade 3 via target_section_id
+    update_res = client.patch(
+        f"/api/v1/admin/students/{student_id}",
+        headers=headers,
+        json={"target_section_id": s3a_id},
+    )
+    assert update_res.status_code == 200
+
+    # 6. Verify student profile and fees are updated in-place to Grade 3 with Need to Pay entry
+    det_res_after = client.get(f"/api/v1/admin/students/{student_id}/details", headers=headers)
+    assert det_res_after.status_code == 200
+    det_after_data = det_res_after.json()
+    assert det_after_data["academic_details"]["grade_id"] == g3_id
+    assert det_after_data["academic_details"]["section_id"] == s3a_id
+    assert float(det_after_data["fees"]["net_amount"]) == 60000.0
+    assert len(det_after_data["fees"]["installments"]) == 4
+    assert float(det_after_data["fees"]["installments"][0]["amount"]) == 15000.0
+
+    # Verify Need to Pay adjustment entry is present
+    adjs = det_after_data["fees"]["adjustments"]
+    assert len(adjs) >= 1
+    need_to_pay_adj = adjs[0]
+    assert need_to_pay_adj["category"] == "additional_charge"
+    assert float(need_to_pay_adj["amount"]) == 20000.0
+    assert "Need to Pay" in need_to_pay_adj["description"]
+
+    # 7. Downgrade student back to Grade 2 (fee decreases from 60,000 to 40,000)
+    downgrade_res = client.patch(
+        f"/api/v1/admin/students/{student_id}",
+        headers=headers,
+        json={"target_section_id": s2a_id},
+    )
+    assert downgrade_res.status_code == 200
+
+    det_res_down = client.get(f"/api/v1/admin/students/{student_id}/details", headers=headers)
+    assert det_res_down.status_code == 200
+    det_down_data = det_res_down.json()
+    assert det_down_data["academic_details"]["grade_id"] == g2_id
+    assert float(det_down_data["fees"]["net_amount"]) == 40000.0
+
+    # Verify Overpaid difference adjustment entry is present
+    down_adjs = det_down_data["fees"]["adjustments"]
+    assert len(down_adjs) >= 2
+    categories = [a["category"] for a in down_adjs]
+    assert "additional_charge" in categories
+    assert "discount" in categories
+    overpaid_adj = next(a for a in down_adjs if a["category"] == "discount")
+    assert float(overpaid_adj["amount"]) == 20000.0
+    assert "Overpaid Difference" in overpaid_adj["description"]
+
+    # Verify no multiple student records exist
+    from app.models.student import Student
+    st_count = db.query(Student).filter(Student.first_name == "DevSync").count()
+    assert st_count == 1
+

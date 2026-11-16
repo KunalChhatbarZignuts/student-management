@@ -393,6 +393,8 @@ def test_student_and_parent_portal_schedules(client: TestClient, payment_fixture
     pt_data = pt_res.json()
     assert pt_data["student_id"] == str(student_id)
     assert len(pt_data["installments"]) > 0
+    assert "adjustments" in pt_data
+    assert "overpaid_amount" in pt_data
 
 
 def test_admin_list_transactions_and_webhooks(client: TestClient, payment_fixture, db: Session):

@@ -345,22 +345,16 @@ def test_student_update_and_transfer_preserves_history(client, db):
     assert transfer_data["current_grade"] == "Grade 11 Commerce"
     assert transfer_data["current_section"] == "11-B"
 
-    # 3. Check enrollment history in database: should have 2 records (1 TRANSFERRED, 1 ACTIVE)
+    # 3. Check enrollment in database: should update the existing enrollment in-place (1 ACTIVE record, no multiple entries)
     st_uuid = uuid.UUID(student_id)
     enrollments = db.execute(
         select(StudentEnrollment).where(StudentEnrollment.student_id == st_uuid).order_by(StudentEnrollment.created_at.asc())
     ).scalars().all()
 
-    assert len(enrollments) == 2
-    old_enr, new_enr = enrollments[0], enrollments[1]
-
-    # Old enrollment is preserved with TRANSFERRED status and left_on date set
-    assert old_enr.section_id == sec_a.id
-    assert old_enr.status == "TRANSFERRED"
-    assert old_enr.left_on is not None
-
-    # New enrollment is ACTIVE
-    assert new_enr.section_id == sec_b.id
-    assert new_enr.status == "ACTIVE"
-    assert new_enr.left_on is None
+    assert len(enrollments) == 1
+    enr = enrollments[0]
+    assert enr.section_id == sec_b.id
+    assert enr.grade_id == grade_b.id
+    assert enr.status == "ACTIVE"
+    assert enr.left_on is None
 

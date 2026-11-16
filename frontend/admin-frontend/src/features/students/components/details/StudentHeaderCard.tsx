@@ -14,17 +14,20 @@ import EmailIcon from '@mui/icons-material/Email';
 import PhoneIcon from '@mui/icons-material/Phone';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import EditIcon from '@mui/icons-material/Edit';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
 import StatusChip from '@/components/ui/StatusChip';
 
 export interface StudentHeaderCardProps {
   studentData: any;
   onOpenEdit: () => void;
+  onDelete?: () => void;
 }
 
 export default function StudentHeaderCard({
   studentData,
   onOpenEdit,
+  onDelete,
 }: StudentHeaderCardProps) {
   const p = studentData.personal_details || studentData.personal_info || {};
   const a = studentData.academic_details || studentData.academic_info || {};
@@ -67,9 +70,17 @@ export default function StudentHeaderCard({
             {a?.current_grade && (
               <Chip
                 label={`${a.current_grade} - ${a.current_section || 'N/A'}`}
-                color="primary"
+                color={a?.is_currently_enrolled ? 'primary' : 'default'}
                 variant="outlined"
                 size="small"
+              />
+            )}
+            {a && a.is_currently_enrolled === false && (
+              <Chip
+                label={a.enrollment_status ? `Status: ${a.enrollment_status}` : 'Not Enrolled'}
+                color={a.enrollment_status?.toLowerCase() === 'left' ? 'error' : 'warning'}
+                size="small"
+                variant="filled"
               />
             )}
             {p.department && (
@@ -116,14 +127,27 @@ export default function StudentHeaderCard({
         </Grid>
 
         <Grid item xs={12} sm="auto">
-          <Button
-            variant="contained"
-            startIcon={<EditIcon />}
-            onClick={onOpenEdit}
-            sx={{ borderRadius: 2 }}
-          >
-            Edit Profile
-          </Button>
+          <Stack direction="row" spacing={1.5}>
+            <Button
+              variant="contained"
+              startIcon={<EditIcon />}
+              onClick={onOpenEdit}
+              sx={{ borderRadius: 2 }}
+            >
+              Edit Profile
+            </Button>
+            {onDelete && (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteOutlineIcon />}
+                onClick={onDelete}
+                sx={{ borderRadius: 2 }}
+              >
+                Delete Student
+              </Button>
+            )}
+          </Stack>
         </Grid>
       </Grid>
     </Paper>

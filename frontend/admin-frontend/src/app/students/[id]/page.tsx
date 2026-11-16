@@ -22,9 +22,11 @@ import PaymentsIcon from '@mui/icons-material/Payments';
 import EditIcon from '@mui/icons-material/Edit';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
 import RequireRole from '@/components/guards/RequireRole';
 import AppShell from '@/components/layout/AppShell';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { ROLES } from '@/lib/constants';
 import { adminStudentApi, studentKeys } from '@/features/students/api';
 import { adminGradeApi, gradeKeys } from '@/features/grades/api';
@@ -154,7 +156,7 @@ export default function StudentDetailsPage() {
       middle_name: p?.middle_name || '',
       last_name: p?.last_name || '',
       dob: p?.dob || '',
-      gender: p?.gender || 'Male',
+      gender: p?.gender ? (p.gender.charAt(0).toUpperCase() + p.gender.slice(1).toLowerCase()) : 'Male',
       department: p?.department || 'General',
       status: p?.status || 'active',
       phone: p?.phone || '',
@@ -193,6 +195,20 @@ export default function StudentDetailsPage() {
     },
     onError: (err) => {
       showSnackbar(formatErrorMessage(err, 'Failed to update student profile'), 'error');
+    },
+  });
+
+  const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
+
+  const deleteMutation = useMutation({
+    mutationFn: () => adminStudentApi.deleteStudent(studentId),
+    onSuccess: (res) => {
+      showSnackbar(res.message || 'Student deleted successfully and portal access revoked', 'success');
+      queryClient.invalidateQueries({ queryKey: studentKeys.all });
+      router.push('/students');
+    },
+    onError: (err) => {
+      showSnackbar(formatErrorMessage(err, 'Failed to delete student'), 'error');
     },
   });
 
@@ -249,12 +265,21 @@ export default function StudentDetailsPage() {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Button
                 variant="outlined"
+                color="error"
+                startIcon={<DeleteOutlineIcon />}
+                onClick={() => setIsDeleteOpen(true)}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              >
+                Delete Student
+              </Button>
+              <Button
+                variant="outlined"
                 color="primary"
                 startIcon={<SwapHorizIcon />}
                 onClick={() => setIsTransferOpen(true)}
                 sx={{ textTransform: 'none', fontWeight: 600 }}
               >
-                Transfer Section
+                {a?.is_currently_enrolled === false ? 'Assign / Enroll Section' : 'Transfer Section'}
               </Button>
               <Button
                 variant="contained"
@@ -298,6 +323,7 @@ export default function StudentDetailsPage() {
               <StudentHeaderCard
                 studentData={studentData}
                 onOpenEdit={handleOpenEdit}
+                onDelete={() => setIsDeleteOpen(true)}
               />
 
               {/* Navigation Tabs */}
@@ -386,6 +412,19 @@ export default function StudentDetailsPage() {
                 currentSectionName={a?.current_section || p.section}
                 currentGradeId={a?.grade_id}
                 currentSectionId={a?.section_id}
+                isCurrentlyEnrolled={a?.is_currently_enrolled !== false}
+              />
+
+              {/* Delete Confirmation Dialog */}
+              <ConfirmDialog
+                open={isDeleteOpen}
+                title="Delete Student & Revoke Portal Access"
+                description={`Are you sure you want to delete ${p.first_name} ${p.last_name} (${studentData.student_code})? This will immediately revoke their Student Portal access, terminate active sessions, and unlink them from parent accounts.`}
+                confirmLabel="Delete Student"
+                confirmColor="error"
+                loading={deleteMutation.isPending}
+                onConfirm={() => deleteMutation.mutate()}
+                onClose={() => setIsDeleteOpen(false)}
               />
             </>
           )}

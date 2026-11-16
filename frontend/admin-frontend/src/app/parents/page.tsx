@@ -175,6 +175,19 @@ export default function ParentsPage() {
     onError: (err) => showSnackbar(formatErrorMessage(err, 'Action failed'), 'error'),
   });
 
+  // Delete Parent Mutation
+  const [parentToDelete, setParentToDelete] = React.useState<{ id: string; name: string } | null>(null);
+
+  const deleteParentMutation = useMutation({
+    mutationFn: (parentId: string) => adminParentApi.deleteParent(parentId),
+    onSuccess: (res) => {
+      showSnackbar(res.message || 'Parent deleted successfully and portal access revoked', 'success');
+      queryClient.invalidateQueries({ queryKey: parentKeys.all });
+      setParentToDelete(null);
+    },
+    onError: (err) => showSnackbar(formatErrorMessage(err, 'Failed to delete parent'), 'error'),
+  });
+
   return (
     <RequireRole roles={[ROLES.SUPER_ADMIN, ROLES.ADMIN]}>
       <AppShell>
@@ -218,6 +231,9 @@ export default function ParentsPage() {
           }
           onToggleStatus={(type, targetId, targetName) =>
             setConfirmAction({ type, targetId, targetName })
+          }
+          onDelete={(parentId, parentName) =>
+            setParentToDelete({ id: parentId, name: parentName })
           }
         />
 
@@ -289,6 +305,20 @@ export default function ParentsPage() {
               })
             }
             onClose={() => setConfirmAction(null)}
+          />
+        )}
+
+        {/* Delete Parent Confirmation Dialog */}
+        {parentToDelete && (
+          <ConfirmDialog
+            open={Boolean(parentToDelete)}
+            title="Delete Parent & Revoke Portal Access"
+            description={`Are you sure you want to delete ${parentToDelete.name}? This will immediately revoke their Parent Portal access, terminate active sessions, and unlink all connected student associations.`}
+            confirmLabel="Delete Parent"
+            confirmColor="error"
+            loading={deleteParentMutation.isPending}
+            onConfirm={() => deleteParentMutation.mutate(parentToDelete.id)}
+            onClose={() => setParentToDelete(null)}
           />
         )}
       </AppShell>

@@ -1,6 +1,7 @@
 import uuid
 from datetime import date, datetime
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from typing import Any
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.schemas.fee import AdmissionFeeAssignmentPayload, StudentFeeAssignmentResponse
 
@@ -10,7 +11,7 @@ class AdmissionStudentPayload(BaseModel):
     middle_name: str | None = Field(None, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
     dob: date
-    gender: str = Field(..., pattern="^(male|female|other|Male|Female|Other)$")
+    gender: str = Field(..., pattern=r"^(?i)(male|female|other)$")
     email: EmailStr | None = None
     phone: str | None = Field(None, max_length=30)
     alternate_phone: str | None = Field(None, max_length=30)
@@ -24,6 +25,15 @@ class AdmissionStudentPayload(BaseModel):
     previous_school_details: str | None = Field(None, max_length=500)
     department: str = Field("General", max_length=50)
     password: str | None = Field(None, min_length=6, max_length=128)
+
+    @field_validator("gender", mode="before")
+    @classmethod
+    def normalize_gender(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            v_clean = v.strip().lower()
+            if v_clean in ("male", "female", "other"):
+                return v_clean.capitalize()
+        return v
 
 
 class AdmissionParentPayload(BaseModel):

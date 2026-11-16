@@ -4,7 +4,7 @@ import hmac
 import json
 import uuid
 from decimal import Decimal, ROUND_HALF_UP
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
@@ -1585,6 +1585,8 @@ def get_student_portal_fee_schedule(student_id: uuid.UUID, db: Session) -> Stude
         for adj in assignment.adjustments
     ]
 
+    overpaid_surplus = max(Decimal("0.00"), total_paid - (assignment.final_payable_amount or Decimal("0.00")))
+
     return StudentPortalFeeScheduleResponse(
         assignment_id=assignment.id,
         student_id=student.id,
@@ -1598,6 +1600,7 @@ def get_student_portal_fee_schedule(student_id: uuid.UUID, db: Session) -> Stude
         final_payable_amount=assignment.final_payable_amount,
         total_paid_amount=_round_currency(total_paid),
         total_outstanding_amount=_round_currency(total_out),
+        overpaid_amount=_round_currency(overpaid_surplus),
         currency=assignment.currency,
         components=comp_items,
         adjustments=adj_items,
@@ -1734,5 +1737,275 @@ def retry_webhook_event(event_id: str, db: Session) -> dict:
 
     raw_body = evt.raw_payload.encode("utf-8")
     return process_webhook_event(raw_body, signature=None, db=db)
+
+
+def sync_student_fee_to_grade(
+    student_id: uuid.UUID,
+    new_grade_id: uuid.UUID,
+    academic_year_id: uuid.UUID,
+    actor_user_id: uuid.UUID | None,
+    db: Session,
+) -> StudentFeeAssignment | None:
+    """Synchronize a student's fee assignment and installment schedule in-place when their grade changes.
+
+    Updates the existing fee assignment to the target grade's active fee structure, re-snapshots components,
+    and recalculates installments while preserving any existing paid amounts.
+    """
+    # 1. Fetch active fee structure for target grade and academic year
+    stmt = (
+        select(FeeStructure)
+        .where(
+            FeeStructure.grade_id == new_grade_id,
+            FeeStructure.academic_year_id == academic_year_id,
+            FeeStructure.status == "active",
+        )
+        .order_by(FeeStructure.created_at.desc())
+    )
+    new_structure = db.execute(stmt).scalars().first()
+
+    # Fallback to any active structure for this grade
+    if not new_structure:
+        stmt_fallback = (
+            select(FeeStructure)
+            .where(
+                FeeStructure.grade_id == new_grade_id,
+                FeeStructure.status == "active",
+            )
+            .order_by(FeeStructure.created_at.desc())
+        )
+        new_structure = db.execute(stmt_fallback).scalars().first()
+
+    if not new_structure:
+        return None
+
+    # 2. Check for existing active fee assignment
+    existing_assignment = (
+        db.execute(
+            select(StudentFeeAssignment)
+            .where(
+                StudentFeeAssignment.student_id == student_id,
+                StudentFeeAssignment.status == "active",
+            )
+            .order_by(StudentFeeAssignment.created_at.desc())
+        )
+        .scalars()
+        .first()
+    )
+
+    if existing_assignment:
+        # Check if already assigned to this exact structure
+        if (
+            existing_assignment.grade_id == new_grade_id
+            and existing_assignment.fee_structure_id == new_structure.id
+        ):
+            return existing_assignment
+
+        # Capture previous grade info and payable amount before updating
+        old_grade = db.get(Grade, existing_assignment.grade_id) if existing_assignment.grade_id else None
+        new_grade = db.get(Grade, new_grade_id) if new_grade_id else None
+        old_grade_name = old_grade.name if old_grade else "Previous Grade"
+        new_grade_name = new_grade.name if new_grade else "New Grade"
+        old_payable = existing_assignment.final_payable_amount or Decimal("0.00")
+
+        # Read existing installments and calculate total already paid
+        existing_installments = (
+            db.execute(
+                select(FeeInstallment)
+                .where(FeeInstallment.assignment_id == existing_assignment.id)
+                .order_by(FeeInstallment.installment_number.asc())
+            )
+            .scalars()
+            .all()
+        )
+        total_already_paid = sum((inst.paid_amount or Decimal("0.00")) for inst in existing_installments)
+
+        # Compute new fee schedule for new grade
+        start_date = existing_assignment.assigned_date or dt.date.today()
+        freq = existing_assignment.installment_frequency or "quarterly"
+        base_amt, total_disc, total_add, final_amt, inst_list = calculate_fee_schedule(
+            structure=new_structure,
+            selected_component_ids=[],
+            adjustments=[],
+            installment_frequency=freq,
+            start_date=start_date,
+        )
+
+        # Generate Grade Change Fee Difference Entry (Overpay or Need to Pay)
+        fee_diff = base_amt - old_payable
+        if existing_assignment.grade_id != new_grade_id and fee_diff != 0:
+            cur_sym = new_structure.currency or "₹"
+            if fee_diff > 0:
+                cat = "additional_charge"
+                adj_type = "ADDITIONAL_CHARGE"
+                desc = f"Grade Change: {old_grade_name} → {new_grade_name} (Need to Pay: +{cur_sym}{fee_diff:,.2f})"
+                adj_amount = _round_currency(fee_diff)
+            else:
+                cat = "discount"
+                adj_type = "DISCOUNT_FIXED"
+                desc = f"Grade Change: {old_grade_name} → {new_grade_name} (Overpaid Difference: -{cur_sym}{abs(fee_diff):,.2f})"
+                adj_amount = _round_currency(abs(fee_diff))
+
+            db.add(
+                StudentFeeAdjustment(
+                    assignment_id=existing_assignment.id,
+                    adjustment_type=adj_type,
+                    category=cat,
+                    description=desc,
+                    calculation_type="fixed",
+                    amount=adj_amount,
+                    created_by_user_id=actor_user_id,
+                )
+            )
+
+        # Update assignment in-place
+        existing_assignment.grade_id = new_grade_id
+        existing_assignment.academic_year_id = academic_year_id
+        existing_assignment.fee_structure_id = new_structure.id
+        existing_assignment.base_amount = base_amt
+        existing_assignment.total_discount = total_disc
+        existing_assignment.total_additional = total_add
+        existing_assignment.final_payable_amount = final_amt
+        existing_assignment.currency = new_structure.currency
+        if actor_user_id:
+            existing_assignment.created_by_user_id = actor_user_id
+
+        # Replace fee component snapshot items
+        db.execute(
+            delete(StudentFeeAssignmentItem).where(
+                StudentFeeAssignmentItem.assignment_id == existing_assignment.id
+            )
+        )
+        for s_item in new_structure.items:
+            db.add(
+                StudentFeeAssignmentItem(
+                    assignment_id=existing_assignment.id,
+                    fee_component_id=s_item.fee_component_id,
+                    component_name=s_item.component.name if s_item.component else "Fee Component",
+                    amount=s_item.amount,
+                    payment_frequency=s_item.payment_frequency,
+                    is_mandatory=s_item.is_mandatory,
+                    is_selected=True,
+                )
+            )
+
+        # Handle Installments: if no payments exist, cleanly recreate
+        if total_already_paid == 0:
+            db.execute(
+                delete(FeeInstallment).where(
+                    FeeInstallment.assignment_id == existing_assignment.id
+                )
+            )
+            for inst in inst_list:
+                db.add(
+                    FeeInstallment(
+                        assignment_id=existing_assignment.id,
+                        installment_number=inst["number"],
+                        installment_name=inst["name"],
+                        due_date=inst["due_date"],
+                        amount=inst["amount"],
+                        paid_amount=Decimal("0.00"),
+                        outstanding_amount=inst["amount"],
+                        status="pending",
+                    )
+                )
+        else:
+            # Reconcile existing installments preserving payment allocations
+            rem_paid = total_already_paid
+            for i, inst_info in enumerate(inst_list):
+                amt = inst_info["amount"]
+                alloc_paid = min(amt, rem_paid)
+                rem_paid -= alloc_paid
+                out = amt - alloc_paid
+                inst_status = "paid" if out == 0 else ("partially_paid" if alloc_paid > 0 else "pending")
+
+                if i < len(existing_installments):
+                    target_inst = existing_installments[i]
+                    target_inst.installment_number = inst_info["number"]
+                    target_inst.installment_name = inst_info["name"]
+                    target_inst.due_date = inst_info["due_date"]
+                    target_inst.amount = amt
+                    target_inst.paid_amount = alloc_paid
+                    target_inst.outstanding_amount = out
+                    target_inst.status = inst_status
+                else:
+                    db.add(
+                        FeeInstallment(
+                            assignment_id=existing_assignment.id,
+                            installment_number=inst_info["number"],
+                            installment_name=inst_info["name"],
+                            due_date=inst_info["due_date"],
+                            amount=amt,
+                            paid_amount=alloc_paid,
+                            outstanding_amount=out,
+                            status=inst_status,
+                        )
+                    )
+
+            # If there are more old installments than new ones, safely remove trailing ones
+            if len(existing_installments) > len(inst_list):
+                for old_inst in existing_installments[len(inst_list):]:
+                    linked_payments = db.execute(select(FeePayment).where(FeePayment.installment_id == old_inst.id)).scalars().all()
+                    for pmt in linked_payments:
+                        pmt.installment_id = existing_installments[0].id
+                    db.delete(old_inst)
+
+        return existing_assignment
+
+    else:
+        # Create initial fee assignment for the new grade
+        start_date = dt.date.today()
+        base_amt, total_disc, total_add, final_amt, inst_list = calculate_fee_schedule(
+            structure=new_structure,
+            selected_component_ids=[],
+            adjustments=[],
+            installment_frequency="quarterly",
+            start_date=start_date,
+        )
+        new_assignment = StudentFeeAssignment(
+            student_id=student_id,
+            academic_year_id=academic_year_id,
+            grade_id=new_grade_id,
+            fee_structure_id=new_structure.id,
+            base_amount=base_amt,
+            total_discount=total_disc,
+            total_additional=total_add,
+            final_payable_amount=final_amt,
+            currency=new_structure.currency,
+            installment_frequency="quarterly",
+            status="active",
+            assigned_date=start_date,
+            created_by_user_id=actor_user_id,
+        )
+        db.add(new_assignment)
+        db.flush()
+
+        for s_item in new_structure.items:
+            db.add(
+                StudentFeeAssignmentItem(
+                    assignment_id=new_assignment.id,
+                    fee_component_id=s_item.fee_component_id,
+                    component_name=s_item.component.name if s_item.component else "Fee Component",
+                    amount=s_item.amount,
+                    payment_frequency=s_item.payment_frequency,
+                    is_mandatory=s_item.is_mandatory,
+                    is_selected=True,
+                )
+            )
+
+        for inst in inst_list:
+            db.add(
+                FeeInstallment(
+                    assignment_id=new_assignment.id,
+                    installment_number=inst["number"],
+                    installment_name=inst["name"],
+                    due_date=inst["due_date"],
+                    amount=inst["amount"],
+                    paid_amount=Decimal("0.00"),
+                    outstanding_amount=inst["amount"],
+                    status="pending",
+                )
+            )
+        return new_assignment
+
 
 

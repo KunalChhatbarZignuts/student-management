@@ -23,8 +23,8 @@ export default function StudentsFilterBar({
     <SearchFilterBar
       search={search}
       onSearchChange={onSearchChange}
-      placeholder="Search by student email..."
-      searchGridProps={{ xs: 12, sm: 6, md: 4 }}
+      placeholder="Search by name, student ID, enrollment no., or email..."
+      searchGridProps={{ xs: 12, sm: 7, md: 5 }}
     >
       <Grid item xs={12} sm={6} md={3}>
         <TextField

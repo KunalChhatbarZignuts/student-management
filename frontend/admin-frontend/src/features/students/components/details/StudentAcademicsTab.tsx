@@ -97,7 +97,17 @@ export default function StudentAcademicsTab({
       <Grid item xs={12}>
         <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: 'background.default' }}>
           <CardContent>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>Current Academic Assignment</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, flexWrap: 'wrap', gap: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>Current Academic Assignment</Typography>
+              {a?.is_currently_enrolled === false && (
+                <Chip
+                  label={a.enrollment_status ? `Enrollment: ${a.enrollment_status}` : 'Not Currently Enrolled'}
+                  color={a.enrollment_status?.toLowerCase() === 'left' ? 'error' : 'warning'}
+                  size="small"
+                  sx={{ fontWeight: 600 }}
+                />
+              )}
+            </Box>
             <Divider sx={{ mb: 2 }} />
             <Grid container spacing={2}>
               <Grid item xs={12} sm={3}>
@@ -178,7 +188,7 @@ export default function StudentAcademicsTab({
                         <TableCell>
                           <Chip label={hist.status.toUpperCase()} size="small" color={hist.status.toLowerCase() === 'active' ? 'success' : 'default'} />
                         </TableCell>
-                        <TableCell>{new Date(hist.enrolled_at).toLocaleDateString()}</TableCell>
+                        <TableCell>{hist.enrolled_at ? new Date(hist.enrolled_at).toLocaleDateString() : '—'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

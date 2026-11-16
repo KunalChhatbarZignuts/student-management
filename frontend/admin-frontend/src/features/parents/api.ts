@@ -98,6 +98,12 @@ export const adminParentApi = {
     return res.data;
   },
 
+  deleteParent: async (parentId: string): Promise<{ id: string; message: string; status: string }> => {
+    const res = await apiClient.delete<{ id: string; message: string; status: string }>(`/admin/parents/${parentId}`);
+    return res.data;
+  },
+
+
   getStudentParents: async (studentId: string): Promise<LinkedParentDetail[]> => {
     const res = await apiClient.get<LinkedParentDetail[]>(`/admin/students/${studentId}/parents`);
     return res.data;

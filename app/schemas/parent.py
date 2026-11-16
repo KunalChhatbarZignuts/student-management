@@ -162,3 +162,10 @@ class ParentNotificationItem(BaseModel):
     created_at: datetime
     is_read: bool = False
 
+
+class ParentDeleteResponse(BaseModel):
+    id: uuid.UUID
+    message: str
+    status: str = "deactivated"
+
+

@@ -11,6 +11,7 @@ import { DataGrid, GridColDef, GridPaginationModel } from '@mui/x-data-grid';
 
 import BlockIcon from '@mui/icons-material/Block';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditIcon from '@mui/icons-material/Edit';
 import FamilyRestroomIcon from '@mui/icons-material/FamilyRestroom';
 import LinkIcon from '@mui/icons-material/Link';
@@ -31,6 +32,7 @@ export interface ParentsTableProps {
   onLink: (parent: ParentWithChildren) => void;
   onResendInvite: (targetId: string, targetName: string) => void;
   onToggleStatus: (actionType: 'suspend' | 'activate', targetId: string, targetName: string) => void;
+  onDelete?: (parentId: string, parentName: string) => void;
 }
 
 export default function ParentsTable({
@@ -44,6 +46,7 @@ export default function ParentsTable({
   onLink,
   onResendInvite,
   onToggleStatus,
+  onDelete,
 }: ParentsTableProps) {
   const columns: GridColDef[] = React.useMemo(
     () => [
@@ -103,7 +106,7 @@ export default function ParentsTable({
       {
         field: 'actions',
         headerName: 'Actions',
-        width: 230,
+        width: 260,
         sortable: false,
         renderCell: (params) => {
           const p: ParentWithChildren = params.row;
@@ -162,12 +165,24 @@ export default function ParentsTable({
                   </IconButton>
                 </Tooltip>
               )}
+
+              {onDelete && (
+                <Tooltip title="Delete Parent & Revoke Portal Access">
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() => onDelete(p.id, pName)}
+                  >
+                    <DeleteOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
             </Box>
           );
         },
       },
     ],
-    [onView, onEdit, onLink, onResendInvite, onToggleStatus]
+    [onView, onEdit, onLink, onResendInvite, onToggleStatus, onDelete]
   );
 
   return (

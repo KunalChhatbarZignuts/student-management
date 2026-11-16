@@ -151,6 +151,8 @@ export interface StudentEnrollmentHistoryItem {
 }
 
 export interface StudentAcademicDetails {
+  is_currently_enrolled?: boolean;
+  enrollment_status?: string | null;
   current_academic_year?: string | null;
   current_grade?: string | null;
   current_section?: string | null;
