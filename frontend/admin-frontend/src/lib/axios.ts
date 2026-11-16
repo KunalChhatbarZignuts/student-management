@@ -1,5 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { API_BASE_URL } from './constants';
+import { API_BASE_URL, ADMIN_ALLOWED_ROLES } from './constants';
 import { useAuthStore } from '@/store/authStore';
 import { TokenResponse } from '@/features/auth/types';
 
@@ -9,6 +9,7 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'ngrok-skip-browser-warning': 'true',
+    'X-Client-Portal': 'admin',
   },
 });
 
@@ -29,22 +30,32 @@ const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue = [];
 };
 
-// Request Interceptor: Attach Access Token
+// Request Interceptor: Attach Access Token & Portal Header
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = useAuthStore.getState().accessToken;
     if (config.headers) {
       if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+        if (typeof config.headers.set === 'function') {
+          config.headers.set('Authorization', `Bearer ${token}`);
+        } else {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
       }
-      config.headers['ngrok-skip-browser-warning'] = 'true';
+      if (typeof config.headers.set === 'function') {
+        config.headers.set('ngrok-skip-browser-warning', 'true');
+        config.headers.set('X-Client-Portal', 'admin');
+      } else {
+        config.headers['ngrok-skip-browser-warning'] = 'true';
+        config.headers['X-Client-Portal'] = 'admin';
+      }
     }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Single-flight refresh on 401
+// Response Interceptor: Single-flight refresh on 401 or 403
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -56,20 +67,27 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const is401 = error.response.status === 401;
+    const status = error.response.status;
+    const shouldRefresh = status === 401 || status === 403;
     const isAuthUrl =
       originalRequest.url?.includes('/auth/refresh') ||
       originalRequest.url?.includes('/auth/login');
 
-    if (is401 && !originalRequest._retry && !isAuthUrl) {
+    if (shouldRefresh && !originalRequest._retry && !isAuthUrl) {
       if (isRefreshing) {
-        return new Promise((resolve, reject) => {
+        return new Promise<string>((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
           .then((token) => {
+            originalRequest._retry = true;
             if (originalRequest.headers) {
-              originalRequest.headers.Authorization = `Bearer ${token}`;
+              originalRequest.headers['Authorization'] = `Bearer ${token}`;
+              originalRequest.headers['authorization'] = `Bearer ${token}`;
+              if (typeof originalRequest.headers.set === 'function') {
+                originalRequest.headers.set('Authorization', `Bearer ${token}`);
+              }
             }
+            console.debug('[AuthInterceptor] Retrying queued request with new token:', originalRequest.url);
             return apiClient(originalRequest);
           })
           .catch((err) => Promise.reject(err));
@@ -79,31 +97,48 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
+        console.debug('[AuthInterceptor] Status', status, '- Calling /auth/refresh for new access token...');
         const response = await axios.post<TokenResponse>(
           `${API_BASE_URL}/auth/refresh`,
           {},
           {
             withCredentials: true,
-            headers: { 'ngrok-skip-browser-warning': 'true' },
+            headers: {
+              'ngrok-skip-browser-warning': 'true',
+              'X-Client-Portal': 'admin',
+            },
           }
         );
 
         const newAccessToken = response.data.access_token;
-        useAuthStore.getState().setAccessToken(newAccessToken);
+        const refreshedUser = response.data.user;
 
+        // Set the newly received access token (replacing the previous token)
+        useAuthStore.getState().setAccessToken(newAccessToken, refreshedUser || undefined);
+
+        // Update headers on the current request
+        if (originalRequest.headers) {
+          originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+          originalRequest.headers['authorization'] = `Bearer ${newAccessToken}`;
+          if (typeof originalRequest.headers.set === 'function') {
+            originalRequest.headers.set('Authorization', `Bearer ${newAccessToken}`);
+          }
+        }
+
+        // Release all queued requests with the new token
         processQueue(null, newAccessToken);
 
-        if (originalRequest.headers) {
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-        }
+        console.debug('[AuthInterceptor] Retrying failed request with new access token:', originalRequest.url);
         return apiClient(originalRequest);
       } catch (refreshError) {
+        // Only logout when the refresh token API call itself fails
+        console.error('[AuthInterceptor] Refresh token call failed. Logging out user:', refreshError);
         processQueue(refreshError, null);
         useAuthStore
           .getState()
           .clearAuth('Your session has expired. Please log in again.');
 
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'test') {
           if (window.location.pathname !== '/login') {
             window.location.href = '/login';
           }
@@ -119,3 +154,4 @@ apiClient.interceptors.response.use(
 );
 
 export default apiClient;
+

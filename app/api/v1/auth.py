@@ -1,3 +1,5 @@
+import logging
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
@@ -16,6 +18,7 @@ from app.core.rate_limit import limiter
 from app.core.security import (
     create_access_token,
     create_restricted_token,
+    decode_token,
     generate_secure_token,
     hash_password,
     hash_token,
@@ -48,14 +51,27 @@ from app.services.auth_service import (
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+logger = logging.getLogger(__name__)
 
 COOKIE_NAME = "refresh_token"
+ADMIN_COOKIE_NAME = "admin_refresh_token"
+STUDENT_COOKIE_NAME = "student_refresh_token"
 
 
-def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
+def _get_cookie_name(request: Request) -> str:
+    """Determine portal-specific cookie name based on X-Client-Portal header."""
+    portal = request.headers.get("x-client-portal", "").strip().lower()
+    if portal == "admin":
+        return ADMIN_COOKIE_NAME
+    if portal in ("student", "parent"):
+        return STUDENT_COOKIE_NAME
+    return COOKIE_NAME
+
+
+def _set_refresh_cookie(response: Response, refresh_token: str, cookie_name: str = COOKIE_NAME) -> None:
     """Helper to set refresh token in httpOnly SameSite=Strict cookie."""
     response.set_cookie(
-        key=COOKIE_NAME,
+        key=cookie_name,
         value=refresh_token,
         httponly=True,
         secure=settings.COOKIE_SECURE,
@@ -65,14 +81,17 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
     )
 
 
-def _clear_refresh_cookie(response: Response) -> None:
-    """Helper to clear refresh token cookie."""
-    response.delete_cookie(
-        key=COOKIE_NAME,
-        path="/api/v1/auth",
-        httponly=True,
-        samesite="strict",
-    )
+def _clear_refresh_cookie(response: Response, cookie_name: str | None = None) -> None:
+    """Helper to clear refresh token cookie(s)."""
+    names_to_clear = [cookie_name] if cookie_name else [COOKIE_NAME, ADMIN_COOKIE_NAME, STUDENT_COOKIE_NAME]
+    for name in names_to_clear:
+        if name:
+            response.delete_cookie(
+                key=name,
+                path="/api/v1/auth",
+                httponly=True,
+                samesite="strict",
+            )
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -148,7 +167,8 @@ def login(
         ip=ip,
     )
 
-    _set_refresh_cookie(response, raw_refresh_token)
+    cookie_name = _get_cookie_name(request)
+    _set_refresh_cookie(response, raw_refresh_token, cookie_name=cookie_name)
 
     log_action(
         db,
@@ -159,10 +179,21 @@ def login(
         ip=ip,
     )
 
+    logger.info(
+        "User logged in successfully",
+        extra={
+            "user_id": str(user.id),
+            "role": user.role,
+            "cookie_name": cookie_name,
+            "ip": ip,
+        },
+    )
+
     return TokenResponse(
         access_token=access_token,
         token_type="bearer",
         must_change_password=False,
+        user=UserRead.model_validate(user),
     )
 
 
@@ -172,11 +203,28 @@ def refresh_token_endpoint(
     response: Response,
     body: RefreshTokenRequest | None = None,
     cookie_token: str | None = Cookie(default=None, alias=COOKIE_NAME),
+    admin_cookie_token: str | None = Cookie(default=None, alias=ADMIN_COOKIE_NAME),
+    student_cookie_token: str | None = Cookie(default=None, alias=STUDENT_COOKIE_NAME),
     db: Session = Depends(get_db),
 ):
-    """Rotate refresh token. Accepts token from httpOnly cookie (preferred) or request body."""
-    raw_token = cookie_token or (body.refresh_token if body else None)
+    """Rotate refresh token. Accepts token from portal-specific cookie, legacy cookie, or request body."""
+    cookie_name = _get_cookie_name(request)
+    raw_token = None
+    if cookie_name == ADMIN_COOKIE_NAME:
+        raw_token = admin_cookie_token or cookie_token or student_cookie_token
+    elif cookie_name == STUDENT_COOKIE_NAME:
+        raw_token = student_cookie_token or cookie_token or admin_cookie_token
+    else:
+        raw_token = cookie_token or admin_cookie_token or student_cookie_token
+
+    if not raw_token and body:
+        raw_token = body.refresh_token
+
     if not raw_token:
+        logger.warning(
+            "Refresh token missing",
+            extra={"ip": get_client_ip(request), "cookie_name": cookie_name},
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token missing",
@@ -192,27 +240,50 @@ def refresh_token_endpoint(
         ip=ip,
     )
 
-    _set_refresh_cookie(response, new_raw_refresh)
+    payload = decode_token(new_access_token)
+    user = db.get(User, uuid.UUID(payload["sub"]))
+
+    _set_refresh_cookie(response, new_raw_refresh, cookie_name=cookie_name)
+
+    logger.info(
+        "Token refresh successful",
+        extra={
+            "user_id": str(user.id) if user else None,
+            "role": user.role if user else None,
+            "cookie_name": cookie_name,
+            "ip": ip,
+        },
+    )
 
     return TokenResponse(
         access_token=new_access_token,
         token_type="bearer",
+        user=UserRead.model_validate(user) if user else None,
     )
 
 
 @router.post("/logout", response_model=MessageResponse)
 def logout(
+    request: Request,
     response: Response,
     body: RefreshTokenRequest | None = None,
     cookie_token: str | None = Cookie(default=None, alias=COOKIE_NAME),
+    admin_cookie_token: str | None = Cookie(default=None, alias=ADMIN_COOKIE_NAME),
+    student_cookie_token: str | None = Cookie(default=None, alias=STUDENT_COOKIE_NAME),
     db: Session = Depends(get_db),
 ):
     """Log out current session and revoke refresh token."""
-    raw_token = cookie_token or (body.refresh_token if body else None)
+    cookie_name = _get_cookie_name(request)
+    raw_token = (
+        (admin_cookie_token if cookie_name == ADMIN_COOKIE_NAME else None)
+        or (student_cookie_token if cookie_name == STUDENT_COOKIE_NAME else None)
+        or cookie_token
+        or (body.refresh_token if body else None)
+    )
     if raw_token:
         revoke_token(db, raw_token)
 
-    _clear_refresh_cookie(response)
+    _clear_refresh_cookie(response, cookie_name=cookie_name)
     return MessageResponse(message="Logged out successfully")
 
 

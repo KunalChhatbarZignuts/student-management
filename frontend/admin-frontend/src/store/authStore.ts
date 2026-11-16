@@ -8,7 +8,7 @@ interface AuthState {
   isBootstrapped: boolean;
   sessionError: string | null;
   setAuth: (accessToken: string, user: User) => void;
-  setAccessToken: (accessToken: string) => void;
+  setAccessToken: (accessToken: string, user?: User | null) => void;
   setUser: (user: User) => void;
   clearAuth: (reason?: string) => void;
   setBootstrapped: (isBootstrapped: boolean) => void;
@@ -30,10 +30,11 @@ export const useAuthStore = create<AuthState>((set) => ({
       sessionError: null,
     }),
 
-  setAccessToken: (accessToken) =>
+  setAccessToken: (accessToken, user) =>
     set((state) => ({
       accessToken,
-      isAuthenticated: !!state.user,
+      user: user !== undefined ? user : state.user,
+      isAuthenticated: !!(user || state.user),
     })),
 
   setUser: (user) =>

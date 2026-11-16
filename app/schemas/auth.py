@@ -1,11 +1,14 @@
 from pydantic import BaseModel, EmailStr, Field
 
+from app.schemas.user import UserRead
+
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     must_change_password: bool = False
     temp_token: str | None = None
+    user: UserRead | None = None
 
 
 class LoginRequest(BaseModel):

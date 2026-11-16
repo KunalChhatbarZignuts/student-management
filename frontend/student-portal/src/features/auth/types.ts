@@ -52,6 +52,7 @@ export interface TokenResponse {
   token_type: string;
   must_change_password?: boolean;
   temp_token?: string | null;
+  user?: User | null;
 }
 
 export interface MessageResponse {

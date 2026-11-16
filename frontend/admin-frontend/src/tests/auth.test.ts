@@ -128,4 +128,70 @@ describe('Admin Frontend Auth & Security Interceptors', () => {
     expect(r2.data).toEqual({ data: 'admin-success' });
     expect(refreshCallCount).toBe(1);
   });
+
+  it('performs token refresh and retries when encountering a 403 error', async () => {
+    let callCounter = 0;
+    server.use(
+      http.get('/api/v1/protected-admin-data-403', ({ request }) => {
+        callCounter++;
+        const auth = request.headers.get('authorization');
+        if (auth !== 'Bearer refreshed-admin-token-1') {
+          return new HttpResponse(JSON.stringify({ detail: 'Forbidden - token expired or mismatched' }), { status: 403 });
+        }
+        return HttpResponse.json({ data: 'recovered-after-403' });
+      }),
+      http.post('/api/v1/auth/refresh', () => {
+        refreshCallCount++;
+        return HttpResponse.json({
+          access_token: `refreshed-admin-token-${refreshCallCount}`,
+          token_type: 'bearer',
+        });
+      })
+    );
+
+    useAuthStore.getState().setAuth('stale-token', {
+      id: 'admin-1',
+      email: 'admin@school.edu',
+      role: ROLES.ADMIN,
+      status: 'ACTIVE',
+      must_change_password: false,
+      created_at: '',
+      updated_at: '',
+    });
+
+    const res = await apiClient.get('/protected-admin-data-403');
+    expect(res.data).toEqual({ data: 'recovered-after-403' });
+    expect(refreshCallCount).toBe(1);
+    expect(useAuthStore.getState().accessToken).toBe('refreshed-admin-token-1');
+  });
+
+  it('evicts session and rejects all waiting requests when refresh endpoint returns 401', async () => {
+    server.use(
+      http.get('/api/v1/protected-failing-resource', () => {
+        return new HttpResponse(null, { status: 401 });
+      }),
+      http.post('/api/v1/auth/refresh', () => {
+        return new HttpResponse(JSON.stringify({ detail: 'Invalid refresh token' }), { status: 401 });
+      })
+    );
+
+    useAuthStore.getState().setAuth('expired-token', {
+      id: 'admin-1',
+      email: 'admin@school.edu',
+      role: ROLES.ADMIN,
+      status: 'ACTIVE',
+      must_change_password: false,
+      created_at: '',
+      updated_at: '',
+    });
+
+    const p1 = apiClient.get('/protected-failing-resource');
+    const p2 = apiClient.get('/protected-failing-resource');
+
+    await expect(p1).rejects.toThrow();
+    await expect(p2).rejects.toThrow();
+
+    expect(useAuthStore.getState().accessToken).toBeNull();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+  });
 });
