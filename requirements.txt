@@ -13,7 +13,6 @@ alembic==1.20.1
 # Auth & Security
 argon2-cffi==25.1.0
 PyJWT==2.15.1
-pyotp==2.10.0
 
 # Rate limiting
 slowapi==0.1.10
@@ -21,6 +20,8 @@ slowapi==0.1.10
 # Utilities
 python-dotenv==1.2.4
 python-multipart==0.0.32
+reportlab==5.1.0
+razorpay==2.0.1
 
 # Testing & Coverage
 pytest==9.2.0

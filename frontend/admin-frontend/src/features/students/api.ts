@@ -1,9 +1,10 @@
 import apiClient from '@/lib/axios';
-import { StudentCreatePayload, PaginatedUsersResponse } from './types';
+import { StudentCreatePayload, PaginatedUsersResponse, ComprehensiveStudentDetailResponse } from './types';
 
 export const studentKeys = {
   all: ['students'] as const,
   list: (filters: Record<string, unknown>) => [...studentKeys.all, 'list', filters] as const,
+  details: (id: string) => [...studentKeys.all, 'details', id] as const,
 };
 
 export const adminStudentApi = {
@@ -32,8 +33,23 @@ export const adminStudentApi = {
     return res.data;
   },
 
+  getStudentComprehensiveDetails: async (studentId: string): Promise<ComprehensiveStudentDetailResponse> => {
+    const res = await apiClient.get<ComprehensiveStudentDetailResponse>(`/admin/students/${studentId}/details`);
+    return res.data;
+  },
+
   updateStudent: async (studentId: string, payload: any) => {
     const res = await apiClient.patch(`/admin/students/${studentId}`, payload);
+    return res.data;
+  },
+
+  transferSection: async (studentId: string, payload: {
+    target_section_id: string;
+    target_grade_id?: string;
+    transfer_date?: string;
+    reason: string;
+  }) => {
+    const res = await apiClient.post(`/admin/students/${studentId}/transfer-section`, payload);
     return res.data;
   },
 

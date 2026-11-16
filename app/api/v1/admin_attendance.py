@@ -51,10 +51,11 @@ def get_daily_overview(
 )
 def get_admin_section_roster(
     section_id: uuid.UUID,
+    date: date | None = Query(None, description="Date for checking approved leaves"),
     db: Session = Depends(get_db),
 ):
     """Retrieve student roster for a section."""
-    return attendance_service.get_section_roster(section_id, db)
+    return attendance_service.get_section_roster(section_id, db, target_date=date)
 
 
 @router.get(

@@ -21,6 +21,7 @@ from app.db.base import Base, TimestampMixin
 if TYPE_CHECKING:
     from app.models.academic_structure import AcademicYear, Grade, Section, StudentEnrollment
     from app.models.classroom import Class, Subject
+    from app.models.parent import Parent
     from app.models.student import Student
     from app.models.teacher import Teacher
     from app.models.user import User
@@ -166,3 +167,49 @@ class AttendanceAuditHistory(Base):
 
     def __repr__(self) -> str:
         return f"<AttendanceAuditHistory record={self.record_id} {self.previous_status}->{self.new_status}>"
+
+
+class AbsenceNotificationLog(TimestampMixin, Base):
+    __tablename__ = "absence_notification_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("students.id", ondelete="CASCADE"), nullable=False
+    )
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("parents.id", ondelete="SET NULL"), nullable=True
+    )
+    attendance_record_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("attendance_records.id", ondelete="CASCADE"), nullable=False
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("attendance_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    date: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    channel: Mapped[str] = mapped_column(String(30), nullable=False, default="IN_APP")  # IN_APP, SMS, EMAIL
+    recipient: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="SENT"
+    )  # SENT, FAILED, SUPPRESSED_HOLIDAY, SUPPRESSED_NO_CONTACT
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sent_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: dt.datetime.now(dt.timezone.utc)
+    )
+
+    # Relationships
+    student: Mapped["Student"] = relationship("Student")
+    parent: Mapped["Parent | None"] = relationship("Parent")
+    attendance_record: Mapped["AttendanceRecord"] = relationship("AttendanceRecord")
+    session: Mapped["AttendanceSession"] = relationship("AttendanceSession")
+
+    __table_args__ = (
+        Index("ix_absence_notif_student", "student_id"),
+        Index("ix_absence_notif_date", "date"),
+        Index("ix_absence_notif_session", "session_id"),
+        Index("ix_absence_notif_status", "status"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<AbsenceNotificationLog student={self.student_id} date={self.date} status={self.status}>"
+

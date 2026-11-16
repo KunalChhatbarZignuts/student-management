@@ -15,11 +15,23 @@ from app.models.invite import Invite
 from app.models.teacher import Teacher
 from app.models.user import User, UserRole, UserStatus
 from app.schemas.teacher import TeacherCreate, TeacherCreateResponse, TeacherResponse
+from app.schemas.teacher_detail import ComprehensiveTeacherDetailResponse
 from app.services.audit_service import log_action
 from app.services.auth_service import revoke_all_user_tokens
 from app.services.id_generator import generate_employee_code
+from app.services.teacher_detail_service import get_teacher_comprehensive_details
 
 router = APIRouter(prefix="/admin/teachers", tags=["Admin - Teachers"])
+
+
+@router.get("", response_model=list[TeacherResponse])
+def list_teachers(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value, UserRole.TEACHER.value)),
+):
+    """List all teachers."""
+    teachers = db.execute(select(Teacher).order_by(Teacher.first_name, Teacher.last_name)).scalars().all()
+    return teachers
 
 
 @router.post("", response_model=TeacherCreateResponse, status_code=status.HTTP_201_CREATED)
@@ -164,3 +176,14 @@ def delete_or_deactivate_teacher(
         "message": f"Teacher '{teacher.first_name} {teacher.last_name}' ({teacher.employee_code}) has been deactivated successfully",
         "id": str(teacher.id),
     }
+
+
+@router.get("/{teacher_id}/details", response_model=ComprehensiveTeacherDetailResponse)
+def get_teacher_details(
+    teacher_id: uuid.UUID,
+    current_user: User = Depends(require_roles(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value)),
+    db: Session = Depends(get_db),
+):
+    """Admin centralized 360-degree view of all teacher profile, workload, timetable, and attendance activity."""
+    return get_teacher_comprehensive_details(teacher_id, db)
+

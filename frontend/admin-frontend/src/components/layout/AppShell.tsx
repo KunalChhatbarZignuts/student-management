@@ -27,7 +27,6 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleIcon from '@mui/icons-material/People';
 import SchoolIcon from '@mui/icons-material/School';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import FamilyRestroomIcon from '@mui/icons-material/FamilyRestroom';
 import ClassIcon from '@mui/icons-material/Class';
@@ -41,6 +40,13 @@ import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
+import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
+import PublishedWithChangesIcon from '@mui/icons-material/PublishedWithChanges';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 
 import { useAuth } from '@/features/auth/hooks';
 import { useUiStore } from '@/store/uiStore';
@@ -86,9 +92,51 @@ const navItems: NavItem[] = [
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
   },
   {
+    label: 'Academic Enrollments',
+    href: '/enrollments',
+    icon: <HistoryEduIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
+    label: 'Academic Rollover',
+    href: '/enrollments/rollover',
+    icon: <PublishedWithChangesIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
+    label: 'Fee Counter POS',
+    href: '/fees/pos',
+    icon: <PointOfSaleIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
     label: 'Fee Management',
     href: '/fees',
     icon: <AccountBalanceWalletIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
+    label: 'Teacher Substitutions',
+    href: '/timetable/substitutions',
+    icon: <SwapHorizIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
+    label: 'Timetables',
+    href: '/timetable',
+    icon: <ScheduleIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
+    label: 'Absence Notifications',
+    href: '/attendance/notifications',
+    icon: <NotificationsActiveIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
+    label: 'Examinations',
+    href: '/examinations',
+    icon: <AssignmentIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
   },
   {
@@ -98,27 +146,39 @@ const navItems: NavItem[] = [
     roles: [ROLES.SUPER_ADMIN],
   },
   {
-    label: 'Bulk Import',
-    href: '/bulk-import',
-    icon: <UploadFileIcon />,
-    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-  },
-  {
-    label: 'Applications',
-    href: '/applications',
-    icon: <AssignmentTurnedInIcon />,
-    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-  },
-  {
     label: 'Parents & Guardians',
     href: '/parents',
     icon: <FamilyRestroomIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
   },
   {
+    label: 'Leave Monitoring',
+    href: '/leave-monitoring',
+    icon: <AssignmentTurnedInIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
     label: 'My Classes',
     href: '/my-classes',
     icon: <ClassIcon />,
+    roles: [ROLES.TEACHER],
+  },
+  {
+    label: 'Student Leave Requests',
+    href: '/leave-requests',
+    icon: <AssignmentTurnedInIcon />,
+    roles: [ROLES.TEACHER],
+  },
+  {
+    label: 'My Timetable',
+    href: '/my-timetable',
+    icon: <ScheduleIcon />,
+    roles: [ROLES.TEACHER],
+  },
+  {
+    label: 'My Examinations',
+    href: '/my-examinations',
+    icon: <FactCheckIcon />,
     roles: [ROLES.TEACHER],
   },
   {
@@ -152,7 +212,14 @@ const navItems: NavItem[] = [
   },
 ];
 
+const AppShellContext = React.createContext(false);
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  const isNested = React.useContext(AppShellContext);
+  if (isNested) {
+    return <>{children}</>;
+  }
+
   const pathname = usePathname();
   const router = useRouter();
   const { user, role, logout } = useAuth();
@@ -216,6 +283,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <ListItemButton
                 component={Link}
                 href={item.href}
+                prefetch={false}
                 selected={isActive}
                 onClick={() => setMobileOpen(false)}
                 sx={{
@@ -270,7 +338,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+    <AppShellContext.Provider value={true}>
+      <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
       <AppBar
         position="fixed"
         sx={{
@@ -350,7 +419,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <ListItemIcon>
                   <PersonIcon fontSize="small" />
                 </ListItemIcon>
-                Profile & 2FA
+                Profile & Settings
               </MenuItem>
               <MenuItem
                 onClick={() => {
@@ -411,6 +480,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </Box>
     </Box>
+    </AppShellContext.Provider>
   );
 }
 

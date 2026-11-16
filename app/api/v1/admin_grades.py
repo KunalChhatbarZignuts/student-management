@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_client_ip, get_current_user, get_db, require_roles
+from app.core.deps import get_client_ip, get_db, require_roles
 from app.models.academic_structure import AcademicYear
 from app.models.user import User, UserRole
 from app.schemas.grade_section import (
@@ -66,7 +66,7 @@ def list_grades(
     search: str | None = Query(None, description="Search by grade name or code"),
     academic_year_id: uuid.UUID | None = Query(None, description="Filter by academic year"),
     status: str | None = Query(None, description="Filter by status (active/inactive)"),
-    current_user: User = Depends(require_roles(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value)),
+    current_user: User = Depends(require_roles(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value, UserRole.TEACHER.value)),
     db: Session = Depends(get_db),
 ):
     """List grades with section and student counts."""
@@ -83,7 +83,7 @@ def list_grades(
 @router.get("/grades/{grade_id}", response_model=GradeDetailResponse)
 def get_grade_detail(
     grade_id: uuid.UUID,
-    current_user: User = Depends(require_roles(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value)),
+    current_user: User = Depends(require_roles(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value, UserRole.TEACHER.value)),
     db: Session = Depends(get_db),
 ):
     """Get grade details including all sections and coordinator."""

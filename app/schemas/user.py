@@ -44,11 +44,10 @@ class ParentProfile(BaseModel):
 
 class UserRead(BaseModel):
     id: uuid.UUID
-    email: EmailStr
+    email: str
     role: str
     status: str
     must_change_password: bool
-    totp_enabled: bool
     last_login_at: datetime | None = None
     created_at: datetime
     updated_at: datetime

@@ -28,7 +28,10 @@ import PersonIcon from '@mui/icons-material/Person';
 import FamilyRestroomIcon from '@mui/icons-material/FamilyRestroom';
 import GradeIcon from '@mui/icons-material/Grade';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import EventNoteIcon from '@mui/icons-material/EventNote';
 import PaymentsIcon from '@mui/icons-material/Payments';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -65,6 +68,11 @@ const navItems: NavItem[] = [
     roles: [ROLES.PARENT],
   },
   {
+    label: 'Examinations & Results',
+    href: '/examinations',
+    icon: <FactCheckIcon />,
+  },
+  {
     label: 'Marks & Grades',
     href: '/marks',
     icon: <GradeIcon />,
@@ -75,9 +83,20 @@ const navItems: NavItem[] = [
     icon: <EventAvailableIcon />,
   },
   {
+    label: 'Class Timetable',
+    href: '/timetable',
+    icon: <ScheduleIcon />,
+  },
+  {
+    label: 'Leave Applications',
+    href: '/leaves',
+    icon: <EventNoteIcon />,
+  },
+  {
     label: 'Fee Details',
     href: '/fees',
     icon: <PaymentsIcon />,
+    roles: [ROLES.PARENT],
   },
 ];
 
@@ -145,6 +164,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <ListItemButton
                 component={Link}
                 href={item.href}
+                prefetch={false}
                 selected={isActive}
                 onClick={() => setMobileOpen(false)}
                 sx={{

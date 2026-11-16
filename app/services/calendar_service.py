@@ -1,10 +1,9 @@
 import calendar
 import datetime as dt
 import uuid
-from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models.academic_structure import AcademicYear, Grade, Section
@@ -15,8 +14,6 @@ from app.models.calendar import (
     HolidayCategory,
     SchoolCalendarSettings,
     SchoolHoliday,
-    holiday_grade_associations,
-    holiday_section_associations,
 )
 from app.schemas.calendar import (
     DateWorkingStatusResponse,
@@ -24,14 +21,12 @@ from app.schemas.calendar import (
     HolidayCategoryCreate,
     MonthCalendarResponse,
     MonthlyCalendarDay,
-    SchoolCalendarSettingsResponse,
     SchoolCalendarSettingsUpdate,
     SchoolHolidayCancelRequest,
     SchoolHolidayCreate,
     SchoolHolidayResponse,
     SchoolHolidayUpdate,
     SpecialWorkingDayCreate,
-    SpecialWorkingDayResponse,
 )
 
 DEFAULT_CATEGORIES = [

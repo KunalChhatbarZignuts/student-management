@@ -1,14 +1,13 @@
 import uuid
 from datetime import date, datetime, timedelta, timezone
-from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import settings
 from app.models.academic_structure import AcademicYear, Grade, Section, StudentEnrollment
-from app.models.attendance import AttendanceRecord, AttendanceSession, AttendanceStatus
+from app.models.attendance import AttendanceAuditHistory, AttendanceRecord, AttendanceSession, AttendanceStatus
 from app.models.classroom import Class, Subject, TeacherAssignment
 from app.models.student import Student
 from app.models.teacher import Teacher
@@ -19,9 +18,8 @@ from app.schemas.attendance import (
     AttendanceSessionUpdate,
     ClassAttendanceSummaryResponse,
     StudentAttendanceSummaryItem,
-    StudentMeAttendanceRecord,
-    StudentMeAttendanceResponse,
 )
+from app.services.absence_notification_service import dispatch_absence_notifications_for_session
 from app.services.audit_service import log_action
 
 
@@ -239,6 +237,11 @@ def get_teacher_attendance(
                     student_code=st.student_code if st else None,
                 )
             )
+        now_utc = datetime.now(timezone.utc)
+        s_created = s.created_at if s.created_at.tzinfo else s.created_at.replace(tzinfo=timezone.utc)
+        rem_secs = max(0, int((s_created + timedelta(minutes=settings.TEACHER_ATTENDANCE_GRACE_MINUTES) - now_utc).total_seconds()))
+        can_edit = s.locked_at is None and rem_secs > 0
+
         results.append(
             AttendanceSessionResponse(
                 id=s.id,
@@ -250,6 +253,8 @@ def get_teacher_attendance(
                 locked_at=s.locked_at,
                 created_at=s.created_at,
                 updated_at=s.updated_at,
+                can_teacher_edit=can_edit,
+                edit_window_remaining_seconds=rem_secs,
                 class_name=classroom.name,
                 section=classroom.section,
                 subject_name=sub.name if sub else None,
@@ -278,15 +283,21 @@ def update_attendance_session(
             raise HTTPException(status_code=403, detail="Forbidden")
         _verify_teacher_class_access(teacher.id, session.class_id, db)
 
-    # Check edit window (default 24h)
-    edit_window = timedelta(hours=settings.ATTENDANCE_EDIT_WINDOW_HOURS)
+    # Check edit window (30-minute grace window for teachers; settings.ATTENDANCE_EDIT_WINDOW_HOURS for admins)
     now = datetime.now(timezone.utc)
-    # Ensure session.created_at is tz-aware for comparison
     created_at = session.created_at if session.created_at.tzinfo else session.created_at.replace(tzinfo=timezone.utc)
-    if not is_admin and (now - created_at > edit_window or session.locked_at is not None):
+    
+    if not is_admin:
+        grace_window = timedelta(minutes=settings.TEACHER_ATTENDANCE_GRACE_MINUTES)
+        if now - created_at > grace_window or session.locked_at is not None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Attendance edit window ({settings.TEACHER_ATTENDANCE_GRACE_MINUTES}m) has expired. Only administrators can modify locked records.",
+            )
+    elif session.locked_at is not None and not is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Attendance edit window ({settings.ATTENDANCE_EDIT_WINDOW_HOURS}h) has expired. Only administrators can modify locked records.",
+            detail="Attendance session is locked and cannot be modified.",
         )
 
     classroom = db.get(Class, session.class_id)
@@ -295,22 +306,70 @@ def update_attendance_session(
     # Map existing records by student_id
     existing_records = {r.student_id: r for r in session.records}
 
-    # Update or insert
+    # Verify mandatory correction remark for teachers when amending statuses
+    if not is_admin:
+        has_status_change = False
+        for item in payload.records:
+            rec = existing_records.get(item.student_id)
+            status_val = item.status.value if isinstance(item.status, AttendanceStatus) else item.status
+            if not rec or rec.status != status_val:
+                has_status_change = True
+                break
+
+        if has_status_change:
+            effective_remark = (payload.correction_remark or "").strip()
+            if not effective_remark:
+                has_item_remark = any(
+                    bool(item.remark and item.remark.strip())
+                    for item in payload.records
+                    if not existing_records.get(item.student_id)
+                    or existing_records[item.student_id].status != (item.status.value if isinstance(item.status, AttendanceStatus) else item.status)
+                )
+                if not has_item_remark:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="A non-empty correction remark is mandatory when amending roll call within the grace window.",
+                    )
+
+    # Update or insert, writing audit log for changes
     for item in payload.records:
         rec = existing_records.get(item.student_id)
         status_val = item.status.value if isinstance(item.status, AttendanceStatus) else item.status
+        reason = (payload.correction_remark or item.remark or ("Teacher self-correction within grace window" if not is_admin else "Admin amendment")).strip()
         if rec:
+            if rec.status != status_val:
+                audit = AttendanceAuditHistory(
+                    record_id=rec.id,
+                    session_id=session.id,
+                    student_id=rec.student_id,
+                    previous_status=rec.status,
+                    new_status=status_val,
+                    reason=reason,
+                    modified_by_user_id=actor_user_id,
+                )
+                db.add(audit)
             rec.status = status_val
-            rec.remark = item.remark
+            rec.remark = item.remark or rec.remark
         else:
             new_rec = AttendanceRecord(
                 session_id=session.id,
                 student_id=item.student_id,
                 status=status_val,
-                remark=item.remark,
+                remark=item.remark or payload.correction_remark,
                 date=session.date,
             )
             db.add(new_rec)
+            db.flush()
+            audit = AttendanceAuditHistory(
+                record_id=new_rec.id,
+                session_id=session.id,
+                student_id=item.student_id,
+                previous_status="UNRECORDED",
+                new_status=status_val,
+                reason=reason,
+                modified_by_user_id=actor_user_id,
+            )
+            db.add(audit)
 
     db.commit()
     db.refresh(session)
@@ -344,6 +403,9 @@ def update_attendance_session(
             )
         )
 
+    rem_secs = max(0, int((created_at + timedelta(minutes=settings.TEACHER_ATTENDANCE_GRACE_MINUTES) - now).total_seconds()))
+    can_teacher_edit = session.locked_at is None and rem_secs > 0
+
     return AttendanceSessionResponse(
         id=session.id,
         class_id=session.class_id,
@@ -354,6 +416,8 @@ def update_attendance_session(
         locked_at=session.locked_at,
         created_at=session.created_at,
         updated_at=session.updated_at,
+        can_teacher_edit=can_teacher_edit,
+        edit_window_remaining_seconds=rem_secs,
         class_name=classroom.name if classroom else None,
         section=classroom.section if classroom else None,
         subject_name=subject.name if subject else None,
@@ -449,68 +513,6 @@ def get_class_attendance_summary(
         to_date=to_date,
         total_sessions=total_sessions,
         items=items,
-    )
-
-
-def get_student_self_attendance(
-    student_id: uuid.UUID,
-    db: Session,
-) -> StudentMeAttendanceResponse:
-    student = db.get(Student, student_id)
-    if not student:
-        raise HTTPException(status_code=404, detail="Student profile not found")
-
-    records = db.execute(
-        select(AttendanceRecord)
-        .where(AttendanceRecord.student_id == student_id)
-        .order_by(AttendanceRecord.created_at.desc())
-    ).scalars().all()
-
-    me_records: list[StudentMeAttendanceRecord] = []
-    attended_count = 0
-    excused_count = 0
-
-    for r in records:
-        r_date = r.date
-        period = None
-        subject_name = None
-        if r.session_id:
-            session = db.get(AttendanceSession, r.session_id)
-            if session:
-                r_date = session.date
-                period = session.period
-                sub = db.get(Subject, session.subject_id)
-                if sub:
-                    subject_name = sub.name
-
-        st_lower = r.status.lower()
-        if st_lower in ("present", "late", "excused"):
-            attended_count += 1
-        if st_lower == "excused":
-            excused_count += 1
-
-        me_records.append(
-            StudentMeAttendanceRecord(
-                id=r.id,
-                date=r_date or datetime.now(timezone.utc).date(),
-                period=period,
-                subject_name=subject_name,
-                status=r.status.upper(),
-                remark=r.remark or r.notes,
-            )
-        )
-
-    total = len(me_records)
-    pct = round((attended_count / total * 100), 1) if total > 0 else 100.0
-
-    return StudentMeAttendanceResponse(
-        student_id=student.id,
-        student_code=student.student_code,
-        total_classes=total,
-        attended_classes=attended_count,
-        percentage=pct,
-        excused_absences=excused_count,
-        records=me_records,
     )
 
 
@@ -610,14 +612,19 @@ def verify_teacher_section_access(teacher_id: uuid.UUID, section_id: uuid.UUID, 
     return section
 
 
-def get_section_roster(section_id: uuid.UUID, db: Session) -> list[dict]:
-    """Retrieve enrolled student roster for a section."""
+def get_section_roster(
+    section_id: uuid.UUID,
+    db: Session,
+    target_date: date | None = None,
+) -> list[dict]:
+    """Retrieve enrolled student roster for a section, annotated with approved leave status."""
     section = db.get(Section, section_id)
     if not section:
         raise HTTPException(status_code=404, detail="Section not found")
 
     enrollments = db.execute(
         select(StudentEnrollment)
+        .options(joinedload(StudentEnrollment.student))
         .where(
             StudentEnrollment.section_id == section.id,
             StudentEnrollment.status == "ACTIVE",
@@ -625,11 +632,26 @@ def get_section_roster(section_id: uuid.UUID, db: Session) -> list[dict]:
         .order_by(StudentEnrollment.roll_no.asc())
     ).scalars().all()
 
+    # Query approved leaves for target date
+    check_dt = target_date or date.today()
+    from app.models.leave import LeaveStatus, StudentLeaveApplication
+    approved_leaves = db.execute(
+        select(StudentLeaveApplication).where(
+            StudentLeaveApplication.section_id == section.id,
+            StudentLeaveApplication.status == LeaveStatus.APPROVED.value,
+            StudentLeaveApplication.start_date <= check_dt,
+            StudentLeaveApplication.end_date >= check_dt,
+        )
+    ).scalars().all()
+    leave_map = {l.student_id: l for l in approved_leaves}
+
     roster = []
     for enr in enrollments:
         stu = enr.student
         if not stu:
             continue
+        leave_app = leave_map.get(stu.id)
+        has_leave = leave_app is not None
         roster.append({
             "student_id": stu.id,
             "enrollment_id": enr.id,
@@ -640,6 +662,10 @@ def get_section_roster(section_id: uuid.UUID, db: Session) -> list[dict]:
             "student_code": stu.student_code,
             "enrollment_number": stu.enrollment_number or stu.student_code,
             "gender": stu.gender,
+            "has_approved_leave": has_leave,
+            "leave_reason": leave_app.reason if leave_app else None,
+            "default_status": "EXCUSED" if has_leave else "PRESENT",
+            "default_remark": f"Approved Leave: {leave_app.reason}" if leave_app else None,
         })
     return roster
 
@@ -782,6 +808,13 @@ def record_section_attendance(
     db.commit()
     db.refresh(session)
 
+    # Automated absence notification hook
+    if absent_count > 0:
+        try:
+            dispatch_absence_notifications_for_session(db, session.id)
+        except Exception:
+            pass
+
     # Log action
     log_action(
         db,
@@ -875,6 +908,11 @@ def get_section_attendance(
             )
         )
 
+    now_utc = datetime.now(timezone.utc)
+    s_created = session.created_at if session.created_at.tzinfo else session.created_at.replace(tzinfo=timezone.utc)
+    rem_secs = max(0, int((s_created + timedelta(minutes=settings.TEACHER_ATTENDANCE_GRACE_MINUTES) - now_utc).total_seconds()))
+    can_edit = session.locked_at is None and rem_secs > 0
+
     return AttendanceSessionResponse(
         id=session.id,
         academic_year_id=session.academic_year_id,
@@ -892,6 +930,8 @@ def get_section_attendance(
         absent_count=a_cnt,
         late_count=l_cnt,
         excused_count=e_cnt,
+        can_teacher_edit=can_edit,
+        edit_window_remaining_seconds=rem_secs,
         created_at=session.created_at,
         updated_at=session.updated_at,
         records=records_out,

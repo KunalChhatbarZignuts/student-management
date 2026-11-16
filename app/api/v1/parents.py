@@ -10,9 +10,10 @@ from app.core.config import settings
 from app.core.deps import get_client_ip, get_db, require_roles
 from app.core.email import send_invite_email
 from app.core.security import generate_secure_token, hash_token, hash_password
-from app.models.academic import AttendanceRecord, FeeInvoice, StudentMark
+from app.models.academic import FeeInvoice, StudentMark
+from app.models.attendance import AttendanceRecord
 from app.models.academic_structure import AcademicYear, Grade, Section, StudentEnrollment
-from app.models.classroom import Class, Subject, TeacherAssignment
+from app.models.classroom import Class, TeacherAssignment
 from app.models.invite import Invite
 from app.models.parent import Parent, ParentStudentLink
 from app.models.student import Student
@@ -27,7 +28,6 @@ from app.schemas.parent import (
     LinkChildPayload,
     LinkedChildDetail,
     LinkedParentDetail,
-    LinkedStudentSummary,
     PaginatedParentsResponse,
     ParentCreate,
     ParentLinkResponse,
@@ -40,7 +40,6 @@ from app.schemas.parent import (
     ParentWithChildrenResponse,
     UpdateRelationshipPayload,
 )
-from app.schemas.student import StudentResponse
 from app.services.audit_service import log_action
 
 router = APIRouter(tags=["Parents & Guardian Management"])
@@ -154,6 +153,7 @@ def list_parents(
             or_(
                 Parent.first_name.ilike(term),
                 Parent.last_name.ilike(term),
+                func.concat(Parent.first_name, " ", Parent.last_name).ilike(term),
                 Parent.phone.ilike(term),
                 User.email.ilike(term),
             )
@@ -1055,13 +1055,28 @@ def get_child_fees(
 @router.get("/parent/children/{student_id}/timetable")
 def get_child_timetable(
     student_id: uuid.UUID,
+    date: dt.date | None = Query(None),
     current_user: User = Depends(require_roles(UserRole.PARENT.value)),
     db: Session = Depends(get_db),
 ):
-    """Parent Portal: view child's class schedule derived from section and subjects."""
+    """Parent Portal: view child's published timetable, or fallback schedule."""
     parent = _get_parent_profile(current_user.id, db)
     student = _verify_parent_child_link(parent.id, student_id, db)
 
+    # Attempt to return published school timetable
+    try:
+        from app.services import timetable_service
+        return timetable_service.get_child_timetable_for_parent(
+            current_user.id,
+            student.id,
+            db,
+            target_date=date,
+        )
+    except HTTPException as e:
+        if e.status_code != status.HTTP_404_NOT_FOUND:
+            raise e
+
+    # Fallback to assignment schedule if timetable not yet configured/published
     active_enr = db.execute(
         select(StudentEnrollment).where(
             StudentEnrollment.student_id == student.id,
@@ -1099,6 +1114,9 @@ def get_child_timetable(
         "class_name": student.class_name,
         "section": student.section,
         "schedule": schedule_items,
+        "entries": [],
+        "periods": [],
+        "working_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
     }
 
 

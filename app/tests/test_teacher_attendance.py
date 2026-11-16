@@ -389,3 +389,95 @@ def test_attendance_summary_and_student_self_view(client: TestClient, attendance
     stu_body = res_stu.json()
     assert "percentage" in stu_body
     assert "total_classes" in stu_body
+
+
+def test_teacher_attendance_grace_window_and_mandatory_remark(client: TestClient, attendance_fixtures: dict, db: Session):
+    """Test 30-minute grace window for teachers:
+    1. Within 30 min, omitting correction_remark returns 422.
+    2. Within 30 min, providing correction_remark succeeds (200) and writes to AttendanceAuditHistory.
+    3. Beyond 30 min, teacher edit returns 403 Forbidden.
+    """
+    from sqlalchemy import select
+    from app.models.attendance import AttendanceAuditHistory
+
+    data = attendance_fixtures
+    t1_token = create_access_token(data["t1_user"].id, role=UserRole.TEACHER.value)
+
+    # 1. Create an active session created 5 minutes ago
+    session_recent = AttendanceSession(
+        class_id=data["classroom"].id,
+        subject_id=data["subject"].id,
+        date=datetime.now(timezone.utc).date(),
+        period=3,
+        taken_by_teacher_id=data["teacher1"].id,
+        created_at=datetime.now(timezone.utc) - timedelta(minutes=5),
+    )
+    db.add(session_recent)
+    db.flush()
+
+    rec = AttendanceRecord(
+        session_id=session_recent.id,
+        student_id=data["student1"].id,
+        status="ABSENT",
+        date=session_recent.date,
+    )
+    db.add(rec)
+    db.commit()
+
+    # Step A: Edit within grace window without correction_remark -> 422 Unprocessable Entity
+    bad_payload = {
+        "records": [
+            {"student_id": str(data["student1"].id), "status": "PRESENT"}
+        ]
+    }
+    res_bad = client.patch(
+        f"/api/v1/teacher/attendance/{session_recent.id}",
+        json=bad_payload,
+        headers={"Authorization": f"Bearer {t1_token}"},
+    )
+    assert res_bad.status_code == 422
+    assert "correction remark is mandatory" in res_bad.json()["detail"].lower()
+
+    # Step B: Edit within grace window with mandatory correction_remark -> 200 OK
+    good_payload = {
+        "records": [
+            {"student_id": str(data["student1"].id), "status": "PRESENT"}
+        ],
+        "correction_remark": "Student arrived 5 minutes late due to bus traffic delay",
+    }
+    res_good = client.patch(
+        f"/api/v1/teacher/attendance/{session_recent.id}",
+        json=good_payload,
+        headers={"Authorization": f"Bearer {t1_token}"},
+    )
+    assert res_good.status_code == 200
+    res_data = res_good.json()
+    assert res_data["can_teacher_edit"] is True
+    assert res_data["edit_window_remaining_seconds"] > 0
+    assert res_data["records"][0]["status"] == "PRESENT"
+
+    # Step C: Verify AttendanceAuditHistory was created
+    audit = db.execute(
+        select(AttendanceAuditHistory).where(
+            AttendanceAuditHistory.session_id == session_recent.id,
+            AttendanceAuditHistory.student_id == data["student1"].id,
+        )
+    ).scalar_one_or_none()
+    assert audit is not None
+    assert audit.previous_status == "ABSENT"
+    assert audit.new_status == "PRESENT"
+    assert "bus traffic delay" in audit.reason
+    assert audit.modified_by_user_id == data["t1_user"].id
+
+    # Step D: Session created 35 minutes ago -> Teacher edit rejected with 403 Forbidden
+    session_recent.created_at = datetime.now(timezone.utc) - timedelta(minutes=35)
+    db.commit()
+
+    res_expired = client.patch(
+        f"/api/v1/teacher/attendance/{session_recent.id}",
+        json=good_payload,
+        headers={"Authorization": f"Bearer {t1_token}"},
+    )
+    assert res_expired.status_code == 403
+    assert "expired" in res_expired.json()["detail"].lower()
+

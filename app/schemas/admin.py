@@ -14,7 +14,7 @@ class PaginatedUsersResponse(BaseModel):
 
 class UserStatusUpdateResponse(BaseModel):
     id: uuid.UUID
-    email: EmailStr
+    email: str
     role: str
     status: str
     message: str

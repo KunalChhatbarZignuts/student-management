@@ -39,6 +39,7 @@ class AttendanceRecordItemUpdate(BaseModel):
 
 class AttendanceSessionUpdate(BaseModel):
     records: list[AttendanceRecordItemUpdate] = Field(..., min_length=1)
+    correction_remark: str | None = Field(None, max_length=500, description="Mandatory correction remark if edited by teacher")
 
 
 class AttendanceRecordResponse(BaseModel):
@@ -77,6 +78,8 @@ class AttendanceSessionResponse(BaseModel):
     excused_count: int = 0
     locked_at: datetime | None = None
     created_at: datetime
+    can_teacher_edit: bool = False
+    edit_window_remaining_seconds: int = 0
     updated_at: datetime
     class_name: str | None = None
     section: str | None = None
@@ -130,6 +133,10 @@ class SectionRosterStudentItem(BaseModel):
     student_code: str
     roll_no: int | None = None
     gender: str | None = None
+    has_approved_leave: bool = False
+    leave_reason: str | None = None
+    default_status: str | None = None
+    default_remark: str | None = None
 
 
 class SectionDailyOverviewItem(BaseModel):
@@ -212,22 +219,3 @@ class ClassAttendanceSummaryResponse(BaseModel):
     to_date: date
     total_sessions: int
     items: list[StudentAttendanceSummaryItem]
-
-
-class StudentMeAttendanceRecord(BaseModel):
-    id: uuid.UUID
-    date: date
-    period: int | None = None
-    subject_name: str | None = None
-    status: str
-    remark: str | None = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class StudentMeAttendanceResponse(BaseModel):
-    student_id: uuid.UUID
-    student_code: str
-    total_classes: int
-    attended_classes: int
-    percentage: float

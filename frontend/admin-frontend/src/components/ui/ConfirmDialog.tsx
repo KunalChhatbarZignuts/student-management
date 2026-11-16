@@ -39,7 +39,7 @@ export default function ConfirmDialog({
         <DialogContentText>{description}</DialogContentText>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}>
-        <Button onClick={onClose} disabled={loading} color="inherit">
+        <Button onClick={onClose} autoFocus disabled={loading} color="inherit">
           {cancelLabel}
         </Button>
         <Button

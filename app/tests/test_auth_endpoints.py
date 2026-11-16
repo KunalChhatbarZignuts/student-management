@@ -193,6 +193,68 @@ def test_refresh_token_cookie_rotation(client, db):
     refresh_res = client.post("/api/v1/auth/refresh", cookies={"refresh_token": cookie_val})
     assert refresh_res.status_code == 200
     assert "access_token" in refresh_res.json()
+    assert refresh_res.json().get("user") is not None
+    assert refresh_res.json()["user"]["email"] == "cookie.user@school.edu"
+    assert refresh_res.json()["user"]["role"] == "parent"
     new_cookie_val = refresh_res.cookies.get("refresh_token")
     assert new_cookie_val is not None
     assert new_cookie_val != cookie_val
+
+
+def test_portal_isolated_cookies_and_concurrent_sessions(client, db):
+    pw = "PortalSecurePass#2026"
+    admin_user = User(
+        email="portal.admin@school.edu",
+        password_hash=hash_password(pw),
+        role=UserRole.ADMIN.value,
+        status=UserStatus.ACTIVE.value,
+    )
+    student_user = User(
+        email="portal.student@school.edu",
+        password_hash=hash_password(pw),
+        role=UserRole.STUDENT.value,
+        status=UserStatus.ACTIVE.value,
+    )
+    db.add_all([admin_user, student_user])
+    db.commit()
+
+    # 1. Login to Admin Portal
+    admin_login = client.post(
+        "/api/v1/auth/login",
+        json={"identifier": "portal.admin@school.edu", "password": pw},
+        headers={"X-Client-Portal": "admin"},
+    )
+    assert admin_login.status_code == 200
+    admin_cookie = admin_login.cookies.get("admin_refresh_token")
+    assert admin_cookie is not None
+    assert admin_login.json()["user"]["role"] == "admin"
+
+    # 2. Login to Student Portal
+    student_login = client.post(
+        "/api/v1/auth/login",
+        json={"identifier": "portal.student@school.edu", "password": pw},
+        headers={"X-Client-Portal": "student"},
+    )
+    assert student_login.status_code == 200
+    student_cookie = student_login.cookies.get("student_refresh_token")
+    assert student_cookie is not None
+    assert student_login.json()["user"]["role"] == "student"
+
+    # 3. Both cookies can refresh independently without collision
+    admin_refresh = client.post(
+        "/api/v1/auth/refresh",
+        headers={"X-Client-Portal": "admin"},
+        cookies={"admin_refresh_token": admin_cookie, "student_refresh_token": student_cookie},
+    )
+    assert admin_refresh.status_code == 200
+    assert admin_refresh.json()["user"]["role"] == "admin"
+    assert admin_refresh.cookies.get("admin_refresh_token") is not None
+
+    student_refresh = client.post(
+        "/api/v1/auth/refresh",
+        headers={"X-Client-Portal": "student"},
+        cookies={"admin_refresh_token": admin_cookie, "student_refresh_token": student_cookie},
+    )
+    assert student_refresh.status_code == 200
+    assert student_refresh.json()["user"]["role"] == "student"
+    assert student_refresh.cookies.get("student_refresh_token") is not None

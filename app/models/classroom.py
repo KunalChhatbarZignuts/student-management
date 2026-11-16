@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from app.models.academic_structure import ClassGroup, Section
+    from app.models.academic_structure import Section
     from app.models.teacher import Teacher
 
 
@@ -69,9 +69,6 @@ class TeacherAssignment(TimestampMixin, Base):
     class_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("classes.id", ondelete="CASCADE"), nullable=True,
     )
-    class_group_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey("class_groups.id", ondelete="CASCADE"), nullable=True,
-    )
     section_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("sections.id", ondelete="CASCADE"), nullable=True,
     )
@@ -89,7 +86,6 @@ class TeacherAssignment(TimestampMixin, Base):
     # Relationships
     teacher: Mapped["Teacher"] = relationship("Teacher")
     classroom: Mapped["Class | None"] = relationship("Class", back_populates="teacher_assignments")
-    class_group: Mapped["ClassGroup | None"] = relationship("ClassGroup", back_populates="teacher_assignments")
     section: Mapped["Section | None"] = relationship("Section", back_populates="teacher_assignments")
     subject: Mapped["Subject | None"] = relationship("Subject", back_populates="teacher_assignments")
 

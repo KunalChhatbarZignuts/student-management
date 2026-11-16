@@ -523,3 +523,93 @@ def test_fees_role_authorization(client: TestClient, fee_setup: dict):
     # Attempt to view dashboard as teacher -> 403 Forbidden
     res_dash = client.get("/api/v1/admin/fees/dashboard", headers=headers)
     assert res_dash.status_code == 403
+
+
+def test_remove_student_fee_adjustment(client: TestClient, fee_setup: dict):
+    """Admin can apply and subsequently remove an adjustment, recalculating balance and installments."""
+    token = fee_setup["admin_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    ay_id = str(fee_setup["academic_year"].id)
+    g2_id = str(fee_setup["grade_2"].id)
+    s2a_id = str(fee_setup["section_2a"].id)
+
+    # 1. Create component & structure
+    comp = client.post(
+        "/api/v1/admin/fees/components",
+        headers=headers,
+        json={"name": "Tuition Adj Test", "code": f"TUI_{uuid.uuid4().hex[:4].upper()}", "is_mandatory": True},
+    ).json()
+
+    struct = client.post(
+        "/api/v1/admin/fees/structures",
+        headers=headers,
+        json={
+            "name": f"Adj Structure {uuid.uuid4().hex[:4]}",
+            "academic_year_id": ay_id,
+            "grade_id": g2_id,
+            "installment_frequency": "quarterly",
+            "items": [{"fee_component_id": comp["id"], "amount": 40000.0, "is_mandatory": True}],
+        },
+    ).json()
+
+    # 2. Register student with fee assignment via /admin/admissions
+    p_email = f"parent_adj_{uuid.uuid4().hex[:6]}@example.com"
+    adm_payload = {
+        "student": {
+            "first_name": "TestAdj",
+            "last_name": "Student",
+            "dob": "2018-04-12",
+            "gender": "Male",
+            "department": "Primary",
+        },
+        "parents": [
+            {
+                "first_name": "Parent",
+                "last_name": "Adj",
+                "email": p_email,
+                "phone": "9988776655",
+                "relationship": "Father",
+                "is_emergency_contact": True,
+            }
+        ],
+        "academic_year_id": ay_id,
+        "grade_id": g2_id,
+        "section_id": s2a_id,
+        "admission_date": "2026-04-01",
+        "fee_assignment": {
+            "fee_structure_id": struct["id"],
+            "selected_component_ids": [comp["id"]],
+            "installment_frequency": "quarterly",
+        },
+    }
+    student_res = client.post("/api/v1/admin/admissions", headers=headers, json=adm_payload)
+    assert student_res.status_code == 201, student_res.text
+    assignment_id = student_res.json()["fee_assignment"]["id"]
+
+    # 3. Apply an additional charge adjustment of 5,000
+    adj_res = client.post(
+        f"/api/v1/admin/fees/assignments/{assignment_id}/adjustments",
+        headers=headers,
+        json={
+            "adjustment_type": "transport_addon",
+            "category": "additional_charge",
+            "description": "Bus Route Extra Charge",
+            "calculation_type": "fixed",
+            "amount": 5000.0,
+        },
+    )
+    assert adj_res.status_code == 201
+    adj_data = adj_res.json()
+    assert float(adj_data["final_payable_amount"]) == 45000.0
+    adjustment_id = adj_data["adjustments"][0]["id"]
+
+    # 4. Remove the adjustment via DELETE
+    del_res = client.delete(
+        f"/api/v1/admin/fees/assignments/{assignment_id}/adjustments/{adjustment_id}",
+        headers=headers,
+    )
+    assert del_res.status_code == 200
+    del_data = del_res.json()
+    assert float(del_data["final_payable_amount"]) == 40000.0
+    assert float(del_data["total_additional"]) == 0.0
+    assert len(del_data["adjustments"]) == 0

@@ -1,5 +1,4 @@
 import uuid
-from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select
@@ -19,7 +18,6 @@ from app.schemas.classroom import (
     SubjectListResponse,
     SubjectResponse,
     TeacherAssignmentCreate,
-    TeacherAssignmentListResponse,
     TeacherAssignmentResponse,
 )
 from app.services.audit_service import log_action

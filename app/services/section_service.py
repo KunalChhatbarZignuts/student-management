@@ -1,5 +1,4 @@
 import uuid
-from typing import Any
 from datetime import date
 from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select

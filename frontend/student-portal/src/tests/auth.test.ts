@@ -18,14 +18,6 @@ const server = setupServer(
         { status: 429 }
       );
     }
-    if (body.identifier === '2fa@school.edu') {
-      return HttpResponse.json({
-        access_token: '',
-        token_type: 'bearer',
-        requires_2fa: true,
-        temp_token: 'valid-temp-token',
-      });
-    }
     if (body.password === 'wrong-password') {
       return new HttpResponse(
         JSON.stringify({ detail: 'Invalid credentials' }),
@@ -54,7 +46,6 @@ const server = setupServer(
       role: ROLES.STUDENT,
       status: 'ACTIVE',
       must_change_password: false,
-      totp_enabled: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -88,7 +79,6 @@ describe('Student Portal Auth & Interceptors', () => {
       role: ROLES.STUDENT,
       status: 'ACTIVE',
       must_change_password: false,
-      totp_enabled: false,
       created_at: '',
       updated_at: '',
     });
@@ -100,14 +90,14 @@ describe('Student Portal Auth & Interceptors', () => {
     expect(localStorage.getItem('auth-storage')).toBeNull();
   });
 
-  it('handles login with 2FA requirement', async () => {
+  it('handles direct login without 2FA requirement', async () => {
     const res = await authApi.login({
-      identifier: '2fa@school.edu',
+      identifier: 'student@school.edu',
       password: 'valid-password-123',
     });
 
-    expect(res.requires_2fa).toBe(true);
-    expect(res.temp_token).toBe('valid-temp-token');
+    expect(res.access_token).toBe('mock-access-token');
+    expect(res.token_type).toBe('bearer');
   });
 
   it('handles invalid invite token rejection with clear message', async () => {

@@ -10,15 +10,6 @@ export const loginSchema = z.object({
 
 export type LoginFormData = z.infer<typeof loginSchema>;
 
-export const twoFactorSchema = z.object({
-  code: z
-    .string()
-    .length(6, 'Authentication code must be exactly 6 digits')
-    .regex(/^\d+$/, 'Code must contain digits only'),
-});
-
-export type TwoFactorFormData = z.infer<typeof twoFactorSchema>;
-
 export const acceptInviteSchema = z
   .object({
     password: z

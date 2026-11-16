@@ -2,29 +2,46 @@
 
 from app.models.academic import FeeInvoice, StudentMark
 from app.models.admission import Admission
+from app.models.examination import (
+    ExamStatus,
+    ExamType,
+    Examination,
+    ExaminationNotification,
+    ExaminationSchedule,
+    GradingScale,
+    MarksStatus,
+    ResultStatus,
+    StudentExamMark,
+    StudentExamResult,
+)
 from app.models.fee import (
     FeeComponent,
     FeeInstallment,
+    FeePayment,
     FeeStructure,
     FeeStructureItem,
+    PaymentTransaction,
+    PaymentWebhookEvent,
     StudentFeeAdjustment,
     StudentFeeAssignment,
     StudentFeeAssignmentItem,
 )
 from app.models.academic_structure import (
     AcademicYear,
-    ClassGroup,
     EnrollmentStatus,
     Grade,
-    GradeSubject,
     Period,
     Section,
     Shift,
     StudentEnrollment,
+    StudentTransferRecord,
     TeacherSubject,
+    TeacherSubstitution,
+    Timetable,
+    TimetableEntry,
 )
-from app.models.application import Application
 from app.models.attendance import (
+    AbsenceNotificationLog,
     AttendanceAuditHistory,
     AttendanceRecord,
     AttendanceSession,
@@ -43,6 +60,7 @@ from app.models.calendar import (
 from app.models.classroom import Class, Subject, TeacherAssignment
 from app.models.id_counter import IdCounter
 from app.models.invite import Invite
+from app.models.leave import LeaveStatus, LeaveSubmissionRole, StudentLeaveApplication
 from app.models.parent import Parent, ParentStudentLink
 from app.models.password_reset import PasswordReset
 from app.models.refresh_token import RefreshToken
@@ -51,9 +69,9 @@ from app.models.teacher import Teacher
 from app.models.user import User
 
 __all__ = [
+    "AbsenceNotificationLog",
     "AcademicYear",
     "Admission",
-    "Application",
     "AttendanceAuditHistory",
     "AttendanceRecord",
     "AttendanceSession",
@@ -61,15 +79,20 @@ __all__ = [
     "AuditLog",
     "CalendarSpecialWorkingDay",
     "Class",
-    "ClassGroup",
     "EnrollmentStatus",
+    "ExamStatus",
+    "ExamType",
+    "Examination",
+    "ExaminationNotification",
+    "ExaminationSchedule",
     "FeeComponent",
     "FeeInstallment",
     "FeeInvoice",
+    "FeePayment",
     "FeeStructure",
     "FeeStructureItem",
     "Grade",
-    "GradeSubject",
+    "GradingScale",
     "HolidayAuditHistory",
     "HolidayCategory",
     "IdCounter",
@@ -77,6 +100,8 @@ __all__ = [
     "Parent",
     "ParentStudentLink",
     "PasswordReset",
+    "PaymentTransaction",
+    "PaymentWebhookEvent",
     "Period",
     "RefreshToken",
     "SchoolCalendarSettings",
@@ -85,13 +110,24 @@ __all__ = [
     "Shift",
     "Student",
     "StudentEnrollment",
+    "StudentTransferRecord",
     "StudentFeeAdjustment",
     "StudentFeeAssignment",
     "StudentFeeAssignmentItem",
+    "StudentLeaveApplication",
+    "LeaveStatus",
+    "LeaveSubmissionRole",
+    "MarksStatus",
+    "ResultStatus",
+    "StudentExamMark",
+    "StudentExamResult",
     "StudentMark",
     "Subject",
     "Teacher",
     "TeacherAssignment",
     "TeacherSubject",
+    "TeacherSubstitution",
+    "Timetable",
+    "TimetableEntry",
     "User",
 ]

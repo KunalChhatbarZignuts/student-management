@@ -48,6 +48,24 @@ export const attendanceApi = {
     return res.data;
   },
 
+  updateAttendanceSession: async (
+    sessionId: string,
+    payload: {
+      records: Array<{
+        student_id: string;
+        status: string;
+        remark?: string | null;
+      }>;
+      correction_remark?: string;
+    }
+  ): Promise<AttendanceSessionResponse> => {
+    const res = await apiClient.patch<AttendanceSessionResponse>(
+      `/teacher/attendance/${sessionId}`,
+      payload
+    );
+    return res.data;
+  },
+
   getSectionHistory: async (
     sectionId: string,
     limit: number = 30

@@ -27,9 +27,11 @@ from app.schemas.grade_section import (
     StudentEnrollmentHistoryItem,
 )
 from app.models.academic_structure import AcademicYear, Grade, Section, StudentEnrollment
+from app.schemas.student_detail import ComprehensiveStudentDetailResponse
 from app.services import enrollment_service
 from app.services.audit_service import log_action
 from app.services.id_generator import generate_enrollment_number, generate_student_code
+from app.services.student_detail_service import get_student_comprehensive_details
 
 router = APIRouter(prefix="/admin/students", tags=["Admin - Students"])
 
@@ -121,6 +123,14 @@ def create_student(
         dob=payload.dob,
         class_name=grade.name,
         section=section.name,
+        current_grade_id=grade.id,
+        current_section_id=section.id,
+        blood_group=payload.blood_group,
+        allergies=payload.allergies,
+        medical_conditions=payload.medical_conditions,
+        emergency_contact_name=payload.emergency_contact_name,
+        emergency_contact_phone=payload.emergency_contact_phone,
+        authorized_pickup_info=payload.authorized_pickup_info,
         department=department,
         admission_date=payload.admission_date,
         guardian_name=payload.guardian_name,
@@ -273,20 +283,56 @@ def update_student(
     # 1. Update personal details
     if payload.first_name is not None:
         student.first_name = payload.first_name.strip()
+    if payload.middle_name is not None:
+        student.middle_name = payload.middle_name.strip() or None
     if payload.last_name is not None:
         student.last_name = payload.last_name.strip()
     if payload.dob is not None:
         student.dob = payload.dob
+    if payload.gender is not None:
+        student.gender = payload.gender
+    if payload.phone is not None:
+        student.phone = payload.phone.strip() or None
+    if payload.alternate_phone is not None:
+        student.alternate_phone = payload.alternate_phone.strip() or None
     if payload.department is not None:
         student.department = payload.department.strip()
+    if payload.address is not None:
+        student.address = payload.address.strip() or None
+    if payload.city is not None:
+        student.city = payload.city.strip() or None
+    if payload.state is not None:
+        student.state = payload.state.strip() or None
+    if payload.country is not None:
+        student.country = payload.country.strip() or None
+    if payload.postal_code is not None:
+        student.postal_code = payload.postal_code.strip() or None
+    if payload.previous_school_name is not None:
+        student.previous_school_name = payload.previous_school_name.strip() or None
+    if payload.previous_school_details is not None:
+        student.previous_school_details = payload.previous_school_details.strip() or None
+    if payload.admission_date is not None:
+        student.admission_date = payload.admission_date
     if payload.guardian_name is not None:
-        student.guardian_name = payload.guardian_name.strip()
+        student.guardian_name = payload.guardian_name.strip() or None
     if payload.guardian_phone is not None:
-        student.guardian_phone = payload.guardian_phone.strip()
+        student.guardian_phone = payload.guardian_phone.strip() or None
     if payload.guardian_email is not None:
         student.guardian_email = payload.guardian_email
     if payload.status is not None:
         student.status = payload.status
+    if payload.blood_group is not None:
+        student.blood_group = payload.blood_group.strip() or None
+    if payload.allergies is not None:
+        student.allergies = payload.allergies.strip() or None
+    if payload.medical_conditions is not None:
+        student.medical_conditions = payload.medical_conditions.strip() or None
+    if payload.emergency_contact_name is not None:
+        student.emergency_contact_name = payload.emergency_contact_name.strip() or None
+    if payload.emergency_contact_phone is not None:
+        student.emergency_contact_phone = payload.emergency_contact_phone.strip() or None
+    if payload.authorized_pickup_info is not None:
+        student.authorized_pickup_info = payload.authorized_pickup_info.strip() or None
 
     # 2. Check if enrollment transfer is requested
     if payload.target_section_id:
@@ -380,6 +426,14 @@ def get_student_profile_admin(
         guardian_phone=student.guardian_phone,
         guardian_email=student.guardian_email,
         status=student.status,
+        current_grade_id=student.current_grade_id,
+        current_section_id=student.current_section_id,
+        blood_group=student.blood_group,
+        allergies=student.allergies,
+        medical_conditions=student.medical_conditions,
+        emergency_contact_name=student.emergency_contact_name,
+        emergency_contact_phone=student.emergency_contact_phone,
+        authorized_pickup_info=student.authorized_pickup_info,
         created_at=student.created_at,
         email=user.email if user else None,
         user_status=user.status if user else None,
@@ -404,6 +458,7 @@ def enroll_student(
 
 
 @router.post("/{student_id}/transfer", response_model=StudentEnrollmentHistoryItem)
+@router.post("/{student_id}/transfer-section", response_model=StudentEnrollmentHistoryItem)
 def transfer_student(
     student_id: uuid.UUID,
     payload: StudentTransferPayload,
@@ -437,3 +492,14 @@ def get_student_enrollments(
 ):
     """View complete academic enrollment history of a student."""
     return enrollment_service.get_student_enrollments(student_id, db)
+
+
+@router.get("/{student_id}/details", response_model=ComprehensiveStudentDetailResponse)
+def get_student_details(
+    student_id: uuid.UUID,
+    current_user: User = Depends(require_roles(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value)),
+    db: Session = Depends(get_db),
+):
+    """Admin centralized 360-degree view of all student records across all domains."""
+    return get_student_comprehensive_details(student_id, db)
+

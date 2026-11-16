@@ -18,12 +18,9 @@ export function useAuth() {
     accessToken,
     isAuthenticated,
     isBootstrapped,
-    requires2FA,
-    tempToken,
     sessionError,
     setAuth,
     setAccessToken,
-    setRequires2FA,
     clearAuth,
     setBootstrapped,
     setSessionError,
@@ -75,11 +72,6 @@ export function useAuth() {
       setSessionError(null);
       const res = await authApi.login(credentials);
 
-      if (res.requires_2fa && res.temp_token) {
-        setRequires2FA(res.temp_token);
-        return { requires2FA: true };
-      }
-
       setAccessToken(res.access_token);
 
       if (res.must_change_password) {
@@ -108,43 +100,7 @@ export function useAuth() {
       router.push('/');
       return { success: true };
     },
-    [clearAuth, queryClient, router, setAccessToken, setAuth, setRequires2FA, setSessionError]
-  );
-
-  const verify2FA = useCallback(
-    async (code: string) => {
-      if (!tempToken) {
-        throw new Error('No 2FA session found. Please log in again.');
-      }
-
-      const res = await authApi.verify2FA({ code, temp_token: tempToken });
-      setAccessToken(res.access_token);
-
-      if (res.must_change_password) {
-        router.push('/change-password');
-        return { success: true, mustChangePassword: true };
-      }
-
-      const userProfile = await authApi.getMe();
-
-      if (!ADMIN_ALLOWED_ROLES.includes(userProfile.role)) {
-        await authApi.logout().catch(() => {});
-        clearAuth();
-        queryClient.clear();
-        throw new Error("You don't have access to this portal");
-      }
-
-      setAuth(res.access_token, userProfile);
-
-      if (userProfile.must_change_password) {
-        router.push('/change-password');
-        return { success: true, mustChangePassword: true };
-      }
-
-      router.push('/');
-      return { success: true };
-    },
-    [clearAuth, queryClient, router, setAccessToken, setAuth, tempToken]
+    [clearAuth, queryClient, router, setAccessToken, setAuth, setSessionError]
   );
 
   return {
@@ -153,15 +109,11 @@ export function useAuth() {
     accessToken,
     isAuthenticated,
     isBootstrapped,
-    requires2FA,
-    tempToken,
     sessionError,
     hasRole,
     login,
     logout,
-    verify2FA,
     setBootstrapped,
     setSessionError,
   };
 }
-

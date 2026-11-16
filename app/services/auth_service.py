@@ -8,18 +8,14 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.security import (
     create_access_token,
-    create_restricted_token,
     generate_secure_token,
-    hash_password,
     hash_token,
-    validate_password_strength,
-    verify_password,
 )
 from app.models.parent import Parent
 from app.models.refresh_token import RefreshToken
 from app.models.student import Student
 from app.models.teacher import Teacher
-from app.models.user import User, UserRole, UserStatus
+from app.models.user import User, UserStatus
 from app.services.audit_service import log_action
 
 MAX_FAILED_ATTEMPTS = 5

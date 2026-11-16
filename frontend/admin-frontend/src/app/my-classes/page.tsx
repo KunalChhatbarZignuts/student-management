@@ -38,6 +38,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import AppShell from '@/components/layout/AppShell';
 import RequireRole from '@/components/guards/RequireRole';
 import { ROLES } from '@/lib/constants';
+import { apiClient } from '@/lib/axios';
 import { teacherPortalApi, TeacherAssignment } from '@/features/teacher-portal/api';
 import { teacherSubjectApi, teacherSubjectKeys } from '@/features/teachers/subjectApi';
 
@@ -75,6 +76,18 @@ export default function MyClassesPage() {
   const { data: assignments, isLoading, error } = useQuery({
     queryKey: ['teacher', 'assigned-classes'],
     queryFn: teacherPortalApi.getAssignedClasses,
+  });
+
+  const { data: mySubstitutions } = useQuery({
+    queryKey: ['teacher', 'substitutions'],
+    queryFn: async () => {
+      try {
+        const res = await apiClient.get<any[]>('/substitutions?as_substitute=true');
+        return res.data || [];
+      } catch {
+        return [];
+      }
+    },
   });
 
   const {
@@ -206,6 +219,51 @@ export default function MyClassesPage() {
               </TableContainer>
             )}
           </Box>
+
+          {mySubstitutions && mySubstitutions.length > 0 && (
+            <Box sx={{ mb: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                <Typography variant="h6" fontWeight={700}>
+                  Assigned Substitution Coverage
+                </Typography>
+                <Chip size="small" color="secondary" label={`${mySubstitutions.length} Assigned`} />
+              </Box>
+              <Paper sx={{ p: 2, borderRadius: 2, bgcolor: '#fdf4ff', border: '1px solid #f0abfc' }}>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Period / Slot</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Grade & Section</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Subject</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Covering For</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Notes</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {mySubstitutions.map((sub: any) => (
+                        <TableRow key={sub.id}>
+                          <TableCell sx={{ fontWeight: 600 }}>{sub.date}</TableCell>
+                          <TableCell>{sub.period_name}</TableCell>
+                          <TableCell>{sub.grade_name} - {sub.section_name}</TableCell>
+                          <TableCell>{sub.subject_name || 'General'}</TableCell>
+                          <TableCell>{sub.original_teacher_name}</TableCell>
+                          <TableCell>
+                            <Chip size="small" color="primary" label={sub.status} />
+                          </TableCell>
+                          <TableCell sx={{ maxWidth: 200, fontSize: '0.8rem', color: 'text.secondary' }}>
+                            {sub.notes || sub.reason || '—'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Box>
+          )}
 
           <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>
             Subject Teaching Assignments

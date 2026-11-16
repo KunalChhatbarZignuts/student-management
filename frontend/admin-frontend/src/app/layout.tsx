@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import * as React from 'react';
 import AppProviders from '@/components/providers/AppProviders';
+import NextTopLoader from 'nextjs-toploader';
 
 export const metadata: Metadata = {
   title: 'Student Management System - Admin Portal',
@@ -27,6 +28,17 @@ export default function RootLayout({
         />
       </head>
       <body>
+        <NextTopLoader
+          color="#1976d2"
+          initialPosition={0.08}
+          crawlSpeed={200}
+          height={3}
+          crawl={true}
+          showSpinner={false}
+          easing="ease"
+          speed={200}
+          shadow="0 0 10px #1976d2,0 0 5px #1976d2"
+        />
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from slowapi.errors import RateLimitExceeded
 
 from app.api.v1 import (
     admin_classes,
+    absence_notifications,
     admin_attendance,
     admin_grades,
     admin_sections,
@@ -12,19 +14,24 @@ from app.api.v1 import (
     admin_teacher_subjects,
     admin_users,
     admissions,
-    applications,
     audit_logs,
     auth,
-    bulk_import,
     calendar,
+    enrollments,
+    examinations,
+    fee_pos,
     fees,
+    leaves,
     parents,
+    rollover,
     students,
+    substitutions,
     teacher_classes,
     teacher_attendance,
     teacher_sections,
     teacher_subjects,
     teachers,
+    timetables,
 )
 from app.core.config import settings
 from app.core.rate_limit import _rate_limit_exceeded_handler, limiter
@@ -47,6 +54,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# GZip compression for payloads >= 1KB (70-85% size reduction)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Include API Routers
 app.include_router(auth.router, prefix="/api/v1")
@@ -60,7 +69,6 @@ app.include_router(admin_grades.router, prefix="/api/v1")
 app.include_router(admin_attendance.router, prefix="/api/v1")
 app.include_router(admin_sections.router, prefix="/api/v1")
 app.include_router(audit_logs.router, prefix="/api/v1")
-app.include_router(bulk_import.router, prefix="/api/v1")
 app.include_router(calendar.router, prefix="/api/v1")
 app.include_router(fees.router, prefix="/api/v1")
 app.include_router(parents.router, prefix="/api/v1")
@@ -70,14 +78,23 @@ app.include_router(teacher_attendance.router, prefix="/api/v1")
 app.include_router(teacher_sections.router, prefix="/api/v1")
 app.include_router(teacher_subjects.router, prefix="/api/v1")
 app.include_router(students.router, prefix="/api/v1")
-app.include_router(applications.router, prefix="/api/v1")
+app.include_router(leaves.router, prefix="/api/v1")
+app.include_router(examinations.router, prefix="/api/v1")
+app.include_router(enrollments.router, prefix="/api/v1")
+app.include_router(timetables.router, prefix="/api/v1")
+app.include_router(substitutions.router, prefix="/api/v1")
+app.include_router(fee_pos.router, prefix="/api/v1")
+app.include_router(absence_notifications.router, prefix="/api/v1")
+app.include_router(rollover.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Root"])
 def root() -> dict:
     return {
         "message": f"{settings.PROJECT_NAME} is running",
+        "health": "/health",
         "docs": "/docs",
+        "redoc": "/redoc",
     }
 
 

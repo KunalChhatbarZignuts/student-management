@@ -1,11 +1,10 @@
 import datetime as dt
 import uuid
-from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_client_ip, get_current_user, get_db, require_roles
+from app.core.deps import get_db, require_roles
 from app.models.academic_structure import AcademicYear
 from app.models.user import User, UserRole
 from app.schemas.calendar import (

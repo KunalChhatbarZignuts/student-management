@@ -1,4 +1,39 @@
 import { StudentFeeAdjustmentItem, StudentFeeAssignment } from '@/features/fees/types';
+import { ParentWithChildren } from '@/features/parents/api';
+
+export interface StudentFormData {
+  firstName: string;
+  middleName: string;
+  lastName: string;
+  dob: string;
+  gender: string;
+  email: string;
+  phone: string;
+  alternatePhone: string;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  postalCode: string;
+  previousSchoolName: string;
+  previousSchoolDetails: string;
+  department: string;
+}
+
+export interface ParentFormItem {
+  id: string;
+  isExisting: boolean;
+  existingParent: ParentWithChildren | null;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  address: string;
+  relationshipType: string;
+  isPrimaryGuardian: boolean;
+  password: string;
+}
+
 
 export interface AdmissionStudentPayload {
   first_name: string;

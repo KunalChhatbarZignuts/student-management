@@ -1,8 +1,6 @@
-import io
 import uuid
 from datetime import date, datetime
 
-import pyotp
 import pytest
 
 from app.core.security import create_access_token, hash_password
@@ -13,10 +11,10 @@ from app.models.teacher import Teacher
 from app.models.user import User, UserRole, UserStatus
 
 
-def test_2fa_setup_login_and_disable(client, db):
+def test_admin_direct_login_without_2fa(client, db):
     pw = "AdminStrongPass#2026"
     admin = User(
-        email="totp.admin@school.edu",
+        email="direct.admin@school.edu",
         password_hash=hash_password(pw),
         role=UserRole.ADMIN.value,
         status=UserStatus.ACTIVE.value,
@@ -24,93 +22,13 @@ def test_2fa_setup_login_and_disable(client, db):
     db.add(admin)
     db.commit()
 
-    token = create_access_token(admin.id, admin.role)
-    headers = {"Authorization": f"Bearer {token}"}
-
-    # 1. Setup 2FA
-    setup_res = client.post("/api/v1/auth/2fa/setup", headers=headers)
-    assert setup_res.status_code == 200, setup_res.text
-    data = setup_res.json()
-    secret = data["secret"]
-    assert secret is not None
-    assert "otpauth://" in data["otpauth_url"]
-
-    # 2. Verify with valid code to activate
-    totp = pyotp.TOTP(secret)
-    valid_code = totp.now()
-    verify_res = client.post("/api/v1/auth/2fa/verify", json={"code": valid_code}, headers=headers)
-    assert verify_res.status_code == 200
-
-    # 3. Next login will require 2FA
-    login_res = client.post("/api/v1/auth/login", json={"identifier": "totp.admin@school.edu", "password": pw})
+    # Direct login succeeds immediately with full access token
+    login_res = client.post("/api/v1/auth/login", json={"identifier": "direct.admin@school.edu", "password": pw})
     assert login_res.status_code == 200
     login_data = login_res.json()
-    assert login_data["requires_2fa"] is True
-    temp_token = login_data["temp_token"]
-
-    # 4. Bad 2FA code fails
-    bad_verify = client.post("/api/v1/auth/2fa/verify", json={"code": "000000", "temp_token": temp_token})
-    assert bad_verify.status_code == 400
-
-    # 5. Good 2FA code completes login
-    good_code = totp.now()
-    good_verify = client.post("/api/v1/auth/2fa/verify", json={"code": good_code, "temp_token": temp_token})
-    assert good_verify.status_code == 200
-    assert "access_token" in good_verify.json()
-
-    # 6. Disable 2FA
-    new_token = good_verify.json()["access_token"]
-    disable_res = client.post(
-        "/api/v1/auth/2fa/disable",
-        json={"code": totp.now(), "password": pw},
-        headers={"Authorization": f"Bearer {new_token}"},
-    )
-    assert disable_res.status_code == 200
-
-
-def test_bulk_csv_import_dry_run_and_confirm(client, db):
-    admin = User(
-        email="bulk.admin@school.edu",
-        password_hash=hash_password("AdminPass#1234"),
-        role=UserRole.ADMIN.value,
-        status=UserStatus.ACTIVE.value,
-    )
-    db.add(admin)
-    db.commit()
-
-    token = create_access_token(admin.id, admin.role)
-    headers = {"Authorization": f"Bearer {token}"}
-
-    csv_data = """type,email,first_name,last_name,department,dob,class_name,section,admission_date,phone
-student,import.stu1@school.edu,Sam,Altman,CS,2006-01-01,11,A,2026-08-01,
-teacher,import.tea1@school.edu,Linus,Torvalds,Kernel,,,,,+1234567890
-student,invalid.stu@school.edu,,,,,,,,
-"""
-
-    # 1. Dry run
-    file_payload = {"file": ("students.csv", io.BytesIO(csv_data.encode("utf-8")), "text/csv")}
-    dry_resp = client.post("/api/v1/admin/users/bulk-import?dry_run=true", files=file_payload, headers=headers)
-    assert dry_resp.status_code == 200, dry_resp.text
-    dry_data = dry_resp.json()
-    assert dry_data["dry_run"] is True
-    assert dry_data["valid_rows"] == 2
-    assert dry_data["invalid_rows"] == 1
-
-    # Ensure no users were created in dry run
-    assert db.query(User).filter_by(email="import.stu1@school.edu").first() is None
-
-    # 2. Confirm import
-    file_payload2 = {"file": ("students.csv", io.BytesIO(csv_data.encode("utf-8")), "text/csv")}
-    confirm_resp = client.post("/api/v1/admin/users/bulk-import?dry_run=false", files=file_payload2, headers=headers)
-    assert confirm_resp.status_code == 200
-    confirm_data = confirm_resp.json()
-    assert confirm_data["dry_run"] is False
-    assert confirm_data["valid_rows"] == 2
-
-    # Verify user created in DB
-    created_stu = db.query(User).filter_by(email="import.stu1@school.edu").first()
-    assert created_stu is not None
-    assert created_stu.status == UserStatus.INVITED.value
+    assert "access_token" in login_data
+    assert login_data.get("requires_2fa") is None or login_data.get("requires_2fa") is False
+    assert login_data["token_type"] == "bearer"
 
 
 def test_parent_linking_and_ownership(client, db):

@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -26,8 +27,7 @@ from app.core.security import (
 )
 from app.models.invite import Invite
 from app.models.password_reset import PasswordReset
-from app.models.user import User, UserRole, UserStatus
-import pyotp
+from app.models.user import User, UserStatus
 from app.schemas.auth import (
     AcceptInviteRequest,
     ChangePasswordRequest,
@@ -37,9 +37,6 @@ from app.schemas.auth import (
     RefreshTokenRequest,
     ResetPasswordRequest,
     TokenResponse,
-    TwoFactorDisableRequest,
-    TwoFactorSetupResponse,
-    TwoFactorVerifyRequest,
 )
 from app.schemas.user import UserRead
 from app.services.audit_service import log_action
@@ -54,14 +51,27 @@ from app.services.auth_service import (
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+logger = logging.getLogger(__name__)
 
 COOKIE_NAME = "refresh_token"
+ADMIN_COOKIE_NAME = "admin_refresh_token"
+STUDENT_COOKIE_NAME = "student_refresh_token"
 
 
-def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
+def _get_cookie_name(request: Request) -> str:
+    """Determine portal-specific cookie name based on X-Client-Portal header."""
+    portal = request.headers.get("x-client-portal", "").strip().lower()
+    if portal == "admin":
+        return ADMIN_COOKIE_NAME
+    if portal in ("student", "parent"):
+        return STUDENT_COOKIE_NAME
+    return COOKIE_NAME
+
+
+def _set_refresh_cookie(response: Response, refresh_token: str, cookie_name: str = COOKIE_NAME) -> None:
     """Helper to set refresh token in httpOnly SameSite=Strict cookie."""
     response.set_cookie(
-        key=COOKIE_NAME,
+        key=cookie_name,
         value=refresh_token,
         httponly=True,
         secure=settings.COOKIE_SECURE,
@@ -71,14 +81,17 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
     )
 
 
-def _clear_refresh_cookie(response: Response) -> None:
-    """Helper to clear refresh token cookie."""
-    response.delete_cookie(
-        key=COOKIE_NAME,
-        path="/api/v1/auth",
-        httponly=True,
-        samesite="strict",
-    )
+def _clear_refresh_cookie(response: Response, cookie_name: str | None = None) -> None:
+    """Helper to clear refresh token cookie(s)."""
+    names_to_clear = [cookie_name] if cookie_name else [COOKIE_NAME, ADMIN_COOKIE_NAME, STUDENT_COOKIE_NAME]
+    for name in names_to_clear:
+        if name:
+            response.delete_cookie(
+                key=name,
+                path="/api/v1/auth",
+                httponly=True,
+                samesite="strict",
+            )
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -144,15 +157,6 @@ def login(
             temp_token=temp_token,
         )
 
-    # Check 2FA requirement for Admin / Super Admin
-    if user.role in (UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value) and user.totp_enabled:
-        temp_token = create_restricted_token(user.id, user.role, token_type="2fa_pending")
-        return TokenResponse(
-            access_token="",
-            requires_2fa=True,
-            temp_token=temp_token,
-        )
-
     # Full active login
     reset_failed_login(db, user, ip=ip)
     access_token = create_access_token(user.id, user.role)
@@ -163,7 +167,8 @@ def login(
         ip=ip,
     )
 
-    _set_refresh_cookie(response, raw_refresh_token)
+    cookie_name = _get_cookie_name(request)
+    _set_refresh_cookie(response, raw_refresh_token, cookie_name=cookie_name)
 
     log_action(
         db,
@@ -174,10 +179,21 @@ def login(
         ip=ip,
     )
 
+    logger.info(
+        "User logged in successfully",
+        extra={
+            "user_id": str(user.id),
+            "role": user.role,
+            "cookie_name": cookie_name,
+            "ip": ip,
+        },
+    )
+
     return TokenResponse(
         access_token=access_token,
         token_type="bearer",
         must_change_password=False,
+        user=UserRead.model_validate(user),
     )
 
 
@@ -187,11 +203,28 @@ def refresh_token_endpoint(
     response: Response,
     body: RefreshTokenRequest | None = None,
     cookie_token: str | None = Cookie(default=None, alias=COOKIE_NAME),
+    admin_cookie_token: str | None = Cookie(default=None, alias=ADMIN_COOKIE_NAME),
+    student_cookie_token: str | None = Cookie(default=None, alias=STUDENT_COOKIE_NAME),
     db: Session = Depends(get_db),
 ):
-    """Rotate refresh token. Accepts token from httpOnly cookie (preferred) or request body."""
-    raw_token = cookie_token or (body.refresh_token if body else None)
+    """Rotate refresh token. Accepts token from portal-specific cookie, legacy cookie, or request body."""
+    cookie_name = _get_cookie_name(request)
+    raw_token = None
+    if cookie_name == ADMIN_COOKIE_NAME:
+        raw_token = admin_cookie_token or cookie_token or student_cookie_token
+    elif cookie_name == STUDENT_COOKIE_NAME:
+        raw_token = student_cookie_token or cookie_token or admin_cookie_token
+    else:
+        raw_token = cookie_token or admin_cookie_token or student_cookie_token
+
+    if not raw_token and body:
+        raw_token = body.refresh_token
+
     if not raw_token:
+        logger.warning(
+            "Refresh token missing",
+            extra={"ip": get_client_ip(request), "cookie_name": cookie_name},
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token missing",
@@ -207,27 +240,50 @@ def refresh_token_endpoint(
         ip=ip,
     )
 
-    _set_refresh_cookie(response, new_raw_refresh)
+    payload = decode_token(new_access_token)
+    user = db.get(User, uuid.UUID(payload["sub"]))
+
+    _set_refresh_cookie(response, new_raw_refresh, cookie_name=cookie_name)
+
+    logger.info(
+        "Token refresh successful",
+        extra={
+            "user_id": str(user.id) if user else None,
+            "role": user.role if user else None,
+            "cookie_name": cookie_name,
+            "ip": ip,
+        },
+    )
 
     return TokenResponse(
         access_token=new_access_token,
         token_type="bearer",
+        user=UserRead.model_validate(user) if user else None,
     )
 
 
 @router.post("/logout", response_model=MessageResponse)
 def logout(
+    request: Request,
     response: Response,
     body: RefreshTokenRequest | None = None,
     cookie_token: str | None = Cookie(default=None, alias=COOKIE_NAME),
+    admin_cookie_token: str | None = Cookie(default=None, alias=ADMIN_COOKIE_NAME),
+    student_cookie_token: str | None = Cookie(default=None, alias=STUDENT_COOKIE_NAME),
     db: Session = Depends(get_db),
 ):
     """Log out current session and revoke refresh token."""
-    raw_token = cookie_token or (body.refresh_token if body else None)
+    cookie_name = _get_cookie_name(request)
+    raw_token = (
+        (admin_cookie_token if cookie_name == ADMIN_COOKIE_NAME else None)
+        or (student_cookie_token if cookie_name == STUDENT_COOKIE_NAME else None)
+        or cookie_token
+        or (body.refresh_token if body else None)
+    )
     if raw_token:
         revoke_token(db, raw_token)
 
-    _clear_refresh_cookie(response)
+    _clear_refresh_cookie(response, cookie_name=cookie_name)
     return MessageResponse(message="Logged out successfully")
 
 
@@ -427,134 +483,4 @@ def change_password(
 def get_me(current_user: User = Depends(get_current_user)):
     """Return profile of current authenticated user, including linked person profile."""
     return current_user
-
-
-@router.post("/2fa/setup", response_model=TwoFactorSetupResponse)
-def setup_2fa(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Generate TOTP secret and provisioning URL for Admin/SuperAdmin."""
-    if current_user.role not in (UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="2FA is only available for administrative accounts",
-        )
-
-    secret = pyotp.random_base32()
-    current_user.totp_secret = secret
-    db.commit()
-
-    totp = pyotp.TOTP(secret)
-    provisioning_url = totp.provisioning_uri(
-        name=current_user.email,
-        issuer_name="StudentManagementSMS",
-    )
-
-    return TwoFactorSetupResponse(
-        secret=secret,
-        otpauth_url=provisioning_url,
-    )
-
-
-@router.post("/2fa/verify", response_model=TokenResponse)
-def verify_2fa(
-    request: Request,
-    response: Response,
-    payload: TwoFactorVerifyRequest,
-    db: Session = Depends(get_db),
-):
-    """Verify TOTP code during login (using temp_token) or during initial setup."""
-    user = None
-    ip = get_client_ip(request)
-
-    # If temp_token provided (login flow)
-    if payload.temp_token:
-        claims = decode_token(payload.temp_token)
-        if claims.get("type") != "2fa_pending":
-            raise HTTPException(status_code=401, detail="Invalid 2FA token type")
-        user = db.get(User, uuid.UUID(claims["sub"]))
-    else:
-        # Initial 2FA activation flow with active session
-        auth_header = request.headers.get("Authorization")
-        if not auth_header or not auth_header.startswith("Bearer "):
-            raise HTTPException(status_code=401, detail="Authentication required")
-        claims = decode_token(auth_header.split(" ")[1])
-        user = db.get(User, uuid.UUID(claims["sub"]))
-
-    if not user or not user.totp_secret:
-        raise HTTPException(status_code=400, detail="2FA is not configured for this user")
-
-    totp = pyotp.TOTP(user.totp_secret)
-    if not totp.verify(payload.code, valid_window=1):
-        log_action(
-            db,
-            actor_user_id=user.id,
-            action="2fa_failed",
-            entity_type="user",
-            entity_id=str(user.id),
-            ip=ip,
-        )
-        raise HTTPException(status_code=400, detail="Invalid 2FA verification code")
-
-    # Mark 2FA enabled and reset any failed counters
-    user.totp_enabled = True
-    reset_failed_login(db, user, ip=ip)
-
-    # Issue full session
-    access_token = create_access_token(user.id, user.role)
-    raw_refresh_token, _ = create_refresh_token_session(
-        db,
-        user_id=user.id,
-        user_agent=request.headers.get("user-agent"),
-        ip=ip,
-    )
-    _set_refresh_cookie(response, raw_refresh_token)
-
-    log_action(
-        db,
-        actor_user_id=user.id,
-        action="2fa_verified",
-        entity_type="user",
-        entity_id=str(user.id),
-        ip=ip,
-    )
-
-    return TokenResponse(
-        access_token=access_token,
-        token_type="bearer",
-        must_change_password=False,
-    )
-
-
-@router.post("/2fa/disable", response_model=MessageResponse)
-def disable_2fa(
-    payload: TwoFactorDisableRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Disable TOTP 2FA. Requires valid current TOTP code and account password."""
-    if not current_user.totp_enabled or not current_user.totp_secret:
-        raise HTTPException(status_code=400, detail="2FA is not enabled")
-
-    if not verify_password(payload.password, current_user.password_hash):
-        raise HTTPException(status_code=400, detail="Invalid account password")
-
-    totp = pyotp.TOTP(current_user.totp_secret)
-    if not totp.verify(payload.code, valid_window=1):
-        raise HTTPException(status_code=400, detail="Invalid 2FA verification code")
-
-    current_user.totp_enabled = False
-    current_user.totp_secret = None
-    db.commit()
-
-    log_action(
-        db,
-        actor_user_id=current_user.id,
-        action="2fa_disabled",
-        entity_type="user",
-        entity_id=str(current_user.id),
-    )
-
-    return MessageResponse(message="2FA has been disabled successfully")
 

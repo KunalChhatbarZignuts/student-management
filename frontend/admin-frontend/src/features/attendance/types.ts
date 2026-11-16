@@ -53,6 +53,8 @@ export interface AttendanceSessionResponse {
   locked_at?: string | null;
   created_at: string;
   updated_at: string;
+  can_teacher_edit?: boolean;
+  edit_window_remaining_seconds?: number;
   records: AttendanceRecordItem[];
 }
 

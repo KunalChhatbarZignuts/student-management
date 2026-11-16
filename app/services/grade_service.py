@@ -13,7 +13,6 @@ from app.schemas.grade_section import (
     GradeListResponse,
     GradeResponse,
     GradeUpdate,
-    SectionResponse,
 )
 from app.services.audit_service import log_action
 

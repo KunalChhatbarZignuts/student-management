@@ -4,182 +4,397 @@ import * as React from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
+import Grid from '@mui/material/Grid';
+import CircularProgress from '@mui/material/CircularProgress';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
-import Chip from '@mui/material/Chip';
-import Grid from '@mui/material/Grid';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import CircularProgress from '@mui/material/CircularProgress';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
-import { useQuery } from '@tanstack/react-query';
+import Button from '@mui/material/Button';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import AppShell from '@/components/layout/AppShell';
 import RequireRole from '@/components/guards/RequireRole';
-import { ROLES, STUDENT_PORTAL_ALLOWED_ROLES } from '@/lib/constants';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { StatusChip } from '@/components/ui/StatusChip';
+import { ROLES } from '@/lib/constants';
 import { useAuth } from '@/features/auth/hooks';
 import { useMyChildren } from '@/features/parents/hooks';
-import { academicApi } from '@/features/academic/api';
+import { portalFeeApi } from '@/features/fees/api';
+import { PortalInstallmentItem } from '@/features/fees/types';
+import { useSnackbar } from '@/components/ui/SnackbarProvider';
+import { formatErrorMessage } from '@/lib/errorMapper';
+
+import {
+  StudentFeeSummaryCards,
+  FeeInstallmentsTable,
+  InitiatePaymentDialog,
+  FeeReceiptDialog,
+} from '@/features/fees/components';
+
+// Helper to dynamically load the Razorpay checkout.js script
+const loadRazorpayScript = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') {
+      resolve(false);
+      return;
+    }
+    if ((window as any).Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
 
 export default function FeesPage() {
+  const queryClient = useQueryClient();
+  const { showSnackbar } = useSnackbar();
   const { role } = useAuth();
   const isParent = role === ROLES.PARENT;
 
-  const { data: children } = useMyChildren();
+  const { data: children, isLoading: loadingChildren } = useMyChildren();
   const [selectedChildIndex, setSelectedChildIndex] = React.useState(0);
   const selectedChild = children && children.length > 0 ? children[selectedChildIndex] : null;
 
-  const { data: invoices, isLoading } = useQuery({
-    queryKey: ['financial', 'fees', isParent ? selectedChild?.id : 'me'],
+  // Pay Dialog State
+  const [openPayDialog, setOpenPayDialog] = React.useState(false);
+  const [selectedInstallment, setSelectedInstallment] = React.useState<PortalInstallmentItem | null>(null);
+  const [payAmount, setPayAmount] = React.useState<number>(0);
+
+  // Receipt Dialog State
+  const [openReceiptDialog, setOpenReceiptDialog] = React.useState(false);
+  const [viewingReceiptNumber, setViewingReceiptNumber] = React.useState<string | null>(null);
+
+  // Fetch Fee Schedule
+  const {
+    data: schedule,
+    isLoading: loadingSchedule,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ['portal-fees', 'schedule', isParent ? selectedChild?.id : 'me'],
     queryFn: () => {
       if (isParent) {
-        if (!selectedChild?.id) return [];
-        return academicApi.getChildFees(selectedChild.id);
+        if (!selectedChild?.id) return null;
+        return portalFeeApi.getChildFeeSchedule(selectedChild.id);
       }
-      return academicApi.getMyFees();
+      return portalFeeApi.getMyFeeSchedule();
     },
     enabled: isParent ? Boolean(selectedChild?.id) : true,
   });
 
-  const totalFees = (invoices || []).reduce((acc, inv) => acc + inv.amount, 0);
-  const paidFees = (invoices || [])
-    .filter((inv) => inv.status === 'Paid')
-    .reduce((acc, inv) => acc + inv.amount, 0);
-  const outstandingFees = totalFees - paidFees;
+  // Fetch Receipt Detail
+  const { data: receiptDetail, isLoading: loadingReceipt } = useQuery({
+    queryKey: ['portal-fees', 'receipt', viewingReceiptNumber],
+    queryFn: () => portalFeeApi.getReceiptDetail(viewingReceiptNumber!),
+    enabled: Boolean(viewingReceiptNumber),
+  });
+
+  // Razorpay Order Creation Mutation
+  const createOrderMutation = useMutation({
+    mutationFn: (payload: { installment_id: string; amount?: number }) =>
+      portalFeeApi.createPaymentOrder(payload),
+    onError: (err) =>
+      showSnackbar(formatErrorMessage(err, 'Failed to initialize payment gateway order'), 'error'),
+  });
+
+  // Payment Verification Mutation
+  const verifyPaymentMutation = useMutation({
+    mutationFn: portalFeeApi.verifyPayment,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['portal-fees'] });
+      showSnackbar(data.message || 'Payment successfully processed!', 'success');
+      setOpenPayDialog(false);
+      if (data.receipt_number) {
+        setViewingReceiptNumber(data.receipt_number);
+        setOpenReceiptDialog(true);
+      }
+    },
+    onError: (err) => {
+      showSnackbar(formatErrorMessage(err, 'Payment verification failed'), 'error');
+      queryClient.invalidateQueries({ queryKey: ['portal-fees'] });
+    },
+  });
+
+  const handleOpenPayModal = (inst: PortalInstallmentItem) => {
+    setSelectedInstallment(inst);
+    setPayAmount(Number(inst.outstanding_amount));
+    setOpenPayDialog(true);
+  };
+
+  const handleStartPayment = async () => {
+    if (!selectedInstallment) return;
+    if (payAmount <= 0) {
+      showSnackbar('Please enter a payment amount greater than zero', 'error');
+      return;
+    }
+    if (payAmount > Number(selectedInstallment.outstanding_amount)) {
+      showSnackbar('Payment amount cannot exceed outstanding balance', 'error');
+      return;
+    }
+
+    try {
+      const order = await createOrderMutation.mutateAsync({
+        installment_id: selectedInstallment.id,
+        amount: payAmount,
+      });
+
+      // Check if running with development placeholder credentials
+      const isDevPlaceholder =
+        !order.key_id ||
+        order.key_id === 'rzp_test_placeholder' ||
+        order.key_id.includes('placeholder') ||
+        order.key_id.startsWith('mock_');
+
+      if (isDevPlaceholder) {
+        showSnackbar('Processing payment in development sandbox mode...', 'info');
+        const simPaymentId = `pay_sim_${Date.now()}`;
+        const simSignature = `sim_sig_${order.order_id}_${simPaymentId}`;
+        verifyPaymentMutation.mutate({
+          gateway_order_id: order.order_id,
+          gateway_payment_id: simPaymentId,
+          gateway_signature: simSignature,
+        });
+        return;
+      }
+
+      const loaded = await loadRazorpayScript();
+      if (!loaded || !(window as any).Razorpay) {
+        showSnackbar(
+          'Razorpay SDK blocked or unavailable. Falling back to sandbox verification...',
+          'warning'
+        );
+        const simPaymentId = `pay_sim_${Date.now()}`;
+        const simSignature = `sim_sig_${order.order_id}_${simPaymentId}`;
+        verifyPaymentMutation.mutate({
+          gateway_order_id: order.order_id,
+          gateway_payment_id: simPaymentId,
+          gateway_signature: simSignature,
+        });
+        return;
+      }
+
+      // Standard Razorpay Checkout for live / registered merchant test keys
+      const options = {
+        key: order.key_id,
+        amount: order.amount_paise,
+        currency: order.currency || 'INR',
+        name: 'Student Management Academy',
+        description: `${order.student_name} - ${order.installment_name}`,
+        order_id: order.order_id,
+        handler: function (response: any) {
+          verifyPaymentMutation.mutate({
+            gateway_order_id: response.razorpay_order_id || order.order_id,
+            gateway_payment_id: response.razorpay_payment_id,
+            gateway_signature: response.razorpay_signature,
+          });
+        },
+        prefill: {
+          name: order.student_name,
+        },
+        theme: {
+          color: '#1976d2',
+        },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (resp: any) {
+        showSnackbar(
+          resp.error?.description || 'Transaction cancelled or failed at gateway.',
+          'error'
+        );
+      });
+      rzp.open();
+    } catch {
+      // Error handled by mutation onError
+    }
+  };
+
+  const handleSimulatePayment = () => {
+    if (!selectedInstallment) return;
+    createOrderMutation.mutate(
+      { installment_id: selectedInstallment.id, amount: payAmount },
+      {
+        onSuccess: (order) => {
+          const simPaymentId = `pay_sim_${Date.now()}`;
+          const simSignature = `sim_sig_${order.order_id}_${simPaymentId}`;
+          verifyPaymentMutation.mutate({
+            gateway_order_id: order.order_id,
+            gateway_payment_id: simPaymentId,
+            gateway_signature: simSignature,
+          });
+        },
+      }
+    );
+  };
 
   return (
-    <RequireRole roles={STUDENT_PORTAL_ALLOWED_ROLES}>
+    <RequireRole roles={[ROLES.PARENT]}>
       <AppShell>
-        <Box sx={{ maxWidth: 960, mx: 'auto' }}>
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="h4" fontWeight={700} gutterBottom>
-              Fees & Tuition Invoices
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Review current billing status, term tuition fees, and past payment receipts.
-            </Typography>
-          </Box>
+        <Box sx={{ maxWidth: 1040, mx: 'auto' }}>
+          <PageHeader
+            title="Fee Schedule & Online Payments"
+            subtitle="Review assigned fee structures, track upcoming and overdue installments, pay fees securely online, and download official receipts."
+          />
 
-          {isParent && children && children.length > 1 && (
-            <Tabs
-              value={selectedChildIndex}
-              onChange={(_, val) => setSelectedChildIndex(val)}
-              sx={{ mb: 3 }}
-            >
-              {children.map((child, idx) => (
-                <Tab key={child.id} label={`${child.first_name} ${child.last_name}`} />
-              ))}
-            </Tabs>
+          {/* Parent: Multi-child Switcher */}
+          {isParent && children && children.length > 0 && (
+            <Paper sx={{ mb: 3 }}>
+              <Tabs
+                value={selectedChildIndex}
+                onChange={(_, val) => setSelectedChildIndex(val)}
+                indicatorColor="primary"
+                textColor="primary"
+                variant="scrollable"
+                scrollButtons="auto"
+              >
+                {children.map((child) => (
+                  <Tab
+                    key={child.id}
+                    label={`${child.first_name} ${child.last_name}`}
+                  />
+                ))}
+              </Tabs>
+            </Paper>
           )}
 
-          <Grid container spacing={3} sx={{ mb: 4 }}>
-            <Grid item xs={12} sm={4}>
-              <Card>
-                <CardContent>
-                  <Typography variant="caption" color="text.secondary" fontWeight={500}>
-                    TOTAL ASSESSED FEES
-                  </Typography>
-                  <Typography variant="h4" fontWeight={700}>
-                    ${totalFees.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    Academic Year 2026-2027
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            <Grid item xs={12} sm={4}>
-              <Card>
-                <CardContent>
-                  <Typography variant="caption" color="text.secondary" fontWeight={500}>
-                    SETTLED & PAID
-                  </Typography>
-                  <Typography variant="h4" fontWeight={700} color="success.main">
-                    ${paidFees.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    Confirmed by accounts office
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            <Grid item xs={12} sm={4}>
-              <Card>
-                <CardContent>
-                  <Typography variant="caption" color="text.secondary" fontWeight={500}>
-                    OUTSTANDING BALANCE
-                  </Typography>
-                  <Typography
-                    variant="h4"
-                    fontWeight={700}
-                    color={outstandingFees > 0 ? 'warning.main' : 'success.main'}
-                  >
-                    ${outstandingFees.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    {outstandingFees > 0 ? 'Due for upcoming term' : 'All accounts settled'}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-
-          <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 700 }}>Invoice Number</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Description</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Due Date</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Amount</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Payment Status</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                      <CircularProgress size={28} sx={{ mr: 1, verticalAlign: 'middle' }} />
-                      Loading fee invoices...
-                    </TableCell>
-                  </TableRow>
-                ) : !invoices || invoices.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                      No billing invoices found.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  invoices.map((inv) => (
-                    <TableRow key={inv.id} hover>
-                      <TableCell sx={{ fontFamily: 'monospace', fontWeight: 600 }}>
-                        {inv.invoice_number}
-                      </TableCell>
-                      <TableCell>{inv.description}</TableCell>
-                      <TableCell>{new Date(inv.due_date).toLocaleDateString()}</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>
-                        ${inv.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={inv.status}
-                          color={inv.status === 'Paid' ? 'success' : 'warning'}
-                          size="small"
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))
+          {/* Loading or Empty State */}
+          {loadingSchedule || (isParent && loadingChildren) ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+              <CircularProgress />
+            </Box>
+          ) : isError || !schedule ? (
+            <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', my: 3 }}>
+              <Typography variant="h6" fontWeight={600} gutterBottom>
+                No Active Fee Schedule Found
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {formatErrorMessage(
+                  error,
+                  'No fee assignment has been published for this student profile yet. Please check back later or contact the administration office.'
                 )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+              </Typography>
+            </Paper>
+          ) : (
+            <>
+              {/* Student Info Banner */}
+              <Paper variant="outlined" sx={{ p: 2, mb: 3, bgcolor: 'action.hover' }}>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle1" fontWeight={700}>
+                      {schedule.student_name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Enrollment: <code>{schedule.student_code || 'Enrolled'}</code> • Grade:{' '}
+                      <b>{schedule.grade_name}</b>
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Academic Session: <b>{schedule.academic_year_name}</b>
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              <StudentFeeSummaryCards schedule={schedule} />
+
+              <FeeInstallmentsTable
+                installments={schedule.installments}
+                onPayNow={handleOpenPayModal}
+                onViewReceipt={(receiptNum) => {
+                  setViewingReceiptNumber(receiptNum);
+                  setOpenReceiptDialog(true);
+                }}
+              />
+
+              {/* Payment History & Receipts */}
+              {schedule.payment_history && schedule.payment_history.length > 0 && (
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="h6" fontWeight={700} gutterBottom>
+                    Payment History & Receipts
+                  </Typography>
+                  <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: 'action.hover' }}>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 700 }}>Receipt #</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Installment</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Payment Date</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Method</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }} align="right">Amount</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }} align="center">Action</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {schedule.payment_history.map((hist: any, idx: number) => (
+                          <TableRow key={hist.receipt_number || idx} hover>
+                            <TableCell sx={{ fontWeight: 600 }}>{hist.receipt_number}</TableCell>
+                            <TableCell>{hist.installment_name || '—'}</TableCell>
+                            <TableCell>{hist.payment_date || '—'}</TableCell>
+                            <TableCell sx={{ textTransform: 'capitalize' }}>
+                              {(hist.payment_method || 'online').replace('_', ' ')}
+                            </TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 600, color: 'success.main' }}>
+                              ₹{Number(hist.amount).toLocaleString()}
+                            </TableCell>
+                            <TableCell>
+                              <StatusChip status={hist.status || 'completed'} />
+                            </TableCell>
+                            <TableCell align="center">
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<ReceiptIcon />}
+                                onClick={() => {
+                                  setViewingReceiptNumber(hist.receipt_number);
+                                  setOpenReceiptDialog(true);
+                                }}
+                              >
+                                View / Download
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              )}
+            </>
+          )}
+
+          {/* Pay Online Modal */}
+          <InitiatePaymentDialog
+            open={openPayDialog}
+            onClose={() => setOpenPayDialog(false)}
+            selectedInstallment={selectedInstallment}
+            payAmount={payAmount}
+            onPayAmountChange={setPayAmount}
+            onStartPayment={handleStartPayment}
+            onSimulatePayment={handleSimulatePayment}
+            isProcessing={createOrderMutation.isPending || verifyPaymentMutation.isPending}
+          />
+
+          {/* Printable Fee Receipt Modal */}
+          <FeeReceiptDialog
+            open={openReceiptDialog}
+            onClose={() => setOpenReceiptDialog(false)}
+            receiptDetail={receiptDetail}
+            isLoading={loadingReceipt}
+          />
         </Box>
       </AppShell>
     </RequireRole>

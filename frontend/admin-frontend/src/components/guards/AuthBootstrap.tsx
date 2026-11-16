@@ -58,17 +58,17 @@ export default function AuthBootstrap({ children }: { children: React.ReactNode 
     return (
       <Box
         sx={{
-          minHeight: '100vh',
+          minHeight: 'calc(100vh - 160px)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
+          py: 8,
           gap: 2,
-          bgcolor: 'background.default',
         }}
       >
-        <CircularProgress size={52} thickness={4} color="primary" />
-        <Typography variant="body1" color="text.secondary" fontWeight={500}>
+        <CircularProgress size={44} thickness={4} color="primary" />
+        <Typography variant="body2" color="text.secondary" fontWeight={500}>
           Loading your session...
         </Typography>
       </Box>

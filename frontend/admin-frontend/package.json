@@ -20,13 +20,16 @@
     "@mui/material": "^6.1.6",
     "@mui/material-nextjs": "^6.1.6",
     "@mui/x-data-grid": "^7.22.1",
+    "@mui/x-date-pickers": "^7.29.4",
     "@tanstack/react-query": "^5.60.5",
     "axios": "^1.7.7",
     "dayjs": "^1.11.13",
     "next": "^14.2.18",
+    "nextjs-toploader": "^3.9.17",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.53.2",
+    "workflow": "^5.3.0",
     "zod": "^3.23.8",
     "zustand": "^5.0.1"
   },
@@ -44,5 +47,9 @@
     "openapi-typescript": "^7.13.0",
     "typescript": "^5.6.3",
     "vitest": "^2.1.4"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-darwin-arm64": "^4.67.5",
+    "@rollup/rollup-darwin-x64": "^4.67.5"
   }
 }
