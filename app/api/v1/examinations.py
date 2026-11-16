@@ -163,6 +163,47 @@ def delete_examination_schedule(
     examination_service.delete_schedule_slot(schedule_id, db)
 
 
+@router.get(
+    "/admin/examinations/schedules/{schedule_id}/roster",
+    response_model=ScheduleRosterResponse,
+)
+def get_admin_schedule_roster(
+    schedule_id: uuid.UUID,
+    current_user: User = Depends(admin_only),
+    db: Session = Depends(get_db),
+):
+    """Admin endpoint: View section student roster and existing draft marks."""
+    return examination_service.get_schedule_roster(schedule_id, current_user.id, db, is_admin=True)
+
+
+@router.post(
+    "/admin/examinations/schedules/{schedule_id}/marks/draft",
+    response_model=ScheduleRosterResponse,
+)
+def save_admin_marks_draft(
+    schedule_id: uuid.UUID,
+    payload: MarksBulkSaveRequest,
+    current_user: User = Depends(admin_only),
+    db: Session = Depends(get_db),
+):
+    """Admin endpoint: Save student marks as draft without final submission."""
+    return examination_service.save_schedule_marks(schedule_id, payload, current_user.id, is_submit=False, db=db, is_admin=True)
+
+
+@router.post(
+    "/admin/examinations/schedules/{schedule_id}/marks/submit",
+    response_model=ScheduleRosterResponse,
+)
+def submit_admin_marks(
+    schedule_id: uuid.UUID,
+    payload: MarksBulkSaveRequest,
+    current_user: User = Depends(admin_only),
+    db: Session = Depends(get_db),
+):
+    """Admin endpoint: Submit student marks for review and result publication."""
+    return examination_service.save_schedule_marks(schedule_id, payload, current_user.id, is_submit=True, db=db, is_admin=True)
+
+
 # ---------------------------------------------------------------------------
 # Admin Endpoints: Results Publishing & Grading Scales
 # ---------------------------------------------------------------------------

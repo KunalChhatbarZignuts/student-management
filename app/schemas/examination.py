@@ -173,6 +173,7 @@ class ScheduleRosterResponse(BaseModel):
     max_marks: float
     pass_marks: float
     status: str
+    teacher_remarks: str | None = None
     students: list[StudentRosterMarkItem]
 
 

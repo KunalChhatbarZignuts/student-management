@@ -28,10 +28,10 @@ BASE_URL = "http://127.0.0.1:8000"
 PASSWORD = "PerfTest@123"
 
 LOGIN_CREDS = {
-    "admin":   "perf.admin@perf.test",
-    "teacher": "perf.teacher01@perf.test",
-    "student": "perf.student01@perf.test",
-    "parent":  "perf.parent01@perf.test",
+    "admin":   "perf.admin@perf.edu",
+    "teacher": "perf.teacher01@perf.edu",
+    "student": "perf.student01@perf.edu",
+    "parent":  "perf.parent01@perf.edu",
 }
 
 # Pre-fetched shared tokens (populated in test_start event)

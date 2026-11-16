@@ -12,10 +12,12 @@ import IconButton from '@mui/material/IconButton';
 import Divider from '@mui/material/Divider';
 import CircularProgress from '@mui/material/CircularProgress';
 import PrintIcon from '@mui/icons-material/Print';
+import DownloadIcon from '@mui/icons-material/Download';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 
 import { FeeReceiptDetail } from '@/features/fees/types';
+import { portalFeeApi } from '@/features/fees/api';
 
 export interface FeeReceiptDialogProps {
   open: boolean;
@@ -30,6 +32,27 @@ export const FeeReceiptDialog: React.FC<FeeReceiptDialogProps> = ({
   receiptDetail,
   isLoading,
 }) => {
+  const [downloading, setDownloading] = React.useState(false);
+
+  const handleDownloadPdf = async () => {
+    if (!receiptDetail?.receipt_number) return;
+    try {
+      setDownloading(true);
+      const blob = await portalFeeApi.downloadReceiptPdf(receiptDetail.receipt_number);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Receipt_${receiptDetail.receipt_number}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download PDF receipt:', err);
+    } finally {
+      setDownloading(false);
+    }
+  };
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -179,6 +202,14 @@ export const FeeReceiptDialog: React.FC<FeeReceiptDialogProps> = ({
         )}
       </DialogContent>
       <DialogActions>
+        <Button
+          variant="contained"
+          startIcon={downloading ? <CircularProgress size={16} color="inherit" /> : <DownloadIcon />}
+          onClick={handleDownloadPdf}
+          disabled={downloading || !receiptDetail}
+        >
+          {downloading ? 'Downloading...' : 'Download PDF'}
+        </Button>
         <Button startIcon={<PrintIcon />} onClick={() => window.print()}>
           Print Receipt
         </Button>

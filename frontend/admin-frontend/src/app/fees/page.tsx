@@ -51,6 +51,8 @@ export default function FeesManagementPage() {
   const [selectedYearId, setSelectedYearId] = React.useState<string>('');
   const [selectedGradeId, setSelectedGradeId] = React.useState<string>('');
   const [assignmentSearch, setAssignmentSearch] = React.useState('');
+  const [feePage, setFeePage] = React.useState(0);
+  const [feePageSize, setFeePageSize] = React.useState(25);
 
   // Dialogs
   const [openComponentDialog, setOpenComponentDialog] = React.useState(false);
@@ -63,6 +65,7 @@ export default function FeesManagementPage() {
   // Additional Filters for Tab 3 & Tab 4
   const [txStatusFilter, setTxStatusFilter] = React.useState<string>('');
   const [txMethodFilter, setTxMethodFilter] = React.useState<string>('');
+  const [txSearchQuery, setTxSearchQuery] = React.useState<string>('');
   const [webhookStatusFilter, setWebhookStatusFilter] = React.useState<string>('');
 
   // Offline Payment Modal State
@@ -137,13 +140,14 @@ export default function FeesManagementPage() {
 
   // Fetch Student Assignments
   const { data: assignmentsData, isLoading: loadingAssignments } = useQuery({
-    queryKey: ['fees', 'assignments', { academic_year_id: selectedYearId, grade_id: selectedGradeId, search: assignmentSearch }],
+    queryKey: ['fees', 'assignments', { academic_year_id: selectedYearId, grade_id: selectedGradeId, search: assignmentSearch, page: feePage, pageSize: feePageSize }],
     queryFn: () =>
       adminFeeApi.listAssignments({
         academic_year_id: selectedYearId || undefined,
         grade_id: selectedGradeId || undefined,
         search: assignmentSearch.trim() || undefined,
-        limit: 50,
+        skip: feePage * feePageSize,
+        limit: feePageSize,
       }),
   });
 
@@ -156,13 +160,14 @@ export default function FeesManagementPage() {
 
   // Fetch Payment Transactions (Tab 3)
   const { data: transactionsData, isLoading: loadingTransactions } = useQuery({
-    queryKey: ['fees', 'transactions', { academic_year_id: selectedYearId, grade_id: selectedGradeId, status: txStatusFilter, payment_method: txMethodFilter }],
+    queryKey: ['fees', 'transactions', { academic_year_id: selectedYearId, grade_id: selectedGradeId, status: txStatusFilter, payment_method: txMethodFilter, search: txSearchQuery }],
     queryFn: () =>
       adminFeeApi.listTransactions({
         academic_year_id: selectedYearId || undefined,
         grade_id: selectedGradeId || undefined,
         status: txStatusFilter || undefined,
         payment_method: txMethodFilter || undefined,
+        search: txSearchQuery || undefined,
         limit: 50,
       }),
     enabled: tabIndex === 3,
@@ -322,6 +327,16 @@ export default function FeesManagementPage() {
     onError: (err) => showSnackbar(formatErrorMessage(err, 'Failed to apply adjustment'), 'error'),
   });
 
+  const removeAdjustmentMutation = useMutation({
+    mutationFn: ({ assignmentId, adjustmentId }: { assignmentId: string; adjustmentId: string }) =>
+      adminFeeApi.removeAdjustment(assignmentId, adjustmentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fees'] });
+      showSnackbar('Fee adjustment removed and balance recalculated successfully', 'success');
+    },
+    onError: (err) => showSnackbar(formatErrorMessage(err, 'Failed to remove fee adjustment'), 'error'),
+  });
+
   const retryWebhookMutation = useMutation({
     mutationFn: (eventId: string) => adminFeeApi.retryWebhook(eventId),
     onSuccess: () => {
@@ -392,16 +407,32 @@ export default function FeesManagementPage() {
         {tabIndex === 0 && (
           <StudentFeesTab
             assignmentSearch={assignmentSearch}
-            onSearchChange={setAssignmentSearch}
+            onSearchChange={(val) => {
+              setAssignmentSearch(val);
+              setFeePage(0);
+            }}
             selectedYearId={selectedYearId}
-            onYearChange={setSelectedYearId}
+            onYearChange={(val) => {
+              setSelectedYearId(val);
+              setFeePage(0);
+            }}
             academicYears={academicYears}
             selectedGradeId={selectedGradeId}
-            onGradeChange={setSelectedGradeId}
+            onGradeChange={(val) => {
+              setSelectedGradeId(val);
+              setFeePage(0);
+            }}
             grades={grades}
             assignmentsData={assignmentsData}
             isLoading={loadingAssignments}
             onViewAssignment={setViewingAssignmentId}
+            page={feePage}
+            onPageChange={setFeePage}
+            pageSize={feePageSize}
+            onPageSizeChange={(s) => {
+              setFeePageSize(s);
+              setFeePage(0);
+            }}
           />
         )}
 
@@ -440,6 +471,8 @@ export default function FeesManagementPage() {
             onStatusFilterChange={setTxStatusFilter}
             txMethodFilter={txMethodFilter}
             onMethodFilterChange={setTxMethodFilter}
+            searchQuery={txSearchQuery}
+            onSearchChange={setTxSearchQuery}
             transactionsData={transactionsData}
             isLoading={loadingTransactions}
             onViewReceipt={(receiptNum) => {
@@ -510,6 +543,11 @@ export default function FeesManagementPage() {
             setOfflineDate(new Date().toISOString().split('T')[0]);
             setOfflineNote('');
             setOpenOfflineDialog(true);
+          }}
+          onRemoveAdjustment={(adjId) => {
+            if (viewingAssignmentId) {
+              removeAdjustmentMutation.mutate({ assignmentId: viewingAssignmentId, adjustmentId: adjId });
+            }
           }}
         />
 

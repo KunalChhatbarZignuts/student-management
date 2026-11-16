@@ -121,10 +121,18 @@ export const adminFeeApi = {
     student_id?: string;
     status?: string;
     payment_method?: string;
+    search?: string;
     skip?: number;
     limit?: number;
   }): Promise<PaginatedTransactionsResponse> => {
     const res = await apiClient.get<PaginatedTransactionsResponse>('/admin/fees/transactions', { params });
+    return res.data;
+  },
+
+  downloadReceiptPdf: async (receiptNumber: string): Promise<Blob> => {
+    const res = await apiClient.get(`/fees/receipts/${receiptNumber}/pdf`, {
+      responseType: 'blob',
+    });
     return res.data;
   },
 
@@ -146,6 +154,16 @@ export const adminFeeApi = {
     const res = await apiClient.post<StudentFeeAssignment>(
       `/admin/fees/assignments/${assignmentId}/adjustments`,
       payload
+    );
+    return res.data;
+  },
+
+  removeAdjustment: async (
+    assignmentId: string,
+    adjustmentId: string
+  ): Promise<StudentFeeAssignment> => {
+    const res = await apiClient.delete<StudentFeeAssignment>(
+      `/admin/fees/assignments/${assignmentId}/adjustments/${adjustmentId}`
     );
     return res.data;
   },

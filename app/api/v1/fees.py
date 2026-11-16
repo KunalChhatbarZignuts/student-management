@@ -1,5 +1,5 @@
 import uuid
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -279,9 +279,15 @@ def _verify_parent_access(parent_user_id: uuid.UUID, student_id: uuid.UUID, db: 
 # ==========================================
 
 @router.post(
+    "/fees/payments/create-order",
+    response_model=PaymentOrderResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+@router.post(
     "/payments/create-order",
     response_model=PaymentOrderResponse,
     status_code=status.HTTP_201_CREATED,
+    include_in_schema=False,
 )
 def create_payment_order(
     payload: PaymentOrderCreateRequest,
@@ -296,8 +302,11 @@ def create_payment_order(
         )
 
     student_id = None
+    parent_id = None
     if current_user.role == UserRole.PARENT.value:
-        # Resolve student from installment
+        parent = db.execute(select(Parent).where(Parent.user_id == current_user.id)).scalar_one_or_none()
+        if parent:
+            parent_id = parent.id
         installment = db.get(fee_service.FeeInstallment, payload.installment_id)
         if not installment or not installment.assignment:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Installment not found")
@@ -311,12 +320,17 @@ def create_payment_order(
     else:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized")
 
-    return fee_service.create_payment_order(payload, student_id, db)
+    return fee_service.create_payment_order(payload, student_id, db, parent_id=parent_id)
 
 
 @router.post(
+    "/fees/payments/verify",
+    response_model=PaymentVerificationResponse,
+)
+@router.post(
     "/payments/verify",
     response_model=PaymentVerificationResponse,
+    include_in_schema=False,
 )
 def verify_payment(
     payload: PaymentVerifyRequest,
@@ -332,8 +346,13 @@ def verify_payment(
 # ==========================================
 
 @router.post(
+    "/fees/payments/webhook",
+    status_code=status.HTTP_200_OK,
+)
+@router.post(
     "/webhooks/payments/razorpay",
     status_code=status.HTTP_200_OK,
+    include_in_schema=False,
 )
 async def razorpay_payment_webhook(
     request: Request,
@@ -343,6 +362,35 @@ async def razorpay_payment_webhook(
     """Receive and process payment gateway webhooks idempotently."""
     body_bytes = await request.body()
     return fee_service.process_webhook_event(body_bytes, x_razorpay_signature, db)
+
+
+# ==========================================
+# PDF Receipt Download Endpoint
+# ==========================================
+
+@router.get(
+    "/fees/receipts/{receipt_number}/pdf",
+    response_class=Response,
+)
+@router.get(
+    "/payments/receipts/{receipt_number}/pdf",
+    response_class=Response,
+    include_in_schema=False,
+)
+def download_payment_receipt_pdf(
+    receipt_number: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Download system-generated PDF payment receipt."""
+    pdf_bytes = fee_service.get_fee_payment_receipt_pdf(receipt_number, current_user, db)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="fee_receipt_{receipt_number}.pdf"',
+        },
+    )
 
 
 # ==========================================
@@ -423,6 +471,7 @@ def list_transactions(
     student_id: uuid.UUID | None = Query(None),
     status: str | None = Query(None),
     payment_method: str | None = Query(None),
+    search: str | None = Query(None, description="Search by student name, code, order ID, or payment ID"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -434,6 +483,7 @@ def list_transactions(
         student_id=student_id,
         status_filter=status,
         payment_method=payment_method,
+        search=search,
         skip=skip,
         limit=limit,
         db=db,
@@ -470,6 +520,20 @@ def apply_concession_or_scholarship(
 ):
     """Admin: apply student-specific concession, discount, or scholarship adjustment."""
     return fee_service.apply_student_fee_adjustment(assignment_id, payload, current_user.id, db)
+
+
+@router.delete(
+    "/admin/fees/assignments/{assignment_id}/adjustments/{adjustment_id}",
+    response_model=StudentFeeAssignmentResponse,
+    dependencies=[Depends(admin_only)],
+)
+def remove_student_fee_adjustment(
+    assignment_id: uuid.UUID,
+    adjustment_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """Admin: remove an adjustment and automatically recalculate balance and installments."""
+    return fee_service.remove_student_fee_adjustment(assignment_id, adjustment_id, db)
 
 
 @router.get(

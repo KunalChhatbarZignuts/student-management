@@ -36,11 +36,14 @@ export const MarksEntryTable: React.FC<Props> = ({
   isSubmitting,
 }) => {
   const [marksState, setMarksState] = React.useState<StudentRosterMarkItem[]>(roster.students || []);
-  const [teacherRemarks, setTeacherRemarks] = React.useState<string>('');
+  const [teacherRemarks, setTeacherRemarks] = React.useState<string>(roster.teacher_remarks || '');
   const [validationError, setValidationError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     setMarksState(roster.students || []);
+    if (roster.teacher_remarks !== undefined && roster.teacher_remarks !== null) {
+      setTeacherRemarks(roster.teacher_remarks);
+    }
   }, [roster]);
 
   const maxMarks = roster.max_marks;

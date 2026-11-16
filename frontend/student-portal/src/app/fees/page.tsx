@@ -8,11 +8,20 @@ import Grid from '@mui/material/Grid';
 import CircularProgress from '@mui/material/CircularProgress';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import Button from '@mui/material/Button';
+import ReceiptIcon from '@mui/icons-material/Receipt';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import AppShell from '@/components/layout/AppShell';
 import RequireRole from '@/components/guards/RequireRole';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { StatusChip } from '@/components/ui/StatusChip';
 import { ROLES } from '@/lib/constants';
 import { useAuth } from '@/features/auth/hooks';
 import { useMyChildren } from '@/features/parents/hooks';
@@ -309,6 +318,61 @@ export default function FeesPage() {
                   setOpenReceiptDialog(true);
                 }}
               />
+
+              {/* Payment History & Receipts */}
+              {schedule.payment_history && schedule.payment_history.length > 0 && (
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="h6" fontWeight={700} gutterBottom>
+                    Payment History & Receipts
+                  </Typography>
+                  <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: 'action.hover' }}>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 700 }}>Receipt #</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Installment</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Payment Date</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Method</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }} align="right">Amount</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }} align="center">Action</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {schedule.payment_history.map((hist: any, idx: number) => (
+                          <TableRow key={hist.receipt_number || idx} hover>
+                            <TableCell sx={{ fontWeight: 600 }}>{hist.receipt_number}</TableCell>
+                            <TableCell>{hist.installment_name || '—'}</TableCell>
+                            <TableCell>{hist.payment_date || '—'}</TableCell>
+                            <TableCell sx={{ textTransform: 'capitalize' }}>
+                              {(hist.payment_method || 'online').replace('_', ' ')}
+                            </TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 600, color: 'success.main' }}>
+                              ₹{Number(hist.amount).toLocaleString()}
+                            </TableCell>
+                            <TableCell>
+                              <StatusChip status={hist.status || 'completed'} />
+                            </TableCell>
+                            <TableCell align="center">
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<ReceiptIcon />}
+                                onClick={() => {
+                                  setViewingReceiptNumber(hist.receipt_number);
+                                  setOpenReceiptDialog(true);
+                                }}
+                              >
+                                View / Download
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              )}
             </>
           )}
 

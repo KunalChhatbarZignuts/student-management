@@ -108,7 +108,7 @@ with engine.begin() as conn:
     admin_uid = "00000000-0000-0000-0010-000000000001"
     conn.execute(text("""
         INSERT INTO users (id, email, password_hash, role, status, must_change_password, failed_login_count, created_at, updated_at)
-        VALUES (:id, 'perf.admin@perf.test', :pw, 'admin', 'active', false, 0, :now, :now)
+        VALUES (:id, 'perf.admin@perf.edu', :pw, 'admin', 'active', false, 0, :now, :now)
         ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
     """), {"id": admin_uid, "pw": PW_HASH, "now": NOW})
 
@@ -116,7 +116,7 @@ with engine.begin() as conn:
     sadmin_uid = "00000000-0000-0000-0010-000000000002"
     conn.execute(text("""
         INSERT INTO users (id, email, password_hash, role, status, must_change_password, failed_login_count, created_at, updated_at)
-        VALUES (:id, 'perf.superadmin@perf.test', :pw, 'super_admin', 'active', false, 0, :now, :now)
+        VALUES (:id, 'perf.superadmin@perf.edu', :pw, 'super_admin', 'active', false, 0, :now, :now)
         ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
     """), {"id": sadmin_uid, "pw": PW_HASH, "now": NOW})
 
@@ -125,7 +125,7 @@ with engine.begin() as conn:
     for i in range(1, 11):
         uid = f"00000000-0000-0000-0020-{i:012d}"
         tid = f"00000000-0000-0000-0021-{i:012d}"
-        email = f"perf.teacher{i:02d}@perf.test"
+        email = f"perf.teacher{i:02d}@perf.edu"
         conn.execute(text("""
             INSERT INTO users (id, email, password_hash, role, status, must_change_password, failed_login_count, created_at, updated_at)
             VALUES (:id, :email, :pw, 'teacher', 'active', false, 0, :now, :now)
@@ -148,7 +148,7 @@ with engine.begin() as conn:
     for i in range(1, 31):
         uid  = f"00000000-0000-0000-0030-{i:012d}"
         stid = f"00000000-0000-0000-0031-{i:012d}"
-        email = f"perf.student{i:02d}@perf.test"
+        email = f"perf.student{i:02d}@perf.edu"
         gid, secid = grade_section_pairs[i % 3]
         conn.execute(text("""
             INSERT INTO users (id, email, password_hash, role, status, must_change_password, failed_login_count, created_at, updated_at)
@@ -175,7 +175,7 @@ with engine.begin() as conn:
     for i in range(1, 11):
         uid = f"00000000-0000-0000-0040-{i:012d}"
         pid = f"00000000-0000-0000-0041-{i:012d}"
-        email = f"perf.parent{i:02d}@perf.test"
+        email = f"perf.parent{i:02d}@perf.edu"
         conn.execute(text("""
             INSERT INTO users (id, email, password_hash, role, status, must_change_password, failed_login_count, created_at, updated_at)
             VALUES (:id, :email, :pw, 'parent', 'active', false, 0, :now, :now)
@@ -188,8 +188,8 @@ with engine.begin() as conn:
         """), {"id": pid, "uid": uid, "fn": f"PerfParent{i}", "ln": "Test", "now": NOW})
 
 print("[seed] ✅ All perf data seeded successfully into student_mgmt_perf!")
-print(f"\n  Admin:      perf.admin@perf.test")
-print(f"  Teachers:   perf.teacher01@perf.test  ..  perf.teacher10@perf.test")
-print(f"  Students:   perf.student01@perf.test  ..  perf.student30@perf.test")
-print(f"  Parents:    perf.parent01@perf.test   ..  perf.parent10@perf.test")
+print(f"\n  Admin:      perf.admin@perf.edu")
+print(f"  Teachers:   perf.teacher01@perf.edu  ..  perf.teacher10@perf.edu")
+print(f"  Students:   perf.student01@perf.edu  ..  perf.student30@perf.edu")
+print(f"  Parents:    perf.parent01@perf.edu   ..  perf.parent10@perf.edu")
 print(f"  Password:   {PERF_PASSWORD_PLAIN}")

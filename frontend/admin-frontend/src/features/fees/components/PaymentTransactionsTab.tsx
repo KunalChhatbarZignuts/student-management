@@ -5,6 +5,8 @@ import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import InputAdornment from '@mui/material/InputAdornment';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
@@ -21,14 +23,18 @@ import Tooltip from '@mui/material/Tooltip';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import ReceiptIcon from '@mui/icons-material/Receipt';
+import DownloadIcon from '@mui/icons-material/Download';
+import SearchIcon from '@mui/icons-material/Search';
 
-import { PaginatedTransactionsResponse } from '@/features/fees/api';
+import { PaginatedTransactionsResponse, adminFeeApi } from '@/features/fees/api';
 
 export interface PaymentTransactionsTabProps {
   txStatusFilter: string;
   onStatusFilterChange: (val: string) => void;
   txMethodFilter: string;
   onMethodFilterChange: (val: string) => void;
+  searchQuery?: string;
+  onSearchChange?: (val: string) => void;
   transactionsData?: PaginatedTransactionsResponse;
   isLoading: boolean;
   onViewReceipt: (receiptNumber: string) => void;
@@ -39,13 +45,53 @@ export default function PaymentTransactionsTab({
   onStatusFilterChange,
   txMethodFilter,
   onMethodFilterChange,
+  searchQuery = '',
+  onSearchChange,
   transactionsData,
   isLoading,
   onViewReceipt,
 }: PaymentTransactionsTabProps) {
+  const [downloadingReceipt, setDownloadingReceipt] = React.useState<string | null>(null);
+
+  const handleDownloadPdf = async (receiptNumber: string) => {
+    try {
+      setDownloadingReceipt(receiptNumber);
+      const blob = await adminFeeApi.downloadReceiptPdf(receiptNumber);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Receipt_${receiptNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download PDF receipt:', err);
+    } finally {
+      setDownloadingReceipt(null);
+    }
+  };
+
   return (
     <Card sx={{ p: 2.5 }}>
       <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+        {onSearchChange && (
+          <TextField
+            size="small"
+            placeholder="Search student, order or payment ID..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" color="action" />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ minWidth: 260 }}
+          />
+        )}
+
         <FormControl size="small" sx={{ minWidth: 160 }}>
           <InputLabel>Status</InputLabel>
           <Select
@@ -91,24 +137,25 @@ export default function PaymentTransactionsTab({
             <TableRow>
               <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Student</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Parent</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Installment</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Provider / Channel</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Provider / Method</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Order ID / Ref</TableCell>
               <TableCell sx={{ fontWeight: 700 }} align="right">Amount (₹)</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-              <TableCell sx={{ fontWeight: 700 }} align="center">Receipt</TableCell>
+              <TableCell sx={{ fontWeight: 700 }} align="center">Receipt & Download</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
+                <TableCell colSpan={9} align="center" sx={{ py: 3 }}>
                   <CircularProgress size={24} />
                 </TableCell>
               </TableRow>
             ) : !transactionsData?.items || transactionsData.items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                <TableCell colSpan={9} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                   No payment transactions recorded for the selected filters.
                 </TableCell>
               </TableRow>
@@ -117,10 +164,12 @@ export default function PaymentTransactionsTab({
                 <TableRow key={tx.id} hover>
                   <TableCell>
                     <Typography variant="body2">
-                      {new Date(tx.created_at).toLocaleDateString()}
+                      {tx.payment_timestamp
+                        ? new Date(tx.payment_timestamp).toLocaleDateString()
+                        : new Date(tx.created_at).toLocaleDateString()}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(tx.payment_timestamp || tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -128,24 +177,38 @@ export default function PaymentTransactionsTab({
                       {tx.student_name}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {tx.student_code || tx.grade_name || 'Student'}
+                      {tx.enrollment_number || tx.student_code || tx.grade_name || 'Student'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {tx.parent_name || '—'}
                     </Typography>
                   </TableCell>
                   <TableCell>{tx.installment_name || 'Installment'}</TableCell>
-                  <TableCell sx={{ textTransform: 'uppercase' }}>
+                  <TableCell>
                     <Chip
-                      label={tx.gateway_provider}
+                      label={
+                        tx.payment_method
+                          ? tx.payment_method.replace('_', ' ').toUpperCase()
+                          : tx.gateway_provider.toUpperCase()
+                      }
                       size="small"
                       variant="outlined"
                       color={tx.gateway_provider === 'razorpay' ? 'primary' : 'default'}
                     />
                   </TableCell>
                   <TableCell>
-                    <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
-                      {tx.gateway_payment_id || tx.gateway_order_id}
+                    <Typography variant="caption" sx={{ fontFamily: 'monospace', display: 'block' }}>
+                      {tx.gateway_order_id}
                     </Typography>
+                    {tx.gateway_payment_id && (
+                      <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', display: 'block' }}>
+                        Pay ID: {tx.gateway_payment_id}
+                      </Typography>
+                    )}
                   </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>
+                  <TableCell align="right" sx={{ fontWeight: 700, color: 'success.main' }}>
                     ₹{Number(tx.amount).toLocaleString()}
                   </TableCell>
                   <TableCell>
@@ -165,16 +228,34 @@ export default function PaymentTransactionsTab({
                   </TableCell>
                   <TableCell align="center">
                     {tx.receipt_number ? (
-                      <Tooltip title={`View Receipt: ${tx.receipt_number}`}>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<ReceiptIcon fontSize="small" />}
-                          onClick={() => onViewReceipt(tx.receipt_number!)}
-                        >
-                          {tx.receipt_number}
-                        </Button>
-                      </Tooltip>
+                      <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                        <Tooltip title={`View Receipt: ${tx.receipt_number}`}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<ReceiptIcon fontSize="small" />}
+                            onClick={() => onViewReceipt(tx.receipt_number!)}
+                          >
+                            {tx.receipt_number}
+                          </Button>
+                        </Tooltip>
+                        <Tooltip title="Download PDF">
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="secondary"
+                            onClick={() => handleDownloadPdf(tx.receipt_number!)}
+                            disabled={downloadingReceipt === tx.receipt_number}
+                            sx={{ minWidth: 36, px: 1 }}
+                          >
+                            {downloadingReceipt === tx.receipt_number ? (
+                              <CircularProgress size={14} color="inherit" />
+                            ) : (
+                              <DownloadIcon fontSize="small" />
+                            )}
+                          </Button>
+                        </Tooltip>
+                      </Box>
                     ) : (
                       <Typography variant="caption" color="text.disabled">
                         —

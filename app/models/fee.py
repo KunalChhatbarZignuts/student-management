@@ -23,6 +23,7 @@ from app.db.base import Base, TimestampMixin
 if TYPE_CHECKING:
     from app.models.academic_structure import AcademicYear, Grade
     from app.models.admission import Admission
+    from app.models.parent import Parent
     from app.models.student import Student
     from app.models.user import User
 
@@ -273,15 +274,23 @@ class PaymentTransaction(TimestampMixin, Base):
     student_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("students.id", ondelete="RESTRICT"), nullable=False
     )
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("parents.id", ondelete="SET NULL"), nullable=True
+    )
+    assignment_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("student_fee_assignments.id", ondelete="SET NULL"), nullable=True
+    )
     gateway_provider: Mapped[str] = mapped_column(String(50), nullable=False, default="razorpay")
     gateway_order_id: Mapped[str] = mapped_column(String(100), nullable=False)
     gateway_payment_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     gateway_signature: Mapped[str | None] = mapped_column(String(255), nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     currency: Mapped[str] = mapped_column(String(10), nullable=False, default="INR")
+    payment_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    payment_timestamp: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(
         String(30), nullable=False, default="created"
-    )  # created, authorized, captured, failed, refunded
+    )  # created, pending, authorized, captured, failed, cancelled, refunded
     error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
     error_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -289,6 +298,8 @@ class PaymentTransaction(TimestampMixin, Base):
     # Relationships
     installment: Mapped["FeeInstallment"] = relationship("FeeInstallment", back_populates="transactions")
     student: Mapped["Student"] = relationship("Student")
+    parent: Mapped["Parent | None"] = relationship("Parent")
+    assignment: Mapped["StudentFeeAssignment | None"] = relationship("StudentFeeAssignment")
     payments: Mapped[list["FeePayment"]] = relationship("FeePayment", back_populates="transaction")
 
     __table_args__ = (
@@ -297,6 +308,8 @@ class PaymentTransaction(TimestampMixin, Base):
         Index("ix_payment_transactions_status", "status"),
         Index("ix_payment_transactions_installment", "installment_id"),
         Index("ix_payment_transactions_student", "student_id"),
+        Index("ix_payment_transactions_parent", "parent_id"),
+        Index("ix_payment_transactions_assignment", "assignment_id"),
     )
 
     def __repr__(self) -> str:

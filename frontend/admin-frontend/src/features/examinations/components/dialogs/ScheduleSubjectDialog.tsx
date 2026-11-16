@@ -62,7 +62,7 @@ export const ScheduleSubjectDialog: React.FC<Props> = ({
   const { data: grades } = useQuery({
     queryKey: ['grades-list'],
     queryFn: async () => {
-      const res = await apiClient.get<GradeItem[]>('/grades');
+      const res = await apiClient.get<GradeItem[]>('/admin/grades');
       return res.data;
     },
     enabled: open,
@@ -72,7 +72,7 @@ export const ScheduleSubjectDialog: React.FC<Props> = ({
   const { data: sections } = useQuery({
     queryKey: ['sections-list'],
     queryFn: async () => {
-      const res = await apiClient.get<SectionItem[]>('/sections');
+      const res = await apiClient.get<SectionItem[]>('/admin/sections');
       return res.data;
     },
     enabled: open,
@@ -82,7 +82,7 @@ export const ScheduleSubjectDialog: React.FC<Props> = ({
   const { data: subjects } = useQuery({
     queryKey: ['subjects-list'],
     queryFn: async () => {
-      const res = await apiClient.get<SubjectItem[]>('/subjects');
+      const res = await apiClient.get<SubjectItem[]>('/admin/subjects');
       return res.data;
     },
     enabled: open,

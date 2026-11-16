@@ -44,7 +44,7 @@ class ParentProfile(BaseModel):
 
 class UserRead(BaseModel):
     id: uuid.UUID
-    email: EmailStr
+    email: str
     role: str
     status: str
     must_change_password: bool

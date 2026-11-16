@@ -21,6 +21,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 import PaymentIcon from '@mui/icons-material/Payment';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
 import { StudentFeeAssignment, FeeInstallmentItem } from '@/features/fees/api';
 
@@ -31,6 +32,7 @@ export interface StudentAssignmentDrawerProps {
   isLoading: boolean;
   onOpenAdjustmentDialog: () => void;
   onOpenOfflinePaymentDialog: (installment: FeeInstallmentItem) => void;
+  onRemoveAdjustment?: (adjustmentId: string) => void;
 }
 
 export default function StudentAssignmentDrawer({
@@ -40,6 +42,7 @@ export default function StudentAssignmentDrawer({
   isLoading,
   onOpenAdjustmentDialog,
   onOpenOfflinePaymentDialog,
+  onRemoveAdjustment,
 }: StudentAssignmentDrawerProps) {
   return (
     <Drawer
@@ -124,11 +127,25 @@ export default function StudentAssignmentDrawer({
                     <Typography variant="body2" fontWeight={600}>
                       {adj.description}
                     </Typography>
-                    <Chip
-                      label={adj.category === 'additional_charge' ? `+₹${adj.amount}` : `-₹${adj.amount}`}
-                      size="small"
-                      color={adj.category === 'additional_charge' ? 'error' : 'success'}
-                    />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Chip
+                        label={adj.category === 'additional_charge' ? `+₹${adj.amount}` : `-₹${adj.amount}`}
+                        size="small"
+                        color={adj.category === 'additional_charge' ? 'error' : 'success'}
+                      />
+                      {onRemoveAdjustment && adj.id && (
+                        <Tooltip title="Remove Adjustment">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => onRemoveAdjustment(adj.id!)}
+                            sx={{ p: 0.5 }}
+                          >
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Box>
                   </Box>
                   <Typography variant="caption" color="text.secondary">
                     Type: {adj.adjustment_type} {adj.rate ? `(${adj.rate}%)` : ''}

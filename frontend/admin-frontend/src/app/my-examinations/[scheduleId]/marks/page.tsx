@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AppShell from '@/components/layout/AppShell';
 import RequireRole from '@/components/guards/RequireRole';
 import { useSnackbar } from '@/components/ui/SnackbarProvider';
+import { useAuthStore } from '@/store/authStore';
 import { ROLES } from '@/lib/constants';
 import { examinationsApi } from '@/features/examinations/api';
 import { MarksEntryTable } from '@/features/examinations/components';
@@ -27,6 +28,9 @@ export default function MarksEntryPage() {
   const { showSnackbar } = useSnackbar();
 
   const scheduleId = params.scheduleId as string;
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const backUrl = isAdmin ? '/examinations' : '/my-examinations';
 
   // 1. Fetch Schedule Roster
   const { data: roster, isLoading, error } = useQuery({
@@ -72,7 +76,7 @@ export default function MarksEntryPage() {
       queryClient.invalidateQueries({ queryKey: ['schedule-roster', scheduleId] });
       queryClient.invalidateQueries({ queryKey: ['teacher-examinations'] });
       showSnackbar('Class examination marks submitted successfully to administration!', 'success');
-      router.push('/my-examinations');
+      router.push(backUrl);
     },
     onError: (err: any) => {
       showSnackbar(err?.response?.data?.detail || 'Failed to submit marks', 'error');
@@ -102,10 +106,10 @@ export default function MarksEntryPage() {
             </Alert>
             <Button
               startIcon={<ArrowBackIcon />}
-              onClick={() => router.push('/my-examinations')}
+              onClick={() => router.push(backUrl)}
               sx={{ mt: 2 }}
             >
-              Back to My Examinations
+              Back to Examinations
             </Button>
           </Box>
         </AppShell>
@@ -119,7 +123,7 @@ export default function MarksEntryPage() {
         <Box sx={{ maxWidth: 1200, mx: 'auto', p: { xs: 2, md: 3 } }}>
           <Button
             startIcon={<ArrowBackIcon />}
-            onClick={() => router.push('/my-examinations')}
+            onClick={() => router.push(backUrl)}
             sx={{ mb: 2, color: 'text.secondary' }}
           >
             Back to Examinations List

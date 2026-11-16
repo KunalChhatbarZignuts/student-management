@@ -2,6 +2,7 @@ import datetime as dt
 import uuid
 
 import pytest
+from sqlalchemy import select
 from app.core.security import create_access_token, hash_password
 from app.models.academic_structure import AcademicYear, Grade, Section, StudentEnrollment
 from app.models.calendar import HolidayCategory, SchoolHoliday
@@ -514,4 +515,286 @@ def test_admin_dashboard_metrics(client, exam_setup):
     assert "upcoming_examinations" in data
     assert "published_results" in data
     assert "total_participating_students" in data
+
+
+def test_unpublish_results_resets_marks_and_exam_status(client, exam_setup, db):
+    """Test unpublishing results: StudentExamMark.status must revert from PUBLISHED so teachers can revise marks."""
+    admin_headers = exam_setup["admin_headers"]
+    teacher_headers = exam_setup["teacher_headers"]
+    student = exam_setup["student"]
+    ay = exam_setup["academic_year"]
+    grade = exam_setup["grade"]
+    sec = exam_setup["section"]
+    subj = exam_setup["subject"]
+
+    exam = Examination(
+        name="Unpublish Reset Test Exam",
+        exam_type="UNIT_TEST",
+        academic_year_id=ay.id,
+        term="Term 1",
+        start_date=dt.date(2026, 11, 20),
+        end_date=dt.date(2026, 11, 25),
+        status="SCHEDULED",
+    )
+    db.add(exam)
+    db.commit()
+
+    sched = ExaminationSchedule(
+        examination_id=exam.id,
+        grade_id=grade.id,
+        section_id=sec.id,
+        subject_id=subj.id,
+        exam_date=dt.date(2026, 11, 21),
+        start_time=dt.time(10, 0),
+        end_time=dt.time(11, 30),
+        max_marks=100.0,
+        pass_marks=35.0,
+        status="SCHEDULED",
+    )
+    db.add(sched)
+    db.commit()
+
+    # Teacher submits marks
+    client.post(
+        f"/api/v1/teacher/examinations/schedules/{sched.id}/marks/submit",
+        json={"marks": [{"student_id": str(student.id), "marks_obtained": 80.0, "is_absent": False}]},
+        headers=teacher_headers,
+    )
+
+    # Admin publishes results
+    client.post(
+        f"/api/v1/admin/examinations/{exam.id}/publish-results",
+        json={"section_id": str(sec.id)},
+        headers=admin_headers,
+    )
+
+    # Admin unpublishes results
+    unpub_res = client.post(
+        f"/api/v1/admin/examinations/{exam.id}/unpublish-results",
+        json={"section_id": str(sec.id)},
+        headers=admin_headers,
+    )
+    assert unpub_res.status_code == 200
+
+    # Teacher attempts to update marks after unpublishing
+    update_res = client.post(
+        f"/api/v1/teacher/examinations/schedules/{sched.id}/marks/draft",
+        json={"marks": [{"student_id": str(student.id), "marks_obtained": 85.0, "is_absent": False}]},
+        headers=teacher_headers,
+    )
+    # MUST allow teacher to modify marks once unpublished
+    assert update_res.status_code == 200, f"Failed to edit marks after unpublish: {update_res.text}"
+
+
+def test_partial_publish_does_not_complete_examination(client, exam_setup, db):
+    """Test that publishing results for 1 section does not mark the entire multi-section examination as COMPLETED."""
+    admin_headers = exam_setup["admin_headers"]
+    ay = exam_setup["academic_year"]
+    grade = exam_setup["grade"]
+    sec_a = exam_setup["section"]
+
+    # Create Section B
+    sec_b = Section(name="5-B", code="5B", grade_id=grade.id, academic_year_id=ay.id, status="active")
+    db.add(sec_b)
+    db.commit()
+
+    exam = Examination(
+        name="Multi Section Exam",
+        exam_type="UNIT_TEST",
+        academic_year_id=ay.id,
+        term="Term 1",
+        start_date=dt.date(2026, 11, 20),
+        end_date=dt.date(2026, 11, 25),
+        status="SCHEDULED",
+    )
+    db.add(exam)
+    db.commit()
+
+    # Schedule for Section A and Section B
+    sched_a = ExaminationSchedule(
+        examination_id=exam.id,
+        grade_id=grade.id,
+        section_id=sec_a.id,
+        subject_id=exam_setup["subject"].id,
+        exam_date=dt.date(2026, 11, 21),
+        start_time=dt.time(10, 0),
+        end_time=dt.time(11, 30),
+        max_marks=100.0,
+        pass_marks=35.0,
+        status="SCHEDULED",
+    )
+    sched_b = ExaminationSchedule(
+        examination_id=exam.id,
+        grade_id=grade.id,
+        section_id=sec_b.id,
+        subject_id=exam_setup["subject"].id,
+        exam_date=dt.date(2026, 11, 22),
+        start_time=dt.time(10, 0),
+        end_time=dt.time(11, 30),
+        max_marks=100.0,
+        pass_marks=35.0,
+        status="SCHEDULED",
+    )
+    db.add_all([sched_a, sched_b])
+    db.commit()
+
+    # Publish results ONLY for Section A
+    pub_res = client.post(
+        f"/api/v1/admin/examinations/{exam.id}/publish-results",
+        json={"section_id": str(sec_a.id)},
+        headers=admin_headers,
+    )
+    assert pub_res.status_code == 200
+
+    # Verify examination status is NOT COMPLETED because Section B is still pending
+    exam_detail = client.get(f"/api/v1/admin/examinations/{exam.id}", headers=admin_headers).json()
+    assert exam_detail["status"] != "COMPLETED", "Exam marked COMPLETED despite pending sections"
+
+
+def test_multi_subject_total_max_marks_calculation(client, exam_setup, db):
+    """Test that StudentExamResult total_max_marks equals the sum of max_marks across all schedules in section."""
+    teacher_headers = exam_setup["teacher_headers"]
+    student = exam_setup["student"]
+    ay = exam_setup["academic_year"]
+    grade = exam_setup["grade"]
+    sec = exam_setup["section"]
+    subj1 = exam_setup["subject"]
+
+    # Add second subject
+    subj2 = Subject(name="Physics", code=f"PHY-{uuid.uuid4().hex[:4]}", department="Science", status="active")
+    db.add(subj2)
+    db.commit()
+
+    exam = Examination(
+        name="Multi Subject Total Test",
+        exam_type="MID_TERM",
+        academic_year_id=ay.id,
+        term="Term 1",
+        start_date=dt.date(2026, 11, 20),
+        end_date=dt.date(2026, 11, 25),
+        status="SCHEDULED",
+    )
+    db.add(exam)
+    db.commit()
+
+    # Math (100 marks) + Physics (100 marks) = 200 total max marks
+    s1 = ExaminationSchedule(
+        examination_id=exam.id,
+        grade_id=grade.id,
+        section_id=sec.id,
+        subject_id=subj1.id,
+        exam_date=dt.date(2026, 11, 21),
+        start_time=dt.time(9, 0),
+        end_time=dt.time(10, 30),
+        max_marks=100.0,
+        pass_marks=35.0,
+        status="SCHEDULED",
+    )
+    s2 = ExaminationSchedule(
+        examination_id=exam.id,
+        grade_id=grade.id,
+        section_id=sec.id,
+        subject_id=subj2.id,
+        exam_date=dt.date(2026, 11, 22),
+        start_time=dt.time(9, 0),
+        end_time=dt.time(10, 30),
+        max_marks=100.0,
+        pass_marks=35.0,
+        status="SCHEDULED",
+    )
+    db.add_all([s1, s2])
+    db.commit()
+
+    # Teacher submits marks ONLY for Subject 1 (Math: 80 / 100)
+    client.post(
+        f"/api/v1/teacher/examinations/schedules/{s1.id}/marks/submit",
+        json={"marks": [{"student_id": str(student.id), "marks_obtained": 80.0, "is_absent": False}]},
+        headers=teacher_headers,
+    )
+
+    # Check StudentExamResult
+    res = db.execute(
+        select(StudentExamResult).where(
+            StudentExamResult.examination_id == exam.id, StudentExamResult.student_id == student.id
+        )
+    ).scalars().first()
+
+    assert res is not None
+    # Total max marks for the exam section MUST be 200.0, not 100.0
+    assert res.total_max_marks == 200.0, f"Expected total_max_marks=200.0, got {res.total_max_marks}"
+    assert res.percentage == 40.0, f"Expected percentage=40.0 (80/200), got {res.percentage}"
+
+
+def test_admin_schedule_roster_and_published_delete_guard(client, exam_setup, db):
+    """Test that Admin can access schedule roster and delete guard blocks deleting published slots."""
+    admin_headers = exam_setup["admin_headers"]
+    ay = exam_setup["academic_year"]
+    grade = exam_setup["grade"]
+    sec = exam_setup["section"]
+    subj = exam_setup["subject"]
+    student = exam_setup["student"]
+
+    exam = Examination(
+        name="Admin Test Exam",
+        exam_type="UNIT_TEST",
+        academic_year_id=ay.id,
+        term="Term 1",
+        start_date=dt.date(2026, 11, 20),
+        end_date=dt.date(2026, 11, 25),
+        status="SCHEDULED",
+    )
+    db.add(exam)
+    db.commit()
+
+    sched = ExaminationSchedule(
+        examination_id=exam.id,
+        grade_id=grade.id,
+        section_id=sec.id,
+        subject_id=subj.id,
+        exam_date=dt.date(2026, 11, 21),
+        start_time=dt.time(9, 0),
+        end_time=dt.time(11, 0),
+        max_marks=100.0,
+        pass_marks=35.0,
+        status="SCHEDULED",
+    )
+    db.add(sched)
+    db.commit()
+
+    # 1. Admin accesses /admin/examinations/schedules/{id}/roster -> 200 OK
+    res = client.get(f"/api/v1/admin/examinations/schedules/{sched.id}/roster", headers=admin_headers)
+    assert res.status_code == 200, res.text
+    data = res.json()
+    assert data["schedule_id"] == str(sched.id)
+    assert len(data["students"]) >= 1
+
+    # 2. Admin enters marks and remarks via admin draft endpoint
+    save_res = client.post(
+        f"/api/v1/admin/examinations/schedules/{sched.id}/marks/draft",
+        headers=admin_headers,
+        json={
+            "marks": [{"student_id": str(student.id), "marks_obtained": 95.0, "is_absent": False}],
+            "teacher_remarks": "Outstanding performance in test exam.",
+        },
+    )
+    assert save_res.status_code == 200, save_res.text
+    assert save_res.json()["teacher_remarks"] == "Outstanding performance in test exam."
+
+    # 3. Publish results
+    pub_res = client.post(f"/api/v1/admin/examinations/{exam.id}/publish-results", headers=admin_headers)
+    assert pub_res.status_code == 200
+
+    # 4. Attempt to delete schedule with published marks -> must be 400 Bad Request
+    del_res = client.delete(f"/api/v1/admin/examinations/schedules/{sched.id}", headers=admin_headers)
+    assert del_res.status_code == 400
+    assert "Cannot delete examination schedule slot with published results" in del_res.json()["detail"]
+
+    # 5. Unpublish and then delete succeeds
+    unpub_res = client.post(f"/api/v1/admin/examinations/{exam.id}/unpublish-results", headers=admin_headers)
+    assert unpub_res.status_code == 200
+    del_ok = client.delete(f"/api/v1/admin/examinations/schedules/{sched.id}", headers=admin_headers)
+    assert del_ok.status_code == 204
+
+
+
 

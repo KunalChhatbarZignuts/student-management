@@ -46,7 +46,7 @@ export const CreateExaminationDialog: React.FC<Props> = ({
   const { data: academicYears } = useQuery({
     queryKey: ['academic-years'],
     queryFn: async () => {
-      const res = await apiClient.get<AcademicYear[]>('/academic-years');
+      const res = await apiClient.get<AcademicYear[]>('/admin/academic-years');
       return res.data;
     },
     enabled: open,

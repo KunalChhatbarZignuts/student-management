@@ -31,6 +31,7 @@
     "zustand": "^5.0.1"
   },
   "devDependencies": {
+    "@rollup/rollup-darwin-arm64": "^4.68.3",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.0.1",
     "@types/node": "^20.17.6",
@@ -44,5 +45,9 @@
     "openapi-typescript": "^7.13.0",
     "typescript": "^5.6.3",
     "vitest": "^2.1.4"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-darwin-arm64": "^4.67.5",
+    "@rollup/rollup-darwin-x64": "^4.67.5"
   }
 }

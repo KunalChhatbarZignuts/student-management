@@ -20,6 +20,7 @@ import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import CircularProgress from '@mui/material/CircularProgress';
+import TablePagination from '@mui/material/TablePagination';
 
 import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -39,6 +40,10 @@ export interface StudentFeesTabProps {
   assignmentsData?: PaginatedFeeAssignmentsResponse;
   isLoading: boolean;
   onViewAssignment: (id: string) => void;
+  page?: number;
+  onPageChange?: (newPage: number) => void;
+  pageSize?: number;
+  onPageSizeChange?: (newPageSize: number) => void;
 }
 
 export default function StudentFeesTab({
@@ -53,6 +58,10 @@ export default function StudentFeesTab({
   assignmentsData,
   isLoading,
   onViewAssignment,
+  page = 0,
+  onPageChange,
+  pageSize = 25,
+  onPageSizeChange,
 }: StudentFeesTabProps) {
   return (
     <Card sx={{ p: 2.5 }}>
@@ -167,6 +176,19 @@ export default function StudentFeesTab({
           </TableBody>
         </Table>
       </TableContainer>
+
+      {assignmentsData && assignmentsData.total > 0 && onPageChange && onPageSizeChange && (
+        <TablePagination
+          component="div"
+          count={assignmentsData.total}
+          page={page}
+          onPageChange={(_, newPage) => onPageChange(newPage)}
+          rowsPerPage={pageSize}
+          onRowsPerPageChange={(e) => onPageSizeChange(parseInt(e.target.value, 10))}
+          rowsPerPageOptions={[10, 25, 50, 100]}
+          sx={{ borderTop: 1, borderColor: 'divider', mt: 1 }}
+        />
+      )}
     </Card>
   );
 }

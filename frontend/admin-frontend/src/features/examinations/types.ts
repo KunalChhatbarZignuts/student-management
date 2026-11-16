@@ -89,6 +89,7 @@ export interface ScheduleRosterResponse {
   max_marks: number;
   pass_marks: number;
   status: string;
+  teacher_remarks?: string | null;
   students: StudentRosterMarkItem[];
 }
 

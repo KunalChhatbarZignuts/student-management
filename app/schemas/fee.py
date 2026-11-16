@@ -364,15 +364,22 @@ class PaymentTransactionResponse(BaseModel):
     id: uuid.UUID
     installment_id: uuid.UUID
     installment_name: str | None = None
+    assignment_id: uuid.UUID | None = None
     student_id: uuid.UUID
     student_name: str
     student_code: str | None = None
+    enrollment_number: str | None = None
+    parent_id: uuid.UUID | None = None
+    parent_name: str | None = None
     grade_name: str | None = None
+    academic_year_name: str | None = None
     gateway_provider: str
     gateway_order_id: str
     gateway_payment_id: str | None = None
     amount: Decimal
     currency: str
+    payment_method: str | None = None
+    payment_timestamp: dt.datetime | None = None
     status: str
     receipt_number: str | None = None
     error_code: str | None = None

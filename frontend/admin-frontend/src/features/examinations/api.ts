@@ -1,4 +1,5 @@
 import { apiClient } from '@/lib/axios';
+import { useAuthStore } from '@/store/authStore';
 import {
   CreateExaminationPayload,
   CreateSchedulePayload,
@@ -94,23 +95,32 @@ export const examinationsApi = {
   },
 
   getScheduleRoster: async (scheduleId: string): Promise<ScheduleRosterResponse> => {
-    const res = await apiClient.get<ScheduleRosterResponse>(`/teacher/examinations/schedules/${scheduleId}/roster`);
+    const role = useAuthStore.getState().user?.role;
+    const isAdmin = role === 'admin' || role === 'super_admin';
+    const endpoint = isAdmin
+      ? `/admin/examinations/schedules/${scheduleId}/roster`
+      : `/teacher/examinations/schedules/${scheduleId}/roster`;
+    const res = await apiClient.get<ScheduleRosterResponse>(endpoint);
     return res.data;
   },
 
   saveDraftMarks: async (scheduleId: string, payload: MarksBulkSavePayload): Promise<ScheduleRosterResponse> => {
-    const res = await apiClient.post<ScheduleRosterResponse>(
-      `/teacher/examinations/schedules/${scheduleId}/marks/draft`,
-      payload
-    );
+    const role = useAuthStore.getState().user?.role;
+    const isAdmin = role === 'admin' || role === 'super_admin';
+    const endpoint = isAdmin
+      ? `/admin/examinations/schedules/${scheduleId}/marks/draft`
+      : `/teacher/examinations/schedules/${scheduleId}/marks/draft`;
+    const res = await apiClient.post<ScheduleRosterResponse>(endpoint, payload);
     return res.data;
   },
 
   submitMarks: async (scheduleId: string, payload: MarksBulkSavePayload): Promise<ScheduleRosterResponse> => {
-    const res = await apiClient.post<ScheduleRosterResponse>(
-      `/teacher/examinations/schedules/${scheduleId}/marks/submit`,
-      payload
-    );
+    const role = useAuthStore.getState().user?.role;
+    const isAdmin = role === 'admin' || role === 'super_admin';
+    const endpoint = isAdmin
+      ? `/admin/examinations/schedules/${scheduleId}/marks/submit`
+      : `/teacher/examinations/schedules/${scheduleId}/marks/submit`;
+    const res = await apiClient.post<ScheduleRosterResponse>(endpoint, payload);
     return res.data;
   },
 };

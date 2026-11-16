@@ -38,5 +38,13 @@ export const portalFeeApi = {
     const res = await apiClient.get<FeeReceiptDetail>(`/fees/receipts/${receiptNumber}`);
     return res.data;
   },
+
+  // Download official fee receipt PDF
+  downloadReceiptPdf: async (receiptNumber: string): Promise<Blob> => {
+    const res = await apiClient.get(`/fees/receipts/${receiptNumber}/pdf`, {
+      responseType: 'blob',
+    });
+    return res.data;
+  },
 };
 
