@@ -93,13 +93,13 @@ export default function LoginPage() {
           {...register('password')}
         />
 
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+        {/* <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
           <Link href="/forgot-password" style={{ textDecoration: 'none' }}>
             <Typography variant="body2" color="primary.main">
               Forgot password?
             </Typography>
           </Link>
-        </Box>
+        </Box> */}
 
         <Button
           type="submit"
