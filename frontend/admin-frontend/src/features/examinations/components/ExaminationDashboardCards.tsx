@@ -65,13 +65,16 @@ export const ExaminationDashboardCards: React.FC<Props> = ({ metrics, isLoading 
   ];
 
   return (
-    <Grid container spacing={2} sx={{ mb: 3 }}>
+    <Grid container spacing={2} sx={{ mb: 3 }} alignItems="stretch">
       {cards.map((c, i) => (
         <Grid item xs={12} sm={6} md={4} lg={2} key={i}>
           <Paper
             variant="outlined"
             sx={{
               p: 2,
+              height: '100%',
+              minHeight: 88,
+              boxSizing: 'border-box',
               display: 'flex',
               alignItems: 'center',
               gap: 1.5,
@@ -89,12 +92,23 @@ export const ExaminationDashboardCards: React.FC<Props> = ({ metrics, isLoading 
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                flexShrink: 0,
               }}
             >
               {c.icon}
             </Box>
-            <Box>
-              <Typography variant="caption" color="text.secondary" fontWeight={500}>
+            <Box sx={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                fontWeight={500}
+                sx={{
+                  minHeight: 32,
+                  display: 'flex',
+                  alignItems: 'center',
+                  lineHeight: 1.2,
+                }}
+              >
                 {c.title}
               </Typography>
               <Typography variant="h5" fontWeight={700}>
