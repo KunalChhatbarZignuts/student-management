@@ -124,7 +124,7 @@ export default function StudentsTable({
                     </IconButton>
                   </Tooltip>
 
-                  <Tooltip title="Edit Student & Enrollment">
+                  {/* <Tooltip title="Edit Student & Enrollment">
                     <IconButton
                       size="small"
                       color="info"
@@ -132,7 +132,7 @@ export default function StudentsTable({
                     >
                       <EditIcon fontSize="small" />
                     </IconButton>
-                  </Tooltip>
+                  </Tooltip> */}
                 </>
               )}
 
