@@ -22,8 +22,16 @@ class Settings(BaseSettings):
     # Cookie
     COOKIE_SECURE: bool = False  # set True in production (HTTPS)
 
-    # Email
-    EMAIL_BACKEND: str = "console"  # "console" prints to terminal in dev
+    # Email / Mailtrap SMTP
+    EMAIL_BACKEND: str = "console"  # "console" or "smtp"
+    SMTP_HOST: str = "sandbox.smtp.mailtrap.io"
+    SMTP_PORT: int = 2525
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = "noreply@school.local"
+    SMTP_FROM_NAME: str = "School Management System"
+    SMTP_TLS: bool = True
+    SMTP_SSL: bool = False
 
     # Frontend
     FRONTEND_URL: str = "http://localhost:3000"
