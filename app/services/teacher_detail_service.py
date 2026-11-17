@@ -95,11 +95,12 @@ def get_teacher_comprehensive_details(
     ct_row = db.execute(ct_stmt).first()
     if ct_row:
         assignment, section, grade, year = ct_row
+        raw_role = getattr(assignment, "assignment_type", None) or getattr(assignment, "role", None) or "CLASS_TEACHER"
         class_role = TeacherClassRole(
             grade_name=grade.name,
             section_name=section.name,
             academic_year_name=year.name if year else None,
-            role=assignment.role.replace("_", " ").title() if assignment.role else "Class Teacher",
+            role=raw_role.replace("_", " ").title(),
             assigned_at=assignment.created_at,
         )
 

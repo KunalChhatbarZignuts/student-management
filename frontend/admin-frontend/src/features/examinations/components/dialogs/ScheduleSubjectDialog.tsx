@@ -59,31 +59,40 @@ export const ScheduleSubjectDialog: React.FC<Props> = ({
   const [error, setError] = React.useState<string | null>(null);
 
   // Fetch Grades
-  const { data: grades } = useQuery({
+  const { data: grades } = useQuery<GradeItem[]>({
     queryKey: ['grades-list'],
     queryFn: async () => {
-      const res = await apiClient.get<GradeItem[]>('/admin/grades');
-      return res.data;
+      const res = await apiClient.get<any>('/admin/grades');
+      const data = res.data;
+      if (Array.isArray(data)) return data;
+      if (Array.isArray(data?.items)) return data.items;
+      return [];
     },
     enabled: open,
   });
 
   // Fetch Sections
-  const { data: sections } = useQuery({
+  const { data: sections } = useQuery<SectionItem[]>({
     queryKey: ['sections-list'],
     queryFn: async () => {
-      const res = await apiClient.get<SectionItem[]>('/admin/sections');
-      return res.data;
+      const res = await apiClient.get<any>('/admin/sections');
+      const data = res.data;
+      if (Array.isArray(data)) return data;
+      if (Array.isArray(data?.items)) return data.items;
+      return [];
     },
     enabled: open,
   });
 
   // Fetch Subjects
-  const { data: subjects } = useQuery({
+  const { data: subjects } = useQuery<SubjectItem[]>({
     queryKey: ['subjects-list'],
     queryFn: async () => {
-      const res = await apiClient.get<SubjectItem[]>('/admin/subjects');
-      return res.data;
+      const res = await apiClient.get<any>('/admin/subjects');
+      const data = res.data;
+      if (Array.isArray(data)) return data;
+      if (Array.isArray(data?.items)) return data.items;
+      return [];
     },
     enabled: open,
   });
@@ -209,7 +218,7 @@ export const ScheduleSubjectDialog: React.FC<Props> = ({
                 fullWidth
                 required
               >
-                {subjects?.map((sub) => (
+                {Array.isArray(subjects) && subjects.map((sub) => (
                   <MenuItem key={sub.id} value={sub.id}>
                     {sub.name} ({sub.code})
                   </MenuItem>

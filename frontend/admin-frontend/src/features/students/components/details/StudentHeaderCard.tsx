@@ -126,7 +126,7 @@ export default function StudentHeaderCard({
           </Stack>
         </Grid>
 
-        <Grid item xs={12} sm="auto">
+        {/* <Grid item xs={12} sm="auto">
           <Stack direction="row" spacing={1.5}>
             <Button
               variant="contained"
@@ -148,7 +148,7 @@ export default function StudentHeaderCard({
               </Button>
             )}
           </Stack>
-        </Grid>
+        </Grid> */}
       </Grid>
     </Paper>
   );

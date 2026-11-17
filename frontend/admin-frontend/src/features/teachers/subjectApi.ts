@@ -74,10 +74,13 @@ export const teacherSubjectApi = {
   },
 
   listSubjects: async (): Promise<SubjectItem[]> => {
-    const res = await apiClient.get<{ items: SubjectItem[]; total: number }>('/admin/subjects', {
+    const res = await apiClient.get<any>('/admin/subjects', {
       params: { page: 1, size: 100 },
     });
-    return res.data.items || [];
+    const data = res.data;
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.items)) return data.items;
+    return [];
   },
 
   createSubject: async (payload: { name: string; code: string; department?: string }): Promise<SubjectItem> => {

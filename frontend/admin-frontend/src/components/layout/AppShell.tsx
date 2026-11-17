@@ -127,12 +127,12 @@ const navItems: NavItem[] = [
     icon: <ScheduleIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
   },
-  {
-    label: 'Absence Notifications',
-    href: '/attendance/notifications',
-    icon: <NotificationsActiveIcon />,
-    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-  },
+  // {
+  //   label: 'Absence Notifications',
+  //   href: '/attendance/notifications',
+  //   icon: <NotificationsActiveIcon />,
+  //   roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  // },
   {
     label: 'Examinations',
     href: '/examinations',
@@ -193,12 +193,12 @@ const navItems: NavItem[] = [
     icon: <CalendarMonthIcon />,
     roles: [ROLES.TEACHER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
-  {
-    label: 'Report Missing Student',
-    href: '/report-missing',
-    icon: <ReportProblemIcon />,
-    roles: [ROLES.TEACHER],
-  },
+  // {
+  //   label: 'Report Missing Student',
+  //   href: '/report-missing',
+  //   icon: <ReportProblemIcon />,
+  //   roles: [ROLES.TEACHER],
+  // },
   {
     label: 'Audit Logs',
     href: '/audit-logs',
@@ -340,146 +340,146 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <AppShellContext.Provider value={true}>
       <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      <AppBar
-        position="fixed"
-        sx={{
-          width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
-          ml: { sm: `${DRAWER_WIDTH}px` },
-          bgcolor: 'background.paper',
-          color: 'text.primary',
-          boxShadow: 'none',
-          borderBottom: 1,
-          borderColor: 'divider',
-        }}
-      >
-        <Toolbar sx={{ justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <IconButton
-              color="inherit"
-              aria-label="open drawer"
-              edge="start"
-              onClick={handleDrawerToggle}
-              sx={{ mr: 2, display: { sm: 'none' } }}
-            >
-              <MenuIcon />
-            </IconButton>
-            <Typography variant="subtitle1" fontWeight={600} noWrap>
-              {filteredNavItems.find((n) => n.href === pathname)?.label || 'Administration'}
-            </Typography>
-          </Box>
-
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Tooltip title={`Switch to ${themeMode === 'light' ? 'Dark' : 'Light'} Mode`}>
-              <IconButton onClick={toggleTheme} color="inherit" size="small">
-                {themeMode === 'light' ? <Brightness4Icon /> : <Brightness7Icon />}
+        <AppBar
+          position="fixed"
+          sx={{
+            width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
+            ml: { sm: `${DRAWER_WIDTH}px` },
+            bgcolor: 'background.paper',
+            color: 'text.primary',
+            boxShadow: 'none',
+            borderBottom: 1,
+            borderColor: 'divider',
+          }}
+        >
+          <Toolbar sx={{ justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <IconButton
+                color="inherit"
+                aria-label="open drawer"
+                edge="start"
+                onClick={handleDrawerToggle}
+                sx={{ mr: 2, display: { sm: 'none' } }}
+              >
+                <MenuIcon />
               </IconButton>
-            </Tooltip>
+              <Typography variant="subtitle1" fontWeight={600} noWrap>
+                {filteredNavItems.find((n) => n.href === pathname)?.label || 'Administration'}
+              </Typography>
+            </Box>
 
-            <Tooltip title="User Profile">
-              <IconButton onClick={handleMenuOpen} size="small" sx={{ ml: 1 }}>
-                <Avatar
-                  sx={{
-                    width: 36,
-                    height: 36,
-                    bgcolor: 'primary.main',
-                    fontSize: 14,
-                    fontWeight: 600,
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Tooltip title={`Switch to ${themeMode === 'light' ? 'Dark' : 'Light'} Mode`}>
+                <IconButton onClick={toggleTheme} color="inherit" size="small">
+                  {themeMode === 'light' ? <Brightness4Icon /> : <Brightness7Icon />}
+                </IconButton>
+              </Tooltip>
+
+              <Tooltip title="User Profile">
+                <IconButton onClick={handleMenuOpen} size="small" sx={{ ml: 1 }}>
+                  <Avatar
+                    sx={{
+                      width: 36,
+                      height: 36,
+                      bgcolor: 'primary.main',
+                      fontSize: 14,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {user?.email?.charAt(0).toUpperCase() || 'A'}
+                  </Avatar>
+                </IconButton>
+              </Tooltip>
+
+              <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={handleMenuClose}
+                transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+                PaperProps={{
+                  sx: { width: 220, mt: 1 },
+                }}
+              >
+                <Box sx={{ px: 2, py: 1.5 }}>
+                  <Typography variant="subtitle2" noWrap fontWeight={600}>
+                    {user?.email}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {user?.role}
+                  </Typography>
+                </Box>
+                <Divider />
+                <MenuItem
+                  onClick={() => {
+                    handleMenuClose();
+                    router.push('/profile');
                   }}
                 >
-                  {user?.email?.charAt(0).toUpperCase() || 'A'}
-                </Avatar>
-              </IconButton>
-            </Tooltip>
+                  <ListItemIcon>
+                    <PersonIcon fontSize="small" />
+                  </ListItemIcon>
+                  Profile & Settings
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    handleMenuClose();
+                    logout();
+                  }}
+                  sx={{ color: 'error.main' }}
+                >
+                  <ListItemIcon sx={{ color: 'error.main' }}>
+                    <LogoutIcon fontSize="small" />
+                  </ListItemIcon>
+                  Log Out
+                </MenuItem>
+              </Menu>
+            </Box>
+          </Toolbar>
+        </AppBar>
 
-            <Menu
-              anchorEl={anchorEl}
-              open={Boolean(anchorEl)}
-              onClose={handleMenuClose}
-              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-              PaperProps={{
-                sx: { width: 220, mt: 1 },
-              }}
-            >
-              <Box sx={{ px: 2, py: 1.5 }}>
-                <Typography variant="subtitle2" noWrap fontWeight={600}>
-                  {user?.email}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {user?.role}
-                </Typography>
-              </Box>
-              <Divider />
-              <MenuItem
-                onClick={() => {
-                  handleMenuClose();
-                  router.push('/profile');
-                }}
-              >
-                <ListItemIcon>
-                  <PersonIcon fontSize="small" />
-                </ListItemIcon>
-                Profile & Settings
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleMenuClose();
-                  logout();
-                }}
-                sx={{ color: 'error.main' }}
-              >
-                <ListItemIcon sx={{ color: 'error.main' }}>
-                  <LogoutIcon fontSize="small" />
-                </ListItemIcon>
-                Log Out
-              </MenuItem>
-            </Menu>
-          </Box>
-        </Toolbar>
-      </AppBar>
+        <Box
+          component="nav"
+          sx={{ width: { sm: DRAWER_WIDTH }, flexShrink: { sm: 0 } }}
+          aria-label="navigation mailbox folders"
+        >
+          <Drawer
+            variant="temporary"
+            open={mobileOpen}
+            onClose={handleDrawerToggle}
+            ModalProps={{ keepMounted: true }}
+            sx={{
+              display: { xs: 'block', sm: 'none' },
+              '& .MuiDrawer-paper': { boxSizing: 'border-box', width: DRAWER_WIDTH },
+            }}
+          >
+            {drawerContent}
+          </Drawer>
+          <Drawer
+            variant="permanent"
+            sx={{
+              display: { xs: 'none', sm: 'block' },
+              '& .MuiDrawer-paper': { boxSizing: 'border-box', width: DRAWER_WIDTH },
+            }}
+            open
+          >
+            {drawerContent}
+          </Drawer>
+        </Box>
 
-      <Box
-        component="nav"
-        sx={{ width: { sm: DRAWER_WIDTH }, flexShrink: { sm: 0 } }}
-        aria-label="navigation mailbox folders"
-      >
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{ keepMounted: true }}
+        <Box
+          component="main"
           sx={{
-            display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: DRAWER_WIDTH },
+            flexGrow: 1,
+            p: { xs: 2, sm: 3 },
+            width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
+            mt: 8,
+            minHeight: 'calc(100vh - 64px)',
           }}
         >
-          {drawerContent}
-        </Drawer>
-        <Drawer
-          variant="permanent"
-          sx={{
-            display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: DRAWER_WIDTH },
-          }}
-          open
-        >
-          {drawerContent}
-        </Drawer>
+          {children}
+        </Box>
       </Box>
-
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          p: { xs: 2, sm: 3 },
-          width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
-          mt: 8,
-          minHeight: 'calc(100vh - 64px)',
-        }}
-      >
-        {children}
-      </Box>
-    </Box>
     </AppShellContext.Provider>
   );
 }

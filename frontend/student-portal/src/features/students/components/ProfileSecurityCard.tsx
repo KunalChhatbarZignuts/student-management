@@ -35,14 +35,14 @@ export const ProfileSecurityCard: React.FC<ProfileSecurityCardProps> = ({
           Change Password
         </Button>
 
-        <Button
+        {/* <Button
           variant="outlined"
           color="error"
           startIcon={<DevicesOtherIcon />}
           onClick={onLogoutAllClick}
         >
           Log Out from All Devices
-        </Button>
+        </Button> */}
       </Box>
     </Paper>
   );

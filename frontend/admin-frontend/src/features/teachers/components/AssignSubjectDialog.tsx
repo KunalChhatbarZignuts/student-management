@@ -296,7 +296,7 @@ export default function AssignSubjectDialog({
                   renderValue={(selected) => (
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                       {selected.map((val) => {
-                        const s = subjects?.find((sub) => sub.id === val);
+                        const s = Array.isArray(subjects) ? subjects.find((sub) => sub.id === val) : undefined;
                         return <Chip key={val} label={s ? `${s.name} (${s.code})` : val} size="small" />;
                       })}
                     </Box>
@@ -304,7 +304,7 @@ export default function AssignSubjectDialog({
                 >
                   {loadingSubjects ? (
                     <MenuItem disabled>Loading subjects...</MenuItem>
-                  ) : !subjects || subjects.length === 0 ? (
+                  ) : !Array.isArray(subjects) || subjects.length === 0 ? (
                     <MenuItem disabled>No subjects found</MenuItem>
                   ) : (
                     subjects.map((sub) => (
