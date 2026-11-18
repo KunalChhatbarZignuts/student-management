@@ -10,6 +10,7 @@ import { DataGrid, GridColDef, GridPaginationModel } from '@mui/x-data-grid';
 
 import BlockIcon from '@mui/icons-material/Block';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditIcon from '@mui/icons-material/Edit';
 import LockResetIcon from '@mui/icons-material/LockReset';
 import SendIcon from '@mui/icons-material/Send';
@@ -28,6 +29,7 @@ export interface StudentsTableProps {
   onResendInvite: (userId: string, userName: string) => void;
   onToggleStatus: (actionType: 'suspend' | 'activate', userId: string, userName: string) => void;
   onPasswordReset: (userId: string, userName: string) => void;
+  onDelete?: (studentId: string, studentName: string) => void;
 }
 
 export default function StudentsTable({
@@ -41,6 +43,7 @@ export default function StudentsTable({
   onResendInvite,
   onToggleStatus,
   onPasswordReset,
+  onDelete,
 }: StudentsTableProps) {
   const columns: GridColDef[] = React.useMemo(
     () => [
@@ -99,7 +102,7 @@ export default function StudentsTable({
       {
         field: 'actions',
         headerName: 'Actions',
-        width: 220,
+        width: 260,
         sortable: false,
         renderCell: (params) => {
           const u = params.row;
@@ -121,7 +124,7 @@ export default function StudentsTable({
                     </IconButton>
                   </Tooltip>
 
-                  <Tooltip title="Edit Student & Enrollment">
+                  {/* <Tooltip title="Edit Student & Enrollment">
                     <IconButton
                       size="small"
                       color="info"
@@ -129,7 +132,7 @@ export default function StudentsTable({
                     >
                       <EditIcon fontSize="small" />
                     </IconButton>
-                  </Tooltip>
+                  </Tooltip> */}
                 </>
               )}
 
@@ -176,12 +179,24 @@ export default function StudentsTable({
                   <LockResetIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
+
+              {u.student && onDelete && (
+                <Tooltip title="Delete Student & Revoke Portal Access">
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() => onDelete(u.student.id, studentName)}
+                  >
+                    <DeleteOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
             </Box>
           );
         },
       },
     ],
-    [onView, onEdit, onResendInvite, onToggleStatus, onPasswordReset]
+    [onView, onEdit, onResendInvite, onToggleStatus, onPasswordReset, onDelete]
   );
 
   return (

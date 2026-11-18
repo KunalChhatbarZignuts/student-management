@@ -15,6 +15,8 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Button from '@mui/material/Button';
+import Alert from '@mui/material/Alert';
+import Chip from '@mui/material/Chip';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
@@ -308,6 +310,13 @@ export default function FeesPage() {
                 </Grid>
               </Paper>
 
+              {/* Overpaid Credit Alert */}
+              {Number(schedule.overpaid_amount) > 0 && (
+                <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
+                  <strong>Overpaid Surplus / Credit Balance: ₹{Number(schedule.overpaid_amount).toLocaleString()}</strong> — A previous payment exceeded the new grade fee schedule. This surplus is recorded as credit on the student profile.
+                </Alert>
+              )}
+
               <StudentFeeSummaryCards schedule={schedule} />
 
               <FeeInstallmentsTable
@@ -318,6 +327,61 @@ export default function FeesPage() {
                   setOpenReceiptDialog(true);
                 }}
               />
+
+              {/* Fee Adjustments & Grade Changes */}
+              {schedule.adjustments && schedule.adjustments.length > 0 && (
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="h6" fontWeight={700} gutterBottom>
+                    Fee Adjustments & Grade Changes
+                  </Typography>
+                  <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: 'action.hover' }}>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Description</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Nature</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }} align="right">Amount</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {schedule.adjustments.map((adj) => {
+                          const isNeedToPay =
+                            adj.category === 'additional_charge' ||
+                            adj.adjustment_type === 'ADDITIONAL_CHARGE';
+                          return (
+                            <TableRow key={adj.id} hover>
+                              <TableCell>
+                                {adj.created_at ? new Date(adj.created_at).toLocaleDateString() : '—'}
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 500 }}>{adj.description}</TableCell>
+                              <TableCell>
+                                <Chip
+                                  size="small"
+                                  label={isNeedToPay ? 'NEED TO PAY' : 'OVERPAY / CREDIT'}
+                                  color={isNeedToPay ? 'warning' : 'info'}
+                                  sx={{ fontWeight: 600 }}
+                                />
+                              </TableCell>
+                              <TableCell
+                                align="right"
+                                sx={{
+                                  fontWeight: 700,
+                                  color: isNeedToPay ? 'warning.main' : 'info.main',
+                                }}
+                              >
+                                {isNeedToPay
+                                  ? `+₹${Number(adj.amount).toLocaleString()}`
+                                  : `-₹${Number(adj.amount).toLocaleString()}`}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              )}
 
               {/* Payment History & Receipts */}
               {schedule.payment_history && schedule.payment_history.length > 0 && (

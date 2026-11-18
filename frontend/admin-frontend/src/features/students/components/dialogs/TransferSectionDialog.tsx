@@ -31,6 +31,7 @@ export interface TransferSectionDialogProps {
   currentSectionName?: string | null;
   currentGradeId?: string | null;
   currentSectionId?: string | null;
+  isCurrentlyEnrolled?: boolean;
 }
 
 export default function TransferSectionDialog({
@@ -43,6 +44,7 @@ export default function TransferSectionDialog({
   currentSectionName,
   currentGradeId,
   currentSectionId,
+  isCurrentlyEnrolled = true,
 }: TransferSectionDialogProps) {
   const queryClient = useQueryClient();
   const { showSnackbar } = useSnackbar();
@@ -102,7 +104,9 @@ export default function TransferSectionDialog({
       }),
     onSuccess: (data) => {
       showSnackbar(
-        `Successfully transferred student to Section ${data.section_name || 'selected'}`,
+        isCurrentlyEnrolled
+          ? `Successfully transferred student to Section ${data.section_name || 'selected'}`
+          : `Successfully enrolled student into Section ${data.section_name || 'selected'}`,
         'success'
       );
       queryClient.invalidateQueries({ queryKey: studentKeys.details(studentId) });
@@ -111,7 +115,7 @@ export default function TransferSectionDialog({
       onClose();
     },
     onError: (err) => {
-      const msg = formatErrorMessage(err, 'Failed to transfer section');
+      const msg = formatErrorMessage(err, isCurrentlyEnrolled ? 'Failed to transfer section' : 'Failed to assign section');
       setErrorMsg(msg);
       showSnackbar(msg, 'error');
     },
@@ -135,7 +139,7 @@ export default function TransferSectionDialog({
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <form onSubmit={handleSubmit}>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pb: 1 }}>
-          <SwapHorizIcon color="primary" /> Transfer Student Section
+          <SwapHorizIcon color="primary" /> {isCurrentlyEnrolled ? 'Transfer Student Section' : 'Assign / Enroll Student Section'}
         </DialogTitle>
 
         <DialogContent dividers>
@@ -161,15 +165,18 @@ export default function TransferSectionDialog({
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1, flexWrap: 'wrap' }}>
               <Typography variant="body2" color="text.secondary">
-                Current Enrollment:
+                {isCurrentlyEnrolled ? 'Current Enrollment:' : 'Last Recorded Enrollment:'}
               </Typography>
               <Chip
                 label={`${currentGradeName || 'Grade'} - ${currentSectionName || 'Section'}`}
-                color="primary"
+                color={isCurrentlyEnrolled ? 'primary' : 'default'}
                 size="small"
                 variant="outlined"
                 sx={{ fontWeight: 600 }}
               />
+              {!isCurrentlyEnrolled && (
+                <Chip label="Inactive / Unenrolled" color="warning" size="small" variant="filled" />
+              )}
             </Box>
           </Box>
 
@@ -257,7 +264,11 @@ export default function TransferSectionDialog({
             }
             disabled={transferMutation.isPending || !targetSectionId}
           >
-            {transferMutation.isPending ? 'Processing Transfer...' : 'Confirm Section Transfer'}
+            {transferMutation.isPending
+              ? 'Processing...'
+              : isCurrentlyEnrolled
+              ? 'Confirm Section Transfer'
+              : 'Confirm Section Assignment'}
           </Button>
         </DialogActions>
       </form>

@@ -1,6 +1,7 @@
 import uuid
 from datetime import date, datetime
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from typing import Any
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class StudentCreate(BaseModel):
@@ -40,7 +41,7 @@ class StudentUpdatePayload(BaseModel):
     middle_name: str | None = Field(None, max_length=100)
     last_name: str | None = Field(None, min_length=1, max_length=100)
     dob: date | None = None
-    gender: str | None = Field(None, pattern="^(male|female|other|Male|Female|Other)$")
+    gender: str | None = Field(None, pattern=r"^(?i)(male|female|other)$")
     phone: str | None = Field(None, max_length=30)
     alternate_phone: str | None = Field(None, max_length=30)
     department: str | None = Field(None, min_length=1, max_length=50)
@@ -71,6 +72,15 @@ class StudentUpdatePayload(BaseModel):
     target_section_id: uuid.UUID | None = None
     transfer_reason: str | None = None
 
+    @field_validator("gender", mode="before")
+    @classmethod
+    def normalize_gender(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            v_clean = v.strip().lower()
+            if v_clean in ("male", "female", "other"):
+                return v_clean.capitalize()
+        return v
+
 
 class StudentResponse(BaseModel):
     id: uuid.UUID
@@ -80,6 +90,7 @@ class StudentResponse(BaseModel):
     first_name: str
     last_name: str
     dob: date
+    gender: str | None = None
     class_name: str
     section: str
     department: str
@@ -133,5 +144,12 @@ class SectionTransferPayload(BaseModel):
     target_section_id: uuid.UUID = Field(..., description="Target section ID to transfer student into")
     effective_date: date = Field(default_factory=date.today, description="Effective date of transfer")
     reason: str = Field(..., min_length=3, max_length=500, description="Reason for section transfer")
+
+
+class StudentDeleteResponse(BaseModel):
+    id: uuid.UUID
+    message: str
+    status: str = "deleted"
+
 
 

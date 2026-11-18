@@ -42,22 +42,22 @@ export const TimetableHeader: React.FC<TimetableHeaderProps> = ({
       </Box>
 
       <Stack direction="row" spacing={1.5}>
-        <Button
+        {/* <Button
           variant="outlined"
           startIcon={<RefreshIcon />}
           onClick={onRefresh}
           size="small"
         >
           Refresh
-        </Button>
-        <Button
+        </Button> */}
+        {/* <Button
           variant="contained"
           startIcon={<PrintIcon />}
           onClick={onPrint}
           size="small"
         >
           Print Schedule
-        </Button>
+        </Button> */}
       </Stack>
     </Box>
   );

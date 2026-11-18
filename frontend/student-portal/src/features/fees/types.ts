@@ -11,6 +11,16 @@ export interface PortalInstallmentItem {
   can_pay_online: boolean;
 }
 
+export interface PortalFeeAdjustmentItem {
+  id: string;
+  adjustment_type: string;
+  category: string;
+  description: string;
+  calculation_type?: string;
+  amount: number | string;
+  created_at?: string;
+}
+
 export interface StudentPortalFeeScheduleResponse {
   assignment_id?: string;
   student_id: string;
@@ -24,6 +34,7 @@ export interface StudentPortalFeeScheduleResponse {
   final_payable_amount?: number | string;
   total_paid_amount?: number | string;
   total_outstanding_amount?: number | string;
+  overpaid_amount?: number | string;
   total_annual_fee?: number | string;
   total_discount_concession?: number | string;
   total_additional_charges?: number | string;
@@ -31,6 +42,7 @@ export interface StudentPortalFeeScheduleResponse {
   total_paid?: number | string;
   total_outstanding?: number | string;
   currency: string;
+  adjustments?: PortalFeeAdjustmentItem[];
   installments: PortalInstallmentItem[];
   payment_history?: any[];
 }

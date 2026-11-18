@@ -77,5 +77,10 @@ export const adminStudentApi = {
     const res = await apiClient.post(`/admin/users/${userId}/trigger-password-reset`);
     return res.data;
   },
+
+  deleteStudent: async (studentId: string): Promise<{ id: string; message: string; status: string }> => {
+    const res = await apiClient.delete<{ id: string; message: string; status: string }>(`/admin/students/${studentId}`);
+    return res.data;
+  },
 };
 

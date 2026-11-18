@@ -30,6 +30,7 @@ from app.schemas.parent import (
     LinkedParentDetail,
     PaginatedParentsResponse,
     ParentCreate,
+    ParentDeleteResponse,
     ParentLinkResponse,
     ParentNotificationItem,
     ParentProfileUpdate,
@@ -41,6 +42,7 @@ from app.schemas.parent import (
     UpdateRelationshipPayload,
 )
 from app.services.audit_service import log_action
+from app.services.auth_service import revoke_all_user_tokens
 
 router = APIRouter(tags=["Parents & Guardian Management"])
 
@@ -126,7 +128,7 @@ def _verify_parent_child_link(parent_id: uuid.UUID, student_id: uuid.UUID, db: S
             detail="Access denied: Student is not linked to your guardian account",
         )
     student = db.get(Student, student_id)
-    if not student:
+    if not student or student.status == "deleted":
         raise HTTPException(status_code=404, detail="Student record not found")
     return student
 
@@ -481,6 +483,53 @@ def update_parent_status(
     )
 
 
+@router.delete("/admin/parents/{parent_id}", response_model=ParentDeleteResponse)
+def delete_parent(
+    parent_id: uuid.UUID,
+    request: Request,
+    current_user: User = Depends(require_roles(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value)),
+    db: Session = Depends(get_db),
+):
+    """Admin deactivates parent account, revokes portal tokens, and unlinks all children."""
+    parent = db.get(Parent, parent_id)
+    if not parent:
+        raise HTTPException(status_code=404, detail="Parent record not found")
+
+    if parent.user_id:
+        user = db.get(User, parent.user_id)
+        if user:
+            user.status = UserStatus.DEACTIVATED.value
+            revoke_all_user_tokens(db, user.id)
+
+    # Deactivate all student links
+    links = db.execute(
+        select(ParentStudentLink).where(
+            ParentStudentLink.parent_id == parent.id,
+            ParentStudentLink.status == "active",
+        )
+    ).scalars().all()
+    for l in links:
+        l.status = "inactive"
+
+    ip = get_client_ip(request)
+    log_action(
+        db,
+        actor_user_id=current_user.id,
+        action="parent_deleted",
+        entity_type="parent",
+        entity_id=str(parent.id),
+        ip=ip,
+    )
+    db.commit()
+
+    return ParentDeleteResponse(
+        id=parent.id,
+        message=f"Parent {parent.first_name} {parent.last_name} deleted successfully and portal access revoked",
+        status="deactivated",
+    )
+
+
+
 @router.post("/admin/parents/{parent_id}/resend-invite")
 @router.post("/admin/parents/{parent_id}/invite")
 def resend_parent_invite(
@@ -548,7 +597,7 @@ def get_parent_children(
     children = []
     for link in links:
         s = db.get(Student, link.student_id)
-        if s:
+        if s and s.status != "deleted":
             children.append(_build_linked_child_detail(db, link, s))
     return children
 
@@ -932,7 +981,7 @@ def get_parent_portal_children(
     children = []
     for link in links:
         s = db.get(Student, link.student_id)
-        if s:
+        if s and s.status != "deleted":
             children.append(_build_linked_child_detail(db, link, s))
     return children
 

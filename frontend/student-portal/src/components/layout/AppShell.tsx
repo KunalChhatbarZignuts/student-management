@@ -72,11 +72,11 @@ const navItems: NavItem[] = [
     href: '/examinations',
     icon: <FactCheckIcon />,
   },
-  {
-    label: 'Marks & Grades',
-    href: '/marks',
-    icon: <GradeIcon />,
-  },
+  // {
+  //   label: 'Marks & Grades',
+  //   href: '/marks',
+  //   icon: <GradeIcon />,
+  // },
   {
     label: 'Attendance',
     href: '/attendance',

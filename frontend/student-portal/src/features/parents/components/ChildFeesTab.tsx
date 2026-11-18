@@ -47,7 +47,7 @@ export const ChildFeesTab: React.FC<ChildFeesTabProps> = ({ fees, isLoading }) =
             <CardContent>
               <Typography variant="caption" color="text.secondary">TOTAL ASSESSED FEES</Typography>
               <Typography variant="h4" fontWeight={700}>
-                ${totalFees.toLocaleString()}
+                ₹{totalFees.toLocaleString()}
               </Typography>
             </CardContent>
           </Card>
@@ -57,7 +57,7 @@ export const ChildFeesTab: React.FC<ChildFeesTabProps> = ({ fees, isLoading }) =
             <CardContent>
               <Typography variant="caption" color="text.secondary">PAID AMOUNT</Typography>
               <Typography variant="h4" fontWeight={700} color="success.main">
-                ${paidFees.toLocaleString()}
+                ₹{paidFees.toLocaleString()}
               </Typography>
             </CardContent>
           </Card>
@@ -67,7 +67,7 @@ export const ChildFeesTab: React.FC<ChildFeesTabProps> = ({ fees, isLoading }) =
             <CardContent>
               <Typography variant="caption" color="text.secondary">OUTSTANDING BALANCE</Typography>
               <Typography variant="h4" fontWeight={700} color={pendingFees > 0 ? 'error.main' : 'text.primary'}>
-                ${pendingFees.toLocaleString()}
+                ₹{pendingFees.toLocaleString()}
               </Typography>
             </CardContent>
           </Card>
@@ -100,7 +100,7 @@ export const ChildFeesTab: React.FC<ChildFeesTabProps> = ({ fees, isLoading }) =
                     <TableCell sx={{ fontWeight: 600 }}>{inv.invoice_number}</TableCell>
                     <TableCell>{inv.description}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700 }}>
-                      ${inv.amount.toLocaleString()}
+                      ₹{inv.amount.toLocaleString()}
                     </TableCell>
                     <TableCell>{inv.due_date}</TableCell>
                     <TableCell>

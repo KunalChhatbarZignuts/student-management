@@ -1,4 +1,6 @@
 import uuid
+from datetime import datetime
+from decimal import Decimal
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
@@ -31,6 +33,7 @@ from app.schemas.student_detail import (
     StudentAttendanceSummary,
     StudentDailyAttendanceItem,
     StudentEnrollmentHistoryItem,
+    StudentFeeAdjustmentItem,
     StudentFeeInstallmentItem,
     StudentFeeSummary,
     StudentLeaveApplicationItem,
@@ -161,6 +164,9 @@ def get_student_comprehensive_details(
             )
         )
 
+    is_currently_enrolled = active_enrollment is not None
+    current_enrollment_status = active_enrollment.status if active_enrollment else (enrollments[0].status if enrollments else "UNENROLLED")
+
     # Fallback to the latest enrollment if no active one found
     if not active_enrollment and enrollments:
         active_enrollment = enrollments[0]
@@ -212,6 +218,8 @@ def get_student_comprehensive_details(
             )
 
     academic_details = StudentAcademicDetails(
+        is_currently_enrolled=is_currently_enrolled,
+        enrollment_status=current_enrollment_status,
         current_academic_year=current_year_name,
         current_grade=current_grade_name,
         current_section=current_section_name,
@@ -443,6 +451,28 @@ def get_student_comprehensive_details(
             for p in payments
         ]
 
+        # Adjustments / Grade change fee entries
+        adj_items: list[StudentFeeAdjustmentItem] = []
+        if getattr(fee_assignment, "adjustments", None):
+            for a in sorted(
+                fee_assignment.adjustments,
+                key=lambda x: (x.created_at or datetime.min, getattr(x, "id", "")),
+                reverse=True,
+            ):
+                adj_items.append(
+                    StudentFeeAdjustmentItem(
+                        id=a.id,
+                        adjustment_type=a.adjustment_type,
+                        category=a.category,
+                        description=a.description,
+                        calculation_type=a.calculation_type,
+                        amount=a.amount,
+                        created_at=a.created_at,
+                    )
+                )
+
+        overpaid_amt = max(Decimal("0.00"), paid_amt - (fee_assignment.final_payable_amount or Decimal("0.00")))
+
         fee_summary = StudentFeeSummary(
             has_fee_assignment=True,
             fee_structure_name=fee_assignment.fee_structure.name if fee_assignment.fee_structure else "Standard Fee Plan",
@@ -453,9 +483,11 @@ def get_student_comprehensive_details(
             net_amount=fee_assignment.final_payable_amount,
             paid_amount=paid_amt,
             outstanding_balance=out_amt,
+            overpaid_amount=overpaid_amt,
             status=fee_assignment.status.upper(),
             installments=inst_items,
             payments=payment_items,
+            adjustments=adj_items,
         )
 
     # 9. Class Timetable

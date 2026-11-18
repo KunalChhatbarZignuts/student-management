@@ -362,7 +362,7 @@ export default function SubjectAssignmentsTab() {
               }}
             >
               <MenuItem value="">All Subjects</MenuItem>
-              {subjects?.map((s) => (
+              {Array.isArray(subjects) && subjects.map((s) => (
                 <MenuItem key={s.id} value={s.id}>
                   {s.name} ({s.code})
                 </MenuItem>

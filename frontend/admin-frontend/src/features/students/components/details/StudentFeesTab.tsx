@@ -14,6 +14,7 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Alert from '@mui/material/Alert';
+import Chip from '@mui/material/Chip';
 
 import StatusChip from '@/components/ui/StatusChip';
 
@@ -22,6 +23,17 @@ export interface StudentFeesTabProps {
 }
 
 export default function StudentFeesTab({ feeInfo: fee }: StudentFeesTabProps) {
+  const getCurrencySymbol = (cur?: string) => {
+    if (!cur) return '₹';
+    const c = cur.toUpperCase();
+    if (c === 'INR') return '₹';
+    if (c === 'USD') return '$';
+    if (c === 'EUR') return '€';
+    if (c === 'GBP') return '£';
+    return `${cur} `;
+  };
+  const sym = getCurrencySymbol(fee?.currency);
+
   if (!fee?.has_fee_assignment) {
     return (
       <Grid container spacing={3}>
@@ -44,16 +56,16 @@ export default function StudentFeesTab({ feeInfo: fee }: StudentFeesTabProps) {
             </Grid>
             <Grid item xs={6} sm={2.4}>
               <Typography variant="caption" color="text.secondary">Net Payable</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>${Number(fee.net_amount).toFixed(2)}</Typography>
+              <Typography variant="h5" sx={{ fontWeight: 700 }}>{sym}{Number(fee.net_amount).toFixed(2)}</Typography>
             </Grid>
             <Grid item xs={6} sm={2.4}>
               <Typography variant="caption" color="text.secondary">Total Paid</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, color: 'success.main' }}>${Number(fee.paid_amount).toFixed(2)}</Typography>
+              <Typography variant="h5" sx={{ fontWeight: 700, color: 'success.main' }}>{sym}{Number(fee.paid_amount).toFixed(2)}</Typography>
             </Grid>
             <Grid item xs={6} sm={2.4}>
               <Typography variant="caption" color="text.secondary">Outstanding Balance</Typography>
               <Typography variant="h5" sx={{ fontWeight: 700, color: Number(fee.outstanding_balance) > 0 ? 'error.main' : 'text.primary' }}>
-                ${Number(fee.outstanding_balance).toFixed(2)}
+                {sym}{Number(fee.outstanding_balance).toFixed(2)}
               </Typography>
             </Grid>
             <Grid item xs={12} sm={2.4}>
@@ -65,6 +77,15 @@ export default function StudentFeesTab({ feeInfo: fee }: StudentFeesTabProps) {
           </Grid>
         </Paper>
       </Grid>
+
+      {/* Overpaid Credit Alert */}
+      {Number(fee.overpaid_amount) > 0 && (
+        <Grid item xs={12}>
+          <Alert severity="info" sx={{ borderRadius: 2 }}>
+            <strong>Overpaid Surplus / Credit Balance: {sym}{Number(fee.overpaid_amount).toFixed(2)}</strong> — The student previously paid more than the new grade payable fee. This surplus is retained as credit for future sessions or refundable.
+          </Alert>
+        </Grid>
+      )}
 
       {/* Installments Table */}
       <Grid item xs={12} md={7}>
@@ -88,9 +109,9 @@ export default function StudentFeesTab({ feeInfo: fee }: StudentFeesTabProps) {
                     <TableRow key={inst.id}>
                       <TableCell>{inst.installment_number}</TableCell>
                       <TableCell>{inst.due_date}</TableCell>
-                      <TableCell>${Number(inst.amount).toFixed(2)}</TableCell>
-                      <TableCell>${Number(inst.paid_amount).toFixed(2)}</TableCell>
-                      <TableCell>${Number(inst.balance).toFixed(2)}</TableCell>
+                      <TableCell>{sym}{Number(inst.amount).toFixed(2)}</TableCell>
+                      <TableCell>{sym}{Number(inst.paid_amount).toFixed(2)}</TableCell>
+                      <TableCell>{sym}{Number(inst.balance).toFixed(2)}</TableCell>
                       <TableCell>
                         <StatusChip status={inst.status?.toLowerCase()} />
                       </TableCell>
@@ -123,10 +144,10 @@ export default function StudentFeesTab({ feeInfo: fee }: StudentFeesTabProps) {
                     {fee.payments.map((pmt: any) => (
                       <TableRow key={pmt.id}>
                         <TableCell sx={{ fontWeight: 600 }}>{pmt.receipt_number || '—'}</TableCell>
-                        <TableCell>{new Date(pmt.payment_date).toLocaleDateString()}</TableCell>
+                        <TableCell>{pmt.payment_date ? new Date(pmt.payment_date).toLocaleDateString() : '—'}</TableCell>
                         <TableCell>{pmt.payment_method}</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: 'success.main' }}>
-                          ${Number(pmt.amount).toFixed(2)}
+                          {sym}{Number(pmt.amount).toFixed(2)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -139,6 +160,63 @@ export default function StudentFeesTab({ feeInfo: fee }: StudentFeesTabProps) {
           </CardContent>
         </Card>
       </Grid>
+
+      {/* Fee Adjustments & Grade Changes */}
+      {fee.adjustments && fee.adjustments.length > 0 && (
+        <Grid item xs={12}>
+          <Card variant="outlined" sx={{ borderRadius: 2 }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                Fee Adjustments & Grade Changes
+              </Typography>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Description</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Nature</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Adjustment Amount</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {fee.adjustments.map((adj: any) => {
+                      const isNeedToPay =
+                        adj.category === 'additional_charge' || adj.adjustment_type === 'ADDITIONAL_CHARGE';
+                      return (
+                        <TableRow key={adj.id}>
+                          <TableCell>
+                            {adj.created_at ? new Date(adj.created_at).toLocaleDateString() : '—'}
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 500 }}>{adj.description}</TableCell>
+                          <TableCell>
+                            <Chip
+                              size="small"
+                              label={isNeedToPay ? 'NEED TO PAY' : 'OVERPAY / CREDIT'}
+                              color={isNeedToPay ? 'warning' : 'info'}
+                              sx={{ fontWeight: 600 }}
+                            />
+                          </TableCell>
+                          <TableCell
+                            sx={{
+                              fontWeight: 700,
+                              color: isNeedToPay ? 'warning.main' : 'info.main',
+                            }}
+                          >
+                            {isNeedToPay
+                              ? `+${sym}${Number(adj.amount).toFixed(2)}`
+                              : `-${sym}${Number(adj.amount).toFixed(2)}`}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </CardContent>
+          </Card>
+        </Grid>
+      )}
     </Grid>
   );
 }

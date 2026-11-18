@@ -2,8 +2,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import settings
 from app.core.deps import get_client_ip, get_db, require_roles
@@ -11,6 +11,9 @@ from app.core.email import send_invite_email, send_password_reset_email
 from app.core.security import generate_secure_token, hash_token
 from app.models.invite import Invite
 from app.models.password_reset import PasswordReset
+from app.models.parent import Parent
+from app.models.student import Student
+from app.models.teacher import Teacher
 from app.models.user import User, UserRole, UserStatus
 from app.schemas.admin import (
     PaginatedUsersResponse,
@@ -29,29 +32,59 @@ router = APIRouter(prefix="/admin/users", tags=["Admin - User Management"])
 def list_users(
     role: str | None = Query(None, description="Filter by user role"),
     status: str | None = Query(None, description="Filter by account status"),
-    search: str | None = Query(None, description="Search by email substring"),
+    search: str | None = Query(None, description="Search by email, name, student ID, or enrollment number"),
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     current_user: User = Depends(require_roles(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value)),
     db: Session = Depends(get_db),
 ):
-    """List users with filtering and pagination."""
+    """List users with filtering, eager profile loading, and comprehensive search."""
     query = select(User)
 
     if role:
         query = query.where(User.role == role.lower())
     if status:
         query = query.where(User.status == status.lower())
+
+    # Eager-load role-specific profile models to avoid N+1 queries
+    query = query.options(
+        joinedload(User.student),
+        joinedload(User.teacher),
+        joinedload(User.parent),
+    )
+
     if search:
-        query = query.where(User.email.ilike(f"%{search.strip()}%"))
+        s = f"%{search.strip().lower()}%"
+        query = (
+            query
+            .outerjoin(Student, User.id == Student.user_id)
+            .outerjoin(Teacher, User.id == Teacher.user_id)
+            .outerjoin(Parent, User.id == Parent.user_id)
+            .where(
+                or_(
+                    User.email.ilike(s),
+                    Student.first_name.ilike(s),
+                    Student.last_name.ilike(s),
+                    func.concat(Student.first_name, " ", Student.last_name).ilike(s),
+                    Student.student_code.ilike(s),
+                    Student.enrollment_number.ilike(s),
+                    Teacher.first_name.ilike(s),
+                    Teacher.last_name.ilike(s),
+                    func.concat(Teacher.first_name, " ", Teacher.last_name).ilike(s),
+                    Parent.first_name.ilike(s),
+                    Parent.last_name.ilike(s),
+                    func.concat(Parent.first_name, " ", Parent.last_name).ilike(s),
+                )
+            )
+        )
 
     # Total count
-    count_query = select(func.count()).select_from(query.subquery())
+    count_query = select(func.count()).select_from(query.distinct().subquery())
     total = db.scalar(count_query) or 0
 
     # Paginated results
     users = db.execute(
-        query.order_by(User.created_at.desc()).offset(skip).limit(limit)
+        query.distinct().order_by(User.created_at.desc()).offset(skip).limit(limit)
     ).scalars().all()
 
     return PaginatedUsersResponse(

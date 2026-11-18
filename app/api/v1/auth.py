@@ -2,7 +2,7 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -357,6 +357,7 @@ def accept_invite(
 def forgot_password(
     request: Request,
     payload: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     """Send single-use 30 min reset link. Returns same generic response to prevent user enumeration."""
@@ -380,7 +381,7 @@ def forgot_password(
         db.add(reset_entry)
         db.commit()
 
-        send_password_reset_email(user.email, raw_token)
+        background_tasks.add_task(send_password_reset_email, user.email, raw_token)
         log_action(
             db,
             actor_user_id=user.id,

@@ -111,7 +111,7 @@ export default function LoginPage() {
             margin="normal"
             fullWidth
             id="identifier"
-            label="Email, Student ID, or Employee ID"
+            label="Email or Employee ID"
             autoComplete="username"
             autoFocus
             disabled={isSubmitting}

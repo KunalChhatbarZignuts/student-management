@@ -399,7 +399,7 @@ export default function FeesManagementPage() {
             <Tab label="Grade Fee Structures" />
             <Tab label="Fee Components Catalog" />
             <Tab label="Payment Transactions" />
-            <Tab label="Webhook Monitoring" />
+            {/* <Tab label="Webhook Monitoring" /> */}
           </Tabs>
         </Paper>
 
@@ -483,7 +483,7 @@ export default function FeesManagementPage() {
         )}
 
         {/* Tab 4: Webhook Monitoring */}
-        {tabIndex === 4 && (
+        {/* {tabIndex === 4 && (
           <PaymentWebhooksTab
             webhookStatusFilter={webhookStatusFilter}
             onStatusFilterChange={setWebhookStatusFilter}
@@ -493,7 +493,7 @@ export default function FeesManagementPage() {
             onRetryWebhook={(eventId) => retryWebhookMutation.mutate(eventId)}
             isRetrying={retryWebhookMutation.isPending}
           />
-        )}
+        )} */}
 
         {/* Dialog: Create/Edit Fee Component */}
         <FeeComponentDialog

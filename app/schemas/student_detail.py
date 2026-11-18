@@ -58,6 +58,8 @@ class StudentEnrollmentHistoryItem(BaseModel):
 
 
 class StudentAcademicDetails(BaseModel):
+    is_currently_enrolled: bool = False
+    enrollment_status: str | None = None
     current_academic_year: str | None = None
     current_grade: str | None = None
     current_section: str | None = None
@@ -150,6 +152,16 @@ class StudentPaymentTransactionItem(BaseModel):
     reference_note: str | None = None
 
 
+class StudentFeeAdjustmentItem(BaseModel):
+    id: uuid.UUID
+    adjustment_type: str
+    category: str
+    description: str
+    calculation_type: str | None = "fixed"
+    amount: Decimal
+    created_at: datetime | None = None
+
+
 class StudentFeeSummary(BaseModel):
     has_fee_assignment: bool = False
     fee_structure_name: str | None = None
@@ -160,9 +172,11 @@ class StudentFeeSummary(BaseModel):
     net_amount: Decimal = Decimal("0.00")
     paid_amount: Decimal = Decimal("0.00")
     outstanding_balance: Decimal = Decimal("0.00")
+    overpaid_amount: Decimal = Decimal("0.00")
     status: str | None = None
     installments: list[StudentFeeInstallmentItem] = []
     payments: list[StudentPaymentTransactionItem] = []
+    adjustments: list[StudentFeeAdjustmentItem] = []
 
 
 class StudentTimetableSlotItem(BaseModel):

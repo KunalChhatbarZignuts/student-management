@@ -143,14 +143,14 @@ export default function ProfilePage() {
                 Change Password
               </Button>
 
-              <Button
+              {/* <Button
                 variant="outlined"
                 color="error"
                 startIcon={<DevicesOtherIcon />}
                 onClick={() => setConfirmLogoutAll(true)}
               >
                 Log Out from All Devices
-              </Button>
+              </Button> */}
             </Box>
           </Paper>
         </Box>

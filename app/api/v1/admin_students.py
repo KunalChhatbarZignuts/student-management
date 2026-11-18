@@ -10,12 +10,14 @@ from app.core.deps import get_client_ip, get_db, require_roles
 from app.core.email import send_invite_email
 from app.core.security import generate_secure_token, hash_token, hash_password
 from app.models.invite import Invite
+from app.models.parent import ParentStudentLink
 from app.models.student import Student
 from app.models.user import User, UserRole, UserStatus
 from app.schemas.student import (
     PaginatedStudentsResponse,
     StudentCreate,
     StudentCreateResponse,
+    StudentDeleteResponse,
     StudentDetailResponse,
     StudentResponse,
     StudentUpdatePayload,
@@ -30,6 +32,7 @@ from app.models.academic_structure import AcademicYear, Grade, Section, StudentE
 from app.schemas.student_detail import ComprehensiveStudentDetailResponse
 from app.services import enrollment_service
 from app.services.audit_service import log_action
+from app.services.auth_service import revoke_all_user_tokens
 from app.services.id_generator import generate_enrollment_number, generate_student_code
 from app.services.student_detail_service import get_student_comprehensive_details
 
@@ -233,6 +236,7 @@ def list_students(
         query = query.where(
             (Student.first_name.ilike(s))
             | (Student.last_name.ilike(s))
+            | (func.concat(Student.first_name, " ", Student.last_name).ilike(s))
             | (Student.student_code.ilike(s))
             | (Student.enrollment_number.ilike(s))
         )
@@ -334,21 +338,101 @@ def update_student(
     if payload.authorized_pickup_info is not None:
         student.authorized_pickup_info = payload.authorized_pickup_info.strip() or None
 
-    # 2. Check if enrollment transfer is requested
+    # 2. Update section, grade, and academic year in-place (no multiple entries created)
     if payload.target_section_id:
-        from app.schemas.grade_section import StudentTransferPayload
-        transfer_payload = StudentTransferPayload(
-            target_section_id=payload.target_section_id,
-            target_grade_id=payload.target_grade_id,
-            reason=payload.transfer_reason or "Admin updated student enrollment",
-        )
-        enrollment_service.transfer_student(
+        target_sec = db.get(Section, payload.target_section_id)
+        if not target_sec:
+            raise HTTPException(status_code=404, detail="Target section not found")
+        target_gr = db.get(Grade, target_sec.grade_id)
+        if not target_gr:
+            raise HTTPException(status_code=404, detail="Target grade not found")
+
+        target_ay_id = payload.target_academic_year_id or target_gr.academic_year_id
+        if not target_ay_id:
+            active_ay = db.execute(
+                select(AcademicYear).where(AcademicYear.status == "active").order_by(AcademicYear.is_current.desc())
+            ).scalars().first()
+            if active_ay:
+                target_ay_id = active_ay.id
+
+        if not target_ay_id:
+            raise HTTPException(status_code=400, detail="Academic year required for section enrollment")
+
+        # Find existing enrollment to update in-place without creating duplicate rows
+        existing_enrollment = db.execute(
+            select(StudentEnrollment).where(
+                StudentEnrollment.student_id == student.id,
+            ).order_by(StudentEnrollment.created_at.desc())
+        ).scalars().first()
+
+        if existing_enrollment:
+            existing_enrollment.section_id = target_sec.id
+            existing_enrollment.grade_id = target_gr.id
+            existing_enrollment.academic_year_id = target_ay_id
+            existing_enrollment.status = "ACTIVE"
+            existing_enrollment.left_on = None
+            existing_enrollment.reason = None
+        else:
+            new_enrollment = StudentEnrollment(
+                student_id=student.id,
+                grade_id=target_gr.id,
+                section_id=target_sec.id,
+                academic_year_id=target_ay_id,
+                roll_no=1,
+                status="ACTIVE",
+                enrollment_date=student.admission_date or date.today(),
+                joined_on=student.admission_date or date.today(),
+            )
+            db.add(new_enrollment)
+
+        # Synchronize student related values directly
+        student.current_grade_id = target_gr.id
+        student.current_section_id = target_sec.id
+        student.class_name = target_gr.name
+        student.section = target_sec.name
+
+        # Synchronize student fee assignment and schedule to match the new grade
+        from app.services.fee_service import sync_student_fee_to_grade
+        sync_student_fee_to_grade(
             student_id=student.id,
-            payload=transfer_payload,
+            new_grade_id=target_gr.id,
+            academic_year_id=target_ay_id,
             actor_user_id=current_user.id,
-            ip=ip,
             db=db,
         )
+
+    elif payload.target_grade_id and payload.target_grade_id != student.current_grade_id:
+        target_gr = db.get(Grade, payload.target_grade_id)
+        if target_gr:
+            student.current_grade_id = target_gr.id
+            student.class_name = target_gr.name
+            target_ay_id = payload.target_academic_year_id or target_gr.academic_year_id
+            if not target_ay_id:
+                active_ay = db.execute(
+                    select(AcademicYear).where(AcademicYear.status == "active").order_by(AcademicYear.is_current.desc())
+                ).scalars().first()
+                if active_ay:
+                    target_ay_id = active_ay.id
+
+            existing_enrollment = db.execute(
+                select(StudentEnrollment).where(
+                    StudentEnrollment.student_id == student.id,
+                ).order_by(StudentEnrollment.created_at.desc())
+            ).scalars().first()
+            if existing_enrollment:
+                existing_enrollment.grade_id = target_gr.id
+                if target_ay_id:
+                    existing_enrollment.academic_year_id = target_ay_id
+
+            if target_ay_id:
+                from app.services.fee_service import sync_student_fee_to_grade
+                sync_student_fee_to_grade(
+                    student_id=student.id,
+                    new_grade_id=target_gr.id,
+                    academic_year_id=target_ay_id,
+                    actor_user_id=current_user.id,
+                    db=db,
+                )
 
     db.commit()
     db.refresh(student)
@@ -466,9 +550,68 @@ def transfer_student(
     current_user: User = Depends(require_roles(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value)),
     db: Session = Depends(get_db),
 ):
-    """Transfer student to another section, preserving complete enrollment history."""
+    """Transfer student to another section, or assign/enroll if student has no active enrollment."""
     ip = get_client_ip(request)
-    return enrollment_service.transfer_student(student_id, payload, current_user.id, ip, db)
+    student = db.get(Student, student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    active_enrollment = db.execute(
+        select(StudentEnrollment).where(
+            StudentEnrollment.student_id == student.id,
+            StudentEnrollment.status == "ACTIVE",
+        ).order_by(StudentEnrollment.created_at.desc())
+    ).scalars().first()
+
+    if not active_enrollment:
+        # Gracefully handle assigning / enrolling students who have no active enrollment
+        target_sec = db.get(Section, payload.target_section_id)
+        if not target_sec:
+            raise HTTPException(status_code=404, detail="Target section not found")
+        target_gr = db.get(Grade, target_sec.grade_id)
+        if not target_gr:
+            raise HTTPException(status_code=404, detail="Target grade not found")
+
+        target_ay_id = target_gr.academic_year_id
+        if not target_ay_id:
+            active_ay = db.execute(
+                select(AcademicYear).where(AcademicYear.status == "active").order_by(AcademicYear.is_current.desc())
+            ).scalars().first()
+            if active_ay:
+                target_ay_id = active_ay.id
+
+        if not target_ay_id:
+            raise HTTPException(status_code=400, detail="Academic year required for section enrollment")
+
+        enroll_payload = StudentEnrollPayload(
+            academic_year_id=target_ay_id,
+            grade_id=target_gr.id,
+            section_id=target_sec.id,
+            roll_no=None,
+            enrollment_date=payload.transfer_date,
+        )
+        res = enrollment_service.enroll_student(student_id, enroll_payload, current_user.id, ip, db)
+        from app.services.fee_service import sync_student_fee_to_grade
+        sync_student_fee_to_grade(
+            student_id=student_id,
+            new_grade_id=target_gr.id,
+            academic_year_id=target_ay_id,
+            actor_user_id=current_user.id,
+            db=db,
+        )
+        return res
+
+    res = enrollment_service.transfer_student(student_id, payload, current_user.id, ip, db)
+    if res and res.grade_id and res.academic_year_id:
+        from app.services.fee_service import sync_student_fee_to_grade
+        sync_student_fee_to_grade(
+            student_id=student_id,
+            new_grade_id=res.grade_id,
+            academic_year_id=res.academic_year_id,
+            actor_user_id=current_user.id,
+            db=db,
+        )
+    return res
 
 
 @router.post("/{student_id}/promote", response_model=StudentEnrollmentHistoryItem)
@@ -502,4 +645,63 @@ def get_student_details(
 ):
     """Admin centralized 360-degree view of all student records across all domains."""
     return get_student_comprehensive_details(student_id, db)
+
+
+@router.delete("/{student_id}", response_model=StudentDeleteResponse)
+def delete_student(
+    student_id: uuid.UUID,
+    request: Request,
+    current_user: User = Depends(require_roles(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value)),
+    db: Session = Depends(get_db),
+):
+    """Delete (deactivate) a student, deactivate linked user account, revoke portal tokens, and unlink parents."""
+    student = db.get(Student, student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    student.status = "deleted"
+
+    if student.user_id:
+        user = db.get(User, student.user_id)
+        if user:
+            user.status = UserStatus.DEACTIVATED.value
+            revoke_all_user_tokens(db, user.id)
+
+    # Deactivate active enrollments
+    enrollments = db.execute(
+        select(StudentEnrollment).where(
+            StudentEnrollment.student_id == student.id,
+            StudentEnrollment.status == "ACTIVE",
+        )
+    ).scalars().all()
+    for e in enrollments:
+        e.status = "INACTIVE"
+
+    # Deactivate parent student links
+    links = db.execute(
+        select(ParentStudentLink).where(
+            ParentStudentLink.student_id == student.id,
+            ParentStudentLink.status == "active",
+        )
+    ).scalars().all()
+    for l in links:
+        l.status = "inactive"
+
+    ip = get_client_ip(request)
+    log_action(
+        db,
+        actor_user_id=current_user.id,
+        action="student_deleted",
+        entity_type="student",
+        entity_id=str(student.id),
+        ip=ip,
+    )
+    db.commit()
+
+    return StudentDeleteResponse(
+        id=student.id,
+        message=f"Student {student.first_name} {student.last_name} deleted successfully and portal access revoked",
+        status="deleted",
+    )
+
 

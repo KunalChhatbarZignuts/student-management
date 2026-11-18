@@ -14,7 +14,7 @@ description: >-
 license: MIT
 metadata:
   author: kindlmann
-  version: "2.0"
+  version: "2.2"
   category: ai-qa
 ---
 
@@ -210,6 +210,16 @@ Convert the "hallucinated APIs" warning into a mechanical gate. After Step 6, be
    ```
 3. **Run the suite once.** Tests that reference nonexistent routes/selectors fail fast; quarantine those before review rather than reviewing dead code.
 
+4. **Show that a test written for a defect fails on the defect.** When the input is a bug
+   report or a diff that fixes one, run the generated test at the revision that still has
+   the bug. `scripts/regression-check.mjs` of the `bug-reproduction` skill does it for
+   every test in the change, and `regressionEvidence`, from that skill's
+   regression-evidence reference, for one named test; a test that passes on both
+   revisions comes back `green_at_base` or `does_not_distinguish`. A generated test that
+   imports a helper written in the same change is `missing_at_base`: red before the fix
+   without touching the bug. A generated test that was only ever run against the
+   fixed code describes that code; it has not been shown to catch the bug.
+
 Any `MISSING` line or `tsc` error is a hallucination to fix before a human spends review time.
 
 ## Anti-Patterns
@@ -229,6 +239,8 @@ Any `MISSING` line or `tsc` error is a hallucination to fix before a human spend
 - The coverage matrix was produced and reviewed before any test code file was written.
 - Verification passed: `tsc --noEmit` (or language equivalent) exits 0 and the selector/endpoint grep reports zero `MISSING` lines.
 - Each generated test has a recorded human review decision; no test is marked KEEP without one.
+- Every test generated from a bug report or a fix has a `distinguishes` verdict against the
+  revision with the bug, or is reported as not shown to catch it.
 - The suite's CI job exits 0 (green).
 - Reproducibility metadata recorded: the exact model ID (e.g. `claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`), input source hash, and the version of any skill / CLI / MCP server invoked.
 

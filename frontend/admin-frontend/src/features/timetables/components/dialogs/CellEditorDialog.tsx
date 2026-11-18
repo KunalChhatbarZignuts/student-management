@@ -78,7 +78,7 @@ export default function CellEditorDialog({
               <MenuItem value="">
                 <em>None (Clear Slot)</em>
               </MenuItem>
-              {subjects.map((sub) => (
+              {Array.isArray(subjects) && subjects.map((sub) => (
                 <MenuItem key={sub.id} value={sub.id}>
                   {sub.name} ({sub.code})
                 </MenuItem>

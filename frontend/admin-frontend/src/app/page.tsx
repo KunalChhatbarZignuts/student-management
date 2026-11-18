@@ -154,30 +154,7 @@ export default function AdminDashboardPage() {
                 </Card>
               </Grid>
 
-              <Grid item xs={12} sm={6} md={3}>
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                        PENDING INVITES
-                      </Typography>
-                      <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'warning.main', color: '#fff' }}>
-                        <MarkEmailUnreadIcon fontSize="small" />
-                      </Box>
-                    </Box>
-                    {loadingInvites ? (
-                      <Skeleton width={80} height={40} />
-                    ) : (
-                      <Typography variant="h4" fontWeight={700} color="warning.main">
-                        {pendingInvitesData?.total ?? 0}
-                      </Typography>
-                    )}
-                    <Typography variant="caption" color="text.secondary">
-                      Awaiting user activation
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
+
 
               <Grid item xs={12} sm={6} md={3}>
                 <Card>
