@@ -52,8 +52,8 @@ export default function StudentTransferModal({
   const { data: grades = [] } = useQuery({
     queryKey: ['grades-list-all'],
     queryFn: async () => {
-      const res = await apiClient.get<any>('/grades?size=100');
-      return res.data?.items || [];
+      const res = await apiClient.get<any>('/admin/grades?size=100');
+      return res.data?.items || (Array.isArray(res.data) ? res.data : []);
     },
     enabled: open,
   });
@@ -63,8 +63,8 @@ export default function StudentTransferModal({
     queryKey: ['sections-for-transfer', targetGradeId],
     queryFn: async () => {
       if (!targetGradeId) return [];
-      const res = await apiClient.get<any[]>(`/grades/${targetGradeId}/sections`);
-      return res.data || [];
+      const res = await apiClient.get<any>(`/admin/grades/${targetGradeId}/sections`);
+      return res.data?.items || (Array.isArray(res.data) ? res.data : []);
     },
     enabled: !!targetGradeId,
   });

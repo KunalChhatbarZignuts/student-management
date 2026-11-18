@@ -264,13 +264,13 @@ export default function AcademicYearRolloverPage() {
             </Grid>
 
             {/* Warnings Alert */}
-            {previewData.warnings.length > 0 && (
+            {(previewData.warnings?.length ?? 0) > 0 && (
               <Alert severity="warning" icon={<WarningAmberIcon />} sx={{ mb: 3 }}>
                 <Typography variant="subtitle2" fontWeight={700}>
                   Configuration Notice:
                 </Typography>
                 <ul style={{ margin: 0, paddingLeft: 20 }}>
-                  {previewData.warnings.map((w, idx) => (
+                  {previewData.warnings?.map((w, idx) => (
                     <li key={idx}>
                       <Typography variant="caption">{w}</Typography>
                     </li>

@@ -18,7 +18,7 @@ export interface RolloverPreviewResponse {
   total_active_students: number;
   cohort_mappings: RolloverCohortMappingItem[];
   is_ready_to_rollover: boolean;
-  warnings: string[];
+  warnings?: string[];
 }
 
 export interface RolloverGradeMappingInput {

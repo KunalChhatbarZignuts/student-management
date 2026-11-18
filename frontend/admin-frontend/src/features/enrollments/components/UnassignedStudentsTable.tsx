@@ -148,8 +148,12 @@ export default function UnassignedStudentsTable({
                   onClick={() => handleToggleOne(st.student_id)}
                   sx={{ cursor: 'pointer' }}
                 >
-                  <TableCell padding="checkbox">
-                    <Checkbox checked={isSelected} />
+                  <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={isSelected}
+                      onChange={() => handleToggleOne(st.student_id)}
+                      inputProps={{ 'aria-label': `Select student ${st.first_name} ${st.last_name}` }}
+                    />
                   </TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>{st.student_code}</TableCell>
                   <TableCell>{st.enrollment_number || '—'}</TableCell>

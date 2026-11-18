@@ -43,19 +43,20 @@ export default function BulkEnrollmentDialog({
   const { data: academicYears = [] } = useQuery({
     queryKey: ['academic-years-all'],
     queryFn: async () => {
-      const res = await apiClient.get<any[]>('/calendar/settings');
-      // fallback or dedicated endpoint
+      const res = await apiClient.get<any[]>('/admin/academic-years');
       return res.data || [];
     },
     enabled: open,
   });
 
-  // Fetch Grades
+  // Fetch Grades (optionally filtered by academic year)
   const { data: grades = [] } = useQuery({
-    queryKey: ['grades-list-all'],
+    queryKey: ['grades-list-all', academicYearId],
     queryFn: async () => {
-      const res = await apiClient.get<any>('/grades?size=100');
-      return res.data?.items || [];
+      const params = new URLSearchParams({ size: '100' });
+      if (academicYearId) params.append('academic_year_id', academicYearId);
+      const res = await apiClient.get<any>(`/admin/grades?${params.toString()}`);
+      return res.data?.items || (Array.isArray(res.data) ? res.data : []);
     },
     enabled: open,
   });
@@ -65,18 +66,19 @@ export default function BulkEnrollmentDialog({
     queryKey: ['sections-for-grade', gradeId],
     queryFn: async () => {
       if (!gradeId) return [];
-      const res = await apiClient.get<any[]>(`/grades/${gradeId}/sections`);
-      return res.data || [];
+      const res = await apiClient.get<any>(`/admin/grades/${gradeId}/sections`);
+      return res.data?.items || (Array.isArray(res.data) ? res.data : []);
     },
     enabled: !!gradeId,
   });
 
-  // Default Academic Year if none selected
+  // Default Academic Year to currently active year
   React.useEffect(() => {
-    if (grades.length > 0 && !academicYearId) {
-      setAcademicYearId(grades[0].academic_year_id);
+    if (academicYears.length > 0 && !academicYearId) {
+      const current = academicYears.find((ay: any) => ay.is_current);
+      setAcademicYearId(current ? current.id : academicYears[0].id);
     }
-  }, [grades, academicYearId]);
+  }, [academicYears, academicYearId]);
 
   const selectedSectionObj = sections.find((s: any) => s.id === sectionId);
 
@@ -127,6 +129,26 @@ export default function BulkEnrollmentDialog({
             </Box>
 
             <FormControl fullWidth required size="small">
+              <InputLabel id="bulk-academic-year-label">Academic Year</InputLabel>
+              <Select
+                labelId="bulk-academic-year-label"
+                value={academicYearId}
+                label="Academic Year"
+                onChange={(e) => {
+                  setAcademicYearId(e.target.value);
+                  setGradeId('');
+                  setSectionId('');
+                }}
+              >
+                {academicYears.map((ay: any) => (
+                  <MenuItem key={ay.id} value={ay.id}>
+                    {ay.name} {ay.is_current ? '(Current Active)' : ''}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth required size="small" disabled={!academicYearId}>
               <InputLabel id="bulk-grade-label">Target Grade</InputLabel>
               <Select
                 labelId="bulk-grade-label"
@@ -135,8 +157,6 @@ export default function BulkEnrollmentDialog({
                 onChange={(e) => {
                   setGradeId(e.target.value);
                   setSectionId('');
-                  const g = grades.find((item: any) => item.id === e.target.value);
-                  if (g) setAcademicYearId(g.academic_year_id);
                 }}
               >
                 {grades.map((g: any) => (
