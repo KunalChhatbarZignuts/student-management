@@ -43,7 +43,7 @@ export default function ParentDetailDialog({
   if (!viewingParent) return null;
 
   return (
-    <Dialog open={Boolean(viewingParent)} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={Boolean(viewingParent)} onClose={onClose} maxWidth="md" fullWidth disableRestoreFocus>
       <DialogTitle fontWeight={700} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>Parent Details & Linked Children</span>
         <Button
@@ -167,4 +167,3 @@ export default function ParentDetailDialog({
     </Dialog>
   );
 }
-

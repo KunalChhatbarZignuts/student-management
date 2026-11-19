@@ -62,7 +62,7 @@ export default function LinkChildDialog({
   };
 
   return (
-    <Dialog open={Boolean(linkingParent)} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={Boolean(linkingParent)} onClose={onClose} maxWidth="sm" fullWidth disableRestoreFocus>
       <DialogTitle fontWeight={700}>
         Link Student to Parent Account
       </DialogTitle>

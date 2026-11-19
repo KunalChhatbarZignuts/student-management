@@ -58,7 +58,7 @@ export default function CreateParentDialog({
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth disableRestoreFocus>
       <DialogTitle fontWeight={700}>Add Parent / Guardian</DialogTitle>
       <Box component="form" onSubmit={handleSubmit(handleFormSubmit)} noValidate>
         <DialogContent dividers>

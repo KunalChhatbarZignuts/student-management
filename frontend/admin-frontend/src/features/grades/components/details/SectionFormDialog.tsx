@@ -79,7 +79,7 @@ export default function SectionFormDialog({
   }, [editingSection, reset]);
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} disableRestoreFocus maxWidth="sm" fullWidth>
       <form onSubmit={handleSubmit(onSubmit)}>
         <DialogTitle fontWeight={700}>
           {isEdit ? 'Edit Section Details' : 'Add New Section'}

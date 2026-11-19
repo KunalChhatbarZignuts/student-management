@@ -30,6 +30,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import { useSnackbar } from '@/components/ui/SnackbarProvider';
 import { ROLES } from '@/lib/constants';
 import { examinationsApi } from '@/features/examinations/api';
+import { useAuth } from '@/features/auth/hooks';
 import {
   CreateExaminationDialog,
   ExaminationDashboardCards,
@@ -41,6 +42,7 @@ export default function ExaminationsAdminPage() {
   const queryClient = useQueryClient();
   const { showSnackbar } = useSnackbar();
 
+  const { isAuthenticated, isBootstrapped } = useAuth();
   const [termFilter, setTermFilter] = React.useState('all');
   const [statusFilter, setStatusFilter] = React.useState('all');
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
@@ -49,6 +51,7 @@ export default function ExaminationsAdminPage() {
   const { data: metrics, isLoading: isMetricsLoading } = useQuery({
     queryKey: ['examinations', 'metrics'],
     queryFn: examinationsApi.getDashboardMetrics,
+    enabled: isBootstrapped && isAuthenticated,
   });
 
   // 2. Fetch Examinations
@@ -59,6 +62,7 @@ export default function ExaminationsAdminPage() {
         term: termFilter === 'all' ? undefined : termFilter,
         status: statusFilter === 'all' ? undefined : statusFilter,
       }),
+    enabled: isBootstrapped && isAuthenticated,
   });
 
   // 3. Create Examination Mutation

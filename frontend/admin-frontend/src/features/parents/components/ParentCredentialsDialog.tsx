@@ -43,7 +43,7 @@ export default function ParentCredentialsDialog({
   };
 
   return (
-    <Dialog open={Boolean(credentials)} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={Boolean(credentials)} onClose={onClose} maxWidth="sm" fullWidth disableRestoreFocus>
       <DialogTitle fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <VpnKeyIcon color="primary" /> Parent Account Credentials Created
       </DialogTitle>

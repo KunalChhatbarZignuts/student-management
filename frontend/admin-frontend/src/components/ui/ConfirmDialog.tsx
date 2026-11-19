@@ -33,7 +33,7 @@ export default function ConfirmDialog({
   onClose,
 }: ConfirmDialogProps) {
   return (
-    <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="xs" fullWidth>
+    <Dialog open={open} onClose={loading ? undefined : onClose} disableRestoreFocus maxWidth="xs" fullWidth>
       <DialogTitle fontWeight={600}>{title}</DialogTitle>
       <DialogContent>
         <DialogContentText>{description}</DialogContentText>

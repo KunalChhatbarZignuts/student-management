@@ -101,7 +101,7 @@ export const CreateExaminationDialog: React.FC<Props> = ({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth disableRestoreFocus>
       <form onSubmit={handleSubmit}>
         <DialogTitle sx={{ fontWeight: 700 }}>Schedule New Examination</DialogTitle>
         <DialogContent dividers>
@@ -151,11 +151,17 @@ export const CreateExaminationDialog: React.FC<Props> = ({
                 fullWidth
                 required
               >
-                {academicYears?.map((y) => (
-                  <MenuItem key={y.id} value={y.id}>
-                    {y.name} {y.is_current ? '(Current)' : ''}
+                {academicYears && academicYears.length > 0 ? (
+                  academicYears.map((y) => (
+                    <MenuItem key={y.id} value={y.id}>
+                      {y.name} {y.is_current ? '(Current)' : ''}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled value="">
+                    Loading academic years...
                   </MenuItem>
-                ))}
+                )}
               </TextField>
             </Grid>
 

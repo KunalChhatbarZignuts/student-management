@@ -97,7 +97,7 @@ export default function GradeFormDialog({
   }, [open, isEdit, initialGrade, defaultAcademicYearId, academicYears, reset]);
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} disableRestoreFocus maxWidth="sm" fullWidth>
       <DialogTitle>{isEdit ? `Edit Grade: ${initialGrade?.name}` : 'Add Academic Grade'}</DialogTitle>
       <form onSubmit={handleSubmit(onSubmit)}>
         <DialogContent dividers>

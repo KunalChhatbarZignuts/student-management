@@ -1008,7 +1008,12 @@ def preview_academic_promotions(
         raise HTTPException(status_code=404, detail="Target grade not found")
 
     source_year = db.get(AcademicYear, payload.source_academic_year_id)
+    if not source_year:
+        raise HTTPException(status_code=404, detail="Source academic year not found")
+
     target_year = db.get(AcademicYear, payload.target_academic_year_id)
+    if not target_year:
+        raise HTTPException(status_code=404, detail="Target academic year not found")
 
     # Target Sections & Capacities
     target_sections_db = db.execute(
@@ -1070,9 +1075,9 @@ def preview_academic_promotions(
         suggested = "PROMOTE"
 
         if exam_res:
-            exam_status = exam_res.result_status  # PASS or FAIL
+            exam_status = getattr(exam_res, "overall_result", getattr(exam_res, "result_status", "NONE"))
             pct = exam_res.percentage
-            if exam_res.result_status == "FAIL":
+            if exam_status == "FAIL":
                 is_eligible = False
                 suggested = "REPEAT"
 

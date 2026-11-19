@@ -161,7 +161,7 @@ export const ScheduleSubjectDialog: React.FC<Props> = ({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth disableRestoreFocus>
       <form onSubmit={handleSubmit}>
         <DialogTitle sx={{ fontWeight: 700 }}>
           Add Subject Examination Slot • {examination.name}
@@ -183,11 +183,17 @@ export const ScheduleSubjectDialog: React.FC<Props> = ({
                 fullWidth
                 required
               >
-                {grades?.map((g) => (
-                  <MenuItem key={g.id} value={g.id}>
-                    {g.name}
+                {grades && grades.length > 0 ? (
+                  grades.map((g) => (
+                    <MenuItem key={g.id} value={g.id}>
+                      {g.name}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled value="">
+                    Loading grades...
                   </MenuItem>
-                ))}
+                )}
               </TextField>
             </Grid>
 
@@ -201,11 +207,17 @@ export const ScheduleSubjectDialog: React.FC<Props> = ({
                 required
                 disabled={!filteredSections.length}
               >
-                {filteredSections.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    {s.name}
+                {filteredSections.length > 0 ? (
+                  filteredSections.map((s) => (
+                    <MenuItem key={s.id} value={s.id}>
+                      {s.name}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled value="">
+                    {gradeId ? 'No sections available' : 'Select a grade first'}
                   </MenuItem>
-                ))}
+                )}
               </TextField>
             </Grid>
 
@@ -218,11 +230,17 @@ export const ScheduleSubjectDialog: React.FC<Props> = ({
                 fullWidth
                 required
               >
-                {Array.isArray(subjects) && subjects.map((sub) => (
-                  <MenuItem key={sub.id} value={sub.id}>
-                    {sub.name} ({sub.code})
+                {Array.isArray(subjects) && subjects.length > 0 ? (
+                  subjects.map((sub) => (
+                    <MenuItem key={sub.id} value={sub.id}>
+                      {sub.name} ({sub.code})
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled value="">
+                    Loading subjects...
                   </MenuItem>
-                ))}
+                )}
               </TextField>
             </Grid>
 

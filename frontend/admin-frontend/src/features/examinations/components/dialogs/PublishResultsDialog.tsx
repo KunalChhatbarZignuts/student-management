@@ -62,7 +62,7 @@ export const PublishResultsDialog: React.FC<Props> = ({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth disableRestoreFocus>
       <DialogTitle sx={{ fontWeight: 700, color: '#00796b' }}>
         Publish Official Examination Results
       </DialogTitle>

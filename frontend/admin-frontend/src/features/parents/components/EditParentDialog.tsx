@@ -45,23 +45,20 @@ export default function EditParentDialog({
     formState: { errors },
   } = useForm<EditParentFormData>({
     resolver: zodResolver(editParentSchema),
+    values: editingParent
+      ? {
+          first_name: editingParent.first_name,
+          last_name: editingParent.last_name,
+          phone: editingParent.phone || '',
+          address: editingParent.address || '',
+        }
+      : undefined,
   });
-
-  React.useEffect(() => {
-    if (editingParent) {
-      reset({
-        first_name: editingParent.first_name,
-        last_name: editingParent.last_name,
-        phone: editingParent.phone || '',
-        address: editingParent.address || '',
-      });
-    }
-  }, [editingParent, reset]);
 
   if (!editingParent) return null;
 
   return (
-    <Dialog open={Boolean(editingParent)} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={Boolean(editingParent)} onClose={onClose} maxWidth="sm" fullWidth disableRestoreFocus>
       <DialogTitle fontWeight={700}>Edit Parent / Guardian Profile</DialogTitle>
       <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
         <DialogContent dividers>

@@ -56,7 +56,7 @@ export default function AcademicPromotionWizardPage() {
   const { data: years = [] } = useQuery({
     queryKey: ['academic-years-all'],
     queryFn: async () => {
-      const res = await apiClient.get<any[]>('/academic-years');
+      const res = await apiClient.get<any[]>('/admin/academic-years');
       return res.data || [];
     },
   });
@@ -64,8 +64,8 @@ export default function AcademicPromotionWizardPage() {
   const { data: grades = [] } = useQuery({
     queryKey: ['grades-list-all'],
     queryFn: async () => {
-      const res = await apiClient.get<any>('/grades?size=100');
-      return res.data?.items || [];
+      const res = await apiClient.get<any>('/admin/grades?size=100');
+      return res.data?.items || (Array.isArray(res.data) ? res.data : []);
     },
   });
 

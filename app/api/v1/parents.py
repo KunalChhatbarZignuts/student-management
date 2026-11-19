@@ -59,7 +59,7 @@ def _build_linked_child_detail(db: Session, link: ParentStudentLink, student: St
             StudentEnrollment.status == "ACTIVE",
         )
         .order_by(StudentEnrollment.created_at.desc())
-    ).scalar_one_or_none()
+    ).scalars().first()
 
     cur_year = None
     cur_grade = student.class_name

@@ -363,6 +363,7 @@ export default function MyClassesPage() {
             onClose={handleCloseRoster}
             maxWidth="md"
             fullWidth
+            disableRestoreFocus
           >
             <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Box>
@@ -458,6 +459,7 @@ export default function MyClassesPage() {
             onClose={() => setSelectedSection(null)}
             maxWidth="md"
             fullWidth
+            disableRestoreFocus
           >
             <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Box>

@@ -106,7 +106,7 @@ export default function StudentTransferModal({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+    <Dialog open={open} onClose={onClose} disableRestoreFocus maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
       <form onSubmit={handleSubmit}>
         <DialogTitle sx={{ fontWeight: 700 }}>
           Transfer Student: {studentName}
