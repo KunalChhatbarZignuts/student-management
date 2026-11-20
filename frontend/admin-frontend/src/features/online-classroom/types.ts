@@ -59,6 +59,8 @@ export interface CreateOnlineClassPayload {
   scheduled_date: string;
   start_time: string;
   expected_duration_minutes: number;
+  grade_id?: string;
+  section_id?: string;
   student_ids?: string[];
   is_recording_enabled?: boolean;
   allow_student_mic?: boolean;

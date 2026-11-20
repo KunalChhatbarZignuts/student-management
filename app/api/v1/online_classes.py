@@ -92,13 +92,19 @@ def list_teacher_online_classes(
 )
 def search_students_for_teacher(
     search: Annotated[str | None, Query()] = None,
+    grade_id: Annotated[uuid.UUID | None, Query()] = None,
+    section_id: Annotated[uuid.UUID | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
-    teacher: Teacher = Depends(get_current_teacher),
+    current_user: User = Depends(require_roles(UserRole.TEACHER.value, UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value)),
     db: Session = Depends(get_db),
 ):
-    """Allow teachers to search and select enrolled students when scheduling an online class."""
+    """Allow teachers and administrators to search and select enrolled students when scheduling an online class."""
     from app.models.student import Student
     query = db.query(Student).filter(Student.status != "deleted")
+    if grade_id:
+        query = query.filter(Student.current_grade_id == grade_id)
+    if section_id:
+        query = query.filter(Student.current_section_id == section_id)
     if search:
         s = f"%{search.strip()}%"
         query = query.filter((Student.first_name.ilike(s)) | (Student.last_name.ilike(s)) | (Student.student_id.ilike(s)))

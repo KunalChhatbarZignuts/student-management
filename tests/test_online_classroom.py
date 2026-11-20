@@ -199,6 +199,35 @@ def test_create_instant_class_auto_enrolls_all_students(test_db_session, seed_da
     app.dependency_overrides.clear()
 
 
+def test_create_online_class_by_grade_auto_enrolls_grade_students(test_db_session, seed_data):
+    teacher = seed_data["teacher"]
+    student1 = seed_data["student1"]
+    grade_id = uuid.uuid4()
+    student1.current_grade_id = grade_id
+    test_db_session.commit()
+
+    app.dependency_overrides[get_db] = lambda: test_db_session
+    app.dependency_overrides[get_current_teacher] = lambda: teacher
+
+    client = TestClient(app)
+    tomorrow = date.today() + timedelta(days=1)
+
+    payload = {
+        "title": "Grade 10 Special Workshop",
+        "scheduled_date": tomorrow.isoformat(),
+        "start_time": "11:00:00",
+        "expected_duration_minutes": 50,
+        "grade_id": str(grade_id),
+    }
+
+    response = client.post("/api/v1/teacher/online-classes", json=payload)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["participant_count"] == 1
+
+    app.dependency_overrides.clear()
+
+
 def test_create_online_class_past_date_fails(test_db_session, seed_data):
     teacher = seed_data["teacher"]
     app.dependency_overrides[get_db] = lambda: test_db_session

@@ -55,12 +55,16 @@ export default function AdminOnlineClassroomMonitoringPage() {
   const { data: stats, isLoading: loadingStats } = useQuery({
     queryKey: onlineClassroomKeys.adminStats(),
     queryFn: () => adminOnlineClassApi.getStats(),
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
 
   // Fetch admin classes
   const { data: classesData, isLoading: loadingClasses } = useQuery({
     queryKey: onlineClassroomKeys.adminClasses(),
     queryFn: () => adminOnlineClassApi.listClasses(),
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
 
   // Observer token mutation
@@ -199,26 +203,13 @@ export default function AdminOnlineClassroomMonitoringPage() {
                         </TableCell>
                         <TableCell>
                           {c.status === 'LIVE' ? (
-                            c.is_room_active ? (
-                              <Chip
-                                icon={<FiberManualRecordIcon sx={{ fontSize: 10, color: '#ff1744 !important' }} />}
-                                label={`LIVE NOW (${c.live_participants_count ?? 1})`}
-                                color="error"
-                                size="small"
-                                sx={{ fontWeight: 700 }}
-                              />
-                            ) : (
-                              <Chip
-                                label="Room Empty"
-                                size="small"
-                                sx={{
-                                  fontWeight: 600,
-                                  bgcolor: 'rgba(148, 163, 184, 0.15)',
-                                  color: '#94a3b8',
-                                  border: '1px solid rgba(148, 163, 184, 0.3)',
-                                }}
-                              />
-                            )
+                            <Chip
+                              icon={<FiberManualRecordIcon sx={{ fontSize: 10, color: '#ff1744 !important' }} />}
+                              label={c.live_participants_count && c.live_participants_count > 0 ? `LIVE NOW (${c.live_participants_count})` : 'LIVE NOW'}
+                              color="error"
+                              size="small"
+                              sx={{ fontWeight: 700 }}
+                            />
                           ) : c.status === 'SCHEDULED' ? (
                             <Chip label="Scheduled" color="primary" variant="outlined" size="small" />
                           ) : (
@@ -227,7 +218,7 @@ export default function AdminOnlineClassroomMonitoringPage() {
                         </TableCell>
                         <TableCell>{c.participant_count} enrolled</TableCell>
                         <TableCell align="right">
-                          {c.status === 'LIVE' && c.is_room_active ? (
+                          {c.status === 'LIVE' ? (
                             <Button
                               variant="contained"
                               color="warning"
@@ -242,8 +233,6 @@ export default function AdminOnlineClassroomMonitoringPage() {
                             <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
                               {c.status === 'COMPLETED'
                                 ? 'Completed'
-                                : c.status === 'LIVE'
-                                ? 'Room Empty'
                                 : 'Awaiting Live'}
                             </Typography>
                           )}

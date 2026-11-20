@@ -16,7 +16,7 @@ export const onlineClassroomKeys = {
   list: (filters?: Record<string, unknown>) => [...onlineClassroomKeys.all, 'list', filters || {}] as const,
   stats: () => [...onlineClassroomKeys.all, 'stats'] as const,
   detail: (id: string) => [...onlineClassroomKeys.all, 'detail', id] as const,
-  students: (search?: string) => [...onlineClassroomKeys.all, 'students', search || ''] as const,
+  students: (params?: { search?: string; grade_id?: string; section_id?: string }) => [...onlineClassroomKeys.all, 'students', params || {}] as const,
   adminStats: () => [...onlineClassroomKeys.all, 'admin-stats'] as const,
   adminClasses: (params?: Record<string, unknown>) => [...onlineClassroomKeys.all, 'admin-classes', params || {}] as const,
 };
@@ -72,9 +72,14 @@ export const teacherOnlineClassApi = {
     return res.data;
   },
 
-  searchStudents: async (search?: string): Promise<Array<{ id: string; student_code: string; first_name: string; last_name: string; class_name?: string }>> => {
+  searchStudents: async (params?: { search?: string; grade_id?: string; section_id?: string }): Promise<Array<{ id: string; student_code: string; first_name: string; last_name: string; class_name?: string }>> => {
     const res = await apiClient.get('/teacher/online-classes/students', {
-      params: { search: search || undefined, limit: 50 },
+      params: {
+        search: params?.search || undefined,
+        grade_id: params?.grade_id || undefined,
+        section_id: params?.section_id || undefined,
+        limit: 100,
+      },
     });
     return res.data?.items || [];
   },

@@ -15,6 +15,7 @@ import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import LiveTvIcon from '@mui/icons-material/LiveTv';
 import SchoolIcon from '@mui/icons-material/School';
 import WifiIcon from '@mui/icons-material/Wifi';
 import PollIcon from '@mui/icons-material/Poll';
@@ -28,7 +29,7 @@ import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
 import LinearProgress from '@mui/material/LinearProgress';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { teacherOnlineClassApi, adminOnlineClassApi, onlineClassroomKeys } from '@/features/online-classroom/api';
 import VideoTile from '@/features/online-classroom/components/live/VideoTile';
@@ -47,6 +48,7 @@ export default function LiveClassroomPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const classId = params.id as string;
   const isObserver = searchParams?.get('mode') === 'observer';
   const dashboardPath = isObserver ? '/admin/online-classroom' : '/online-classroom';
@@ -70,6 +72,10 @@ export default function LiveClassroomPage() {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [teacherStream, setTeacherStream] = useState<MediaStream | null>(null);
+  const teacherStreamRef = useRef<MediaStream | null>(null);
+  useEffect(() => {
+    teacherStreamRef.current = teacherStream;
+  }, [teacherStream]);
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const observerPeerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -284,6 +290,33 @@ export default function LiveClassroomPage() {
 
   // Network quality & latency
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
+
+  // Class ended by host state
+  const [classEndedReason, setClassEndedReason] = useState<string | null>(null);
+  const [isClassEndedDialogOpen, setIsClassEndedDialogOpen] = useState(false);
+  const [classEndedCountdown, setClassEndedCountdown] = useState(3);
+
+  const handleExitToDashboard = () => {
+    queryClient.invalidateQueries({ queryKey: onlineClassroomKeys.all });
+    router.push(dashboardPath);
+  };
+
+  // Auto-redirect countdown when class is ended by host
+  useEffect(() => {
+    if (!isClassEndedDialogOpen) return;
+    const interval = setInterval(() => {
+      setClassEndedCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          queryClient.invalidateQueries({ queryKey: onlineClassroomKeys.all });
+          router.push(dashboardPath);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isClassEndedDialogOpen, router, dashboardPath, queryClient]);
 
   // Simulated participants list (seeded from actual class participants)
   const [participants, setParticipants] = useState<ParticipantItem[]>([]);
@@ -896,9 +929,34 @@ export default function LiveClassroomPage() {
             if (clientTs) {
               setLatencyMs(Math.max(5, Date.now() - clientTs));
             }
+          } else if (msgType === 'CLASS_ENDED') {
+            const reason = data.payload?.reason || 'The instructor has ended this online class session for all participants.';
+            if (teacherStreamRef.current) {
+              teacherStreamRef.current.getTracks().forEach((t) => t.stop());
+            }
+            if (observerPeerConnectionRef.current) {
+              observerPeerConnectionRef.current.close();
+              observerPeerConnectionRef.current = null;
+            }
+            setClassEndedReason(reason);
+            setIsClassEndedDialogOpen(true);
           }
         } catch (e) {
           // ignore malformed message
+        }
+      };
+
+      ws.onclose = (event) => {
+        if (isObserver && (event.code === 1000 || event.code === 4403)) {
+          if (teacherStreamRef.current) {
+            teacherStreamRef.current.getTracks().forEach((t) => t.stop());
+          }
+          if (observerPeerConnectionRef.current) {
+            observerPeerConnectionRef.current.close();
+            observerPeerConnectionRef.current = null;
+          }
+          setClassEndedReason('The instructor has ended this online class session for all participants.');
+          setIsClassEndedDialogOpen(true);
         }
       };
 
@@ -1386,7 +1444,7 @@ export default function LiveClassroomPage() {
         onConfirm={() => {
           if (isObserver) {
             setLeaveConfirmOpen(false);
-            router.push(dashboardPath);
+            handleExitToDashboard();
           } else {
             endClassMutation.mutate();
           }
@@ -1418,6 +1476,46 @@ export default function LiveClassroomPage() {
           {joinNotification}
         </Alert>
       </Snackbar>
+
+      {/* Class Session Concluded Dialog for Observer */}
+      <Dialog
+        open={isClassEndedDialogOpen}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: 'rgba(15, 23, 42, 0.95)',
+            color: '#f8fafc',
+            border: '1px solid rgba(56, 189, 248, 0.4)',
+            borderRadius: 3,
+            p: 1,
+            backdropFilter: 'blur(12px)',
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <LiveTvIcon sx={{ color: '#38bdf8' }} />
+          Class Session Concluded
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: '#cbd5e1', mb: 2 }}>
+            {classEndedReason || 'The instructor has ended this online class session for all participants.'}
+          </Typography>
+          <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+            Redirecting to Online Classroom Governance in {classEndedCountdown}s...
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleExitToDashboard}
+            sx={{ fontWeight: 600, textTransform: 'none' }}
+          >
+            Return to Dashboard Now
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

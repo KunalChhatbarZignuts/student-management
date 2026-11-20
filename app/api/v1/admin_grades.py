@@ -121,7 +121,7 @@ def get_grade_sections(
     grade_id: uuid.UUID,
     page: int = Query(1, ge=1),
     size: int = Query(50, ge=1, le=100),
-    current_user: User = Depends(require_roles(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value)),
+    current_user: User = Depends(require_roles(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value, UserRole.TEACHER.value)),
     db: Session = Depends(get_db),
 ):
     """List sections under a specific grade."""

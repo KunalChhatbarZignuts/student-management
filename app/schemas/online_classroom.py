@@ -11,6 +11,8 @@ class OnlineClassCreate(BaseModel):
     scheduled_date: date = Field(..., description="Date on which the class takes place")
     start_time: time = Field(..., description="Start time (HH:MM:SS)")
     expected_duration_minutes: int = Field(60, ge=15, le=360, description="Expected duration in minutes")
+    grade_id: uuid.UUID | None = Field(None, description="Optional target Grade ID to enroll students from")
+    section_id: uuid.UUID | None = Field(None, description="Optional target Section ID to enroll students from")
     student_ids: list[uuid.UUID] = Field(default_factory=list, description="Independent list of authorized student IDs")
     is_recording_enabled: bool = Field(False, description="Whether recording is enabled for the class")
     allow_student_mic: bool = Field(True, description="Whether students can unmute their microphones")
@@ -26,6 +28,8 @@ class OnlineClassUpdate(BaseModel):
     scheduled_date: date | None = None
     start_time: time | None = None
     expected_duration_minutes: int | None = Field(None, ge=15, le=360)
+    grade_id: uuid.UUID | None = None
+    section_id: uuid.UUID | None = None
     student_ids: list[uuid.UUID] | None = None
     is_recording_enabled: bool | None = None
     allow_student_mic: bool | None = None

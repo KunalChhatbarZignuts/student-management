@@ -44,7 +44,7 @@ class OnlineClassroomService:
 
         participant_count = len([p for p in cls.participants if p.status == "ACTIVE"])
         live_participants_count = ws_manager.get_room_clients_count(cls.id)
-        is_room_active = (cls.status == OnlineClassStatus.LIVE.value and live_participants_count > 0)
+        is_room_active = (cls.status == OnlineClassStatus.LIVE.value)
 
         return OnlineClassResponse(
             id=cls.id,
@@ -103,32 +103,36 @@ class OnlineClassroomService:
         db.add(online_class)
         db.flush()
 
-        # Add participants if provided
-        if data.student_ids:
-            # Validate students exist
-            existing_students = db.execute(
-                select(Student.id).where(Student.id.in_(data.student_ids))
-            ).scalars().all()
-            existing_ids_set = set(existing_students)
+        # Add participants:
+        # 1. If explicit student_ids are chosen, enroll those specific students.
+        # 2. If a grade_id is provided, enroll students from that Grade (and section_id if provided).
+        # 3. If neither is provided, fallback to all active students for instant classes.
+        target_student_ids: set[uuid.UUID] = set()
 
-            for student_id in set(data.student_ids):
-                if student_id in existing_ids_set:
-                    participant = OnlineClassParticipant(
-                        online_class_id=online_class.id,
-                        student_id=student_id,
-                        status="ACTIVE",
-                    )
-                    db.add(participant)
+        if data.student_ids:
+            existing_students = db.execute(
+                select(Student.id).where(Student.id.in_(data.student_ids), Student.status != "deleted")
+            ).scalars().all()
+            target_student_ids.update(existing_students)
+        elif data.grade_id:
+            query = select(Student.id).where(Student.current_grade_id == data.grade_id, Student.status != "deleted")
+            if data.section_id:
+                query = query.where(Student.current_section_id == data.section_id)
+            grade_student_ids = db.execute(query).scalars().all()
+            target_student_ids.update(grade_student_ids)
         elif data.settings and data.settings.get("is_instant"):
-            # Instant class open to all students
-            all_student_ids = db.execute(select(Student.id)).scalars().all()
-            for student_id in all_student_ids:
-                participant = OnlineClassParticipant(
-                    online_class_id=online_class.id,
-                    student_id=student_id,
-                    status="ACTIVE",
-                )
-                db.add(participant)
+            all_student_ids = db.execute(
+                select(Student.id).where(Student.status != "deleted")
+            ).scalars().all()
+            target_student_ids.update(all_student_ids)
+
+        for student_id in target_student_ids:
+            participant = OnlineClassParticipant(
+                online_class_id=online_class.id,
+                student_id=student_id,
+                status="ACTIVE",
+            )
+            db.add(participant)
 
         db.commit()
         db.refresh(online_class)

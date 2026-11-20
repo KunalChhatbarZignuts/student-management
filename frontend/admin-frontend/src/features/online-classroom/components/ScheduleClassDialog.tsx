@@ -19,6 +19,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { teacherOnlineClassApi, adminOnlineClassApi, onlineClassroomKeys } from '../api';
 import { CreateOnlineClassPayload } from '../types';
 import { adminTeacherApi } from '@/features/teachers/api';
+import { adminGradeApi } from '@/features/grades/api';
+import { Grade, Section } from '@/features/grades/types';
 
 interface ScheduleClassDialogProps {
   open: boolean;
@@ -42,6 +44,8 @@ export default function ScheduleClassDialog({ open, onClose, onSuccess, isAdmin 
   const [startTime, setStartTime] = useState('10:00');
   const [duration, setDuration] = useState<number>(60);
   const [selectedTeacher, setSelectedTeacher] = useState<any | null>(null);
+  const [selectedGrade, setSelectedGrade] = useState<Grade | null>(null);
+  const [selectedSection, setSelectedSection] = useState<Section | null>(null);
   const [selectedStudents, setSelectedStudents] = useState<Array<{ id: string; student_code: string; first_name: string; last_name: string; class_name?: string }>>([]);
   const [allowMic, setAllowMic] = useState(true);
   const [allowCam, setAllowCam] = useState(true);
@@ -57,15 +61,37 @@ export default function ScheduleClassDialog({ open, onClose, onSuccess, isAdmin 
   });
   const teachers = teachersData?.items || [];
 
-  // Fetch available students for selection
+  // Fetch available grades
+  const { data: gradesData, isLoading: loadingGrades } = useQuery({
+    queryKey: ['admin-grades-list', { status: 'active' }],
+    queryFn: () => adminGradeApi.listGrades({ size: 100, status: 'active' }),
+    enabled: open,
+  });
+  const grades = gradesData?.items || [];
+
+  // Fetch sections when a grade is selected
+  const { data: sections = [], isLoading: loadingSections } = useQuery({
+    queryKey: ['grade-sections', selectedGrade?.id],
+    queryFn: () => (selectedGrade?.id ? adminGradeApi.getGradeSections(selectedGrade.id) : Promise.resolve([])),
+    enabled: Boolean(open && selectedGrade?.id),
+  });
+
+  // Fetch available students filtered by selected grade and section
   const { data: students = [], isLoading: loadingStudents } = useQuery({
-    queryKey: onlineClassroomKeys.students(),
-    queryFn: () => teacherOnlineClassApi.searchStudents(),
+    queryKey: onlineClassroomKeys.students({
+      grade_id: selectedGrade?.id,
+      section_id: selectedSection?.id,
+    }),
+    queryFn: () =>
+      teacherOnlineClassApi.searchStudents({
+        grade_id: selectedGrade?.id,
+        section_id: selectedSection?.id,
+      }),
     enabled: open,
   });
 
   const mutation = useMutation({
-    mutationFn: (payload: any) =>
+    mutationFn: (payload: CreateOnlineClassPayload) =>
       isAdmin ? adminOnlineClassApi.createClass(payload) : teacherOnlineClassApi.createClass(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: onlineClassroomKeys.all });
@@ -84,6 +110,8 @@ export default function ScheduleClassDialog({ open, onClose, onSuccess, isAdmin 
     setStartTime('10:00');
     setDuration(60);
     setSelectedTeacher(null);
+    setSelectedGrade(null);
+    setSelectedSection(null);
     setSelectedStudents([]);
     setAllowMic(true);
     setAllowCam(true);
@@ -103,18 +131,25 @@ export default function ScheduleClassDialog({ open, onClose, onSuccess, isAdmin 
       setErrorMsg('Please select an instructor to lead this class');
       return;
     }
+    if (!selectedGrade && selectedStudents.length === 0) {
+      setErrorMsg('Please select a Grade or choose specific students to invite');
+      return;
+    }
 
-    const payload: any = {
+    const payload: CreateOnlineClassPayload = {
       title: title.trim(),
       description: description.trim() || undefined,
       scheduled_date: scheduledDate,
       start_time: startTime.length === 5 ? `${startTime}:00` : startTime,
       expected_duration_minutes: duration,
+      grade_id: selectedGrade?.id || undefined,
+      section_id: selectedSection?.id || undefined,
       student_ids: selectedStudents.map((s) => s.id),
       allow_student_mic: allowMic,
       allow_student_cam: allowCam,
       allow_student_chat: allowChat,
       allow_student_whiteboard: allowWhiteboard,
+      settings: {},
       ...(isAdmin && selectedTeacher ? { teacher_id: selectedTeacher.id } : {}),
     };
 
@@ -218,8 +253,60 @@ export default function ScheduleClassDialog({ open, onClose, onSuccess, isAdmin 
               </TextField>
             </Grid>
 
+            <Grid item xs={12} sm={6}>
+              <Autocomplete
+                options={grades}
+                loading={loadingGrades}
+                getOptionLabel={(option) => option.name + (option.code ? ` (${option.code})` : '')}
+                value={selectedGrade}
+                onChange={(_, newValue) => {
+                  setSelectedGrade(newValue);
+                  setSelectedSection(null);
+                  setSelectedStudents([]);
+                }}
+                isOptionEqualToValue={(option, value) => option.id === value?.id}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Grade / Class (Optional)"
+                    placeholder="Select Grade to filter or invite..."
+                    helperText={selectedGrade ? `Selected: ${selectedGrade.name}` : 'Optional: Filter students by grade'}
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <Autocomplete
+                options={sections}
+                loading={loadingSections}
+                disabled={!selectedGrade}
+                getOptionLabel={(option) => option.name}
+                value={selectedSection}
+                onChange={(_, newValue) => {
+                  setSelectedSection(newValue);
+                  setSelectedStudents([]);
+                }}
+                isOptionEqualToValue={(option, value) => option.id === value?.id}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Section (Optional)"
+                    placeholder={selectedGrade ? 'Select Section...' : 'Select a Grade first'}
+                    helperText={
+                      !selectedGrade
+                        ? 'Select a Grade first to filter by Section'
+                        : selectedSection
+                        ? `Section: ${selectedSection.name}`
+                        : 'Optional: Filter by specific section'
+                    }
+                  />
+                )}
+              />
+            </Grid>
+
             <Grid item xs={12}>
-              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
                 Enrolled Students (Independent Selection)
               </Typography>
               <Autocomplete
@@ -231,6 +318,7 @@ export default function ScheduleClassDialog({ open, onClose, onSuccess, isAdmin 
                 }
                 value={selectedStudents}
                 onChange={(_, newValue) => setSelectedStudents(newValue)}
+                isOptionEqualToValue={(option, value) => option.id === value?.id}
                 renderTags={(value, getTagProps) =>
                   value.map((option, index) => (
                     <Chip
@@ -244,7 +332,20 @@ export default function ScheduleClassDialog({ open, onClose, onSuccess, isAdmin 
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    placeholder="Search and select students to invite..."
+                    placeholder={
+                      selectedStudents.length === 0
+                        ? selectedGrade
+                          ? `All students in ${selectedGrade.name}${selectedSection ? ` - ${selectedSection.name}` : ''} will be enrolled (or select specific students)`
+                          : 'Search and select specific students...'
+                        : 'Select more students...'
+                    }
+                    helperText={
+                      selectedGrade
+                        ? selectedStudents.length > 0
+                          ? `Enrolling ${selectedStudents.length} selected student(s) from ${selectedGrade.name}.`
+                          : `Leaving this empty will automatically enroll all students in ${selectedGrade.name}${selectedSection ? ` (${selectedSection.name})` : ''}.`
+                        : 'Search and select individual students to enroll in this class.'
+                    }
                     InputProps={{
                       ...params.InputProps,
                       endAdornment: (

@@ -110,7 +110,7 @@ export default function StudentClassCard({ onlineClass }: StudentClassCardProps)
               />
             ) : isScheduled ? (
               <Chip
-                label="Upcoming"
+                label="Invited"
                 color="primary"
                 variant="outlined"
                 size="small"
