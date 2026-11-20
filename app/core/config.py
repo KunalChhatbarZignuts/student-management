@@ -54,6 +54,11 @@ class Settings(BaseSettings):
         "https://student-management-6mcq.vercel.app",
     ]
 
+    # LiveKit Video Conferencing
+    LIVEKIT_URL: str = "wss://livekit.local"
+    LIVEKIT_API_KEY: str = "devkey"
+    LIVEKIT_API_SECRET: str = "secretsecretsecretsecretsecretsecret32"
+
     # Seed super admin (used by seed script only)
     SEED_SUPER_ADMIN_EMAIL: str = "admin@school.local"
     SEED_SUPER_ADMIN_PASSWORD: str = "ChangeMe@1234"

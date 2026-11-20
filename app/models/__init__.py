@@ -61,6 +61,18 @@ from app.models.classroom import Class, Subject, TeacherAssignment
 from app.models.id_counter import IdCounter
 from app.models.invite import Invite
 from app.models.leave import LeaveStatus, LeaveSubmissionRole, StudentLeaveApplication
+from app.models.online_classroom import (
+    OnlineClass,
+    OnlineClassMaterial,
+    OnlineClassParticipant,
+    OnlineClassRecording,
+    OnlineClassStatus,
+    OnlineClassroomAuditLog,
+    OnlineMeetingSession,
+    OnlineSessionAttendee,
+    OnlineWhiteboardEvent,
+    OnlineWhiteboardSession,
+)
 from app.models.parent import Parent, ParentStudentLink
 from app.models.password_reset import PasswordReset
 from app.models.refresh_token import RefreshToken
@@ -118,6 +130,16 @@ __all__ = [
     "LeaveStatus",
     "LeaveSubmissionRole",
     "MarksStatus",
+    "OnlineClass",
+    "OnlineClassMaterial",
+    "OnlineClassParticipant",
+    "OnlineClassRecording",
+    "OnlineClassStatus",
+    "OnlineClassroomAuditLog",
+    "OnlineMeetingSession",
+    "OnlineSessionAttendee",
+    "OnlineWhiteboardEvent",
+    "OnlineWhiteboardSession",
     "ResultStatus",
     "StudentExamMark",
     "StudentExamResult",

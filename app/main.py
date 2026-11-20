@@ -23,6 +23,7 @@ from app.api.v1 import (
     fees,
     leaves,
     parents,
+    online_classes,
     rollover,
     students,
     substitutions,
@@ -86,6 +87,7 @@ app.include_router(substitutions.router, prefix="/api/v1")
 app.include_router(fee_pos.router, prefix="/api/v1")
 app.include_router(absence_notifications.router, prefix="/api/v1")
 app.include_router(rollover.router, prefix="/api/v1")
+app.include_router(online_classes.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Root"])

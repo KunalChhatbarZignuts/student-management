@@ -36,6 +36,7 @@ import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import LogoutIcon from '@mui/icons-material/Logout';
 import SchoolIcon from '@mui/icons-material/School';
+import VideoCameraFrontIcon from '@mui/icons-material/VideoCameraFront';
 
 import { useAuth } from '@/features/auth/hooks';
 import { useUiStore } from '@/store/uiStore';
@@ -91,6 +92,11 @@ const navItems: NavItem[] = [
     label: 'Leave Applications',
     href: '/leaves',
     icon: <EventNoteIcon />,
+  },
+  {
+    label: 'Online Classroom',
+    href: '/online-classroom',
+    icon: <VideoCameraFrontIcon />,
   },
   {
     label: 'Fee Details',

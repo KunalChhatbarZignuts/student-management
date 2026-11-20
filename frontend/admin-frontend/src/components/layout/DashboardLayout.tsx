@@ -23,7 +23,12 @@ export default function DashboardLayout({
     pathname?.startsWith(route)
   );
 
-  if (isPublicRoute) {
+  // Live video streaming classroom runs in immersive full-window mode without sidebar/app shell
+  const isImmersiveLiveRoute = Boolean(
+    pathname?.includes('/online-classroom/') && pathname?.endsWith('/live')
+  );
+
+  if (isPublicRoute || isImmersiveLiveRoute) {
     return <>{children}</>;
   }
 

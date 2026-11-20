@@ -37,7 +37,7 @@ const nextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()',
+            value: 'camera=(self), microphone=(self), geolocation=()',
           },
           {
             key: 'Content-Security-Policy',
@@ -47,7 +47,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com data:",
               "img-src 'self' data: blob: https://*.razorpay.com",
-              "connect-src 'self' http://localhost:8000 https://api.razorpay.com https://lumberjack.razorpay.com https://lumberjack-cx.razorpay.com",
+              "connect-src 'self' http://localhost:8000 ws://localhost:8000 ws://localhost:3000 ws://localhost:3001 wss: https://api.razorpay.com https://lumberjack.razorpay.com https://lumberjack-cx.razorpay.com",
               "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com",
               "frame-ancestors 'none'",
             ].join('; '),

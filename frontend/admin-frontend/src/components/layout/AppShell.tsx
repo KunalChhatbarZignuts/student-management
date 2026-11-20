@@ -47,6 +47,7 @@ import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import PublishedWithChangesIcon from '@mui/icons-material/PublishedWithChanges';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import VideoCameraFrontIcon from '@mui/icons-material/VideoCameraFront';
 
 import { useAuth } from '@/features/auth/hooks';
 import { useUiStore } from '@/store/uiStore';
@@ -156,6 +157,18 @@ const navItems: NavItem[] = [
     href: '/leave-monitoring',
     icon: <AssignmentTurnedInIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
+    label: 'Classroom Monitoring',
+    href: '/admin/online-classroom',
+    icon: <VideoCameraFrontIcon />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  },
+  {
+    label: 'Online Classroom',
+    href: '/online-classroom',
+    icon: <VideoCameraFrontIcon />,
+    roles: [ROLES.TEACHER],
   },
   {
     label: 'My Classes',
