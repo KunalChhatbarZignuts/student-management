@@ -1,5 +1,23 @@
 """Import all models so Alembic and relationship lookups can discover them."""
 
+from app.models.ai_learning import (
+    AIDailyStudyPlan,
+    AILearningProfile,
+    AILearningRecommendation,
+    AIPracticeQuestion,
+    AIPracticeSession,
+    AIStudyPlanItem,
+    ChapterTopic,
+    RecommendationPriority,
+    RecommendationStatus,
+    StudyPlanStatus,
+    SubjectChapter,
+)
+from app.models.ai_student_assistant import (
+    AIStudentConversation,
+    AIStudentMessage,
+    MessageSender,
+)
 from app.models.academic import FeeInvoice, StudentMark
 from app.models.admission import Admission
 from app.models.examination import (
@@ -152,4 +170,14 @@ __all__ = [
     "Timetable",
     "TimetableEntry",
     "User",
+    "SubjectChapter",
+    "ChapterTopic",
+    "AILearningProfile",
+    "AILearningRecommendation",
+    "AIDailyStudyPlan",
+    "AIStudyPlanItem",
+    "AIPracticeSession",
+    "AIPracticeQuestion",
+    "AIStudentConversation",
+    "AIStudentMessage",
 ]

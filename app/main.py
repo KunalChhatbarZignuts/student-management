@@ -14,6 +14,8 @@ from app.api.v1 import (
     admin_teacher_subjects,
     admin_users,
     admissions,
+    ai_learning,
+    ai_student_assistant,
     audit_logs,
     auth,
     calendar,
@@ -88,6 +90,8 @@ app.include_router(fee_pos.router, prefix="/api/v1")
 app.include_router(absence_notifications.router, prefix="/api/v1")
 app.include_router(rollover.router, prefix="/api/v1")
 app.include_router(online_classes.router, prefix="/api/v1")
+app.include_router(ai_learning.router, prefix="/api/v1")
+app.include_router(ai_student_assistant.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Root"])
