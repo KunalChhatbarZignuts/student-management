@@ -124,7 +124,6 @@ def delete_holiday(
 ):
     calendar_service.delete_school_holiday(holiday_id, actor_user_id=current_user.id, db=db)
 
-
 @router.get("/admin/calendar/settings", response_model=SchoolCalendarSettingsResponse)
 def get_settings(
     academic_year_id: uuid.UUID | None = None,

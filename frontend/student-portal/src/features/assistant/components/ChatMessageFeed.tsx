@@ -68,7 +68,12 @@ export default function ChatMessageFeed({ messages, isLoading = false }: ChatMes
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, py: 2 }}>
+    <Box
+      role="log"
+      aria-live="polite"
+      aria-label="Conversation messages"
+      sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, py: 2 }}
+    >
       {messages.map((msg) => {
         const isUser = msg.sender === 'STUDENT';
         const formattedTime = new Date(msg.created_at).toLocaleTimeString([], {

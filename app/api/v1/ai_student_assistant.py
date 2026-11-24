@@ -37,6 +37,7 @@ from app.schemas.ai_student_assistant import (
     MorningBriefingResponse,
     DailyChallengeResponse,
     CareerDiscoveryResponse,
+    ActionExecutionRequest,
 )
 from app.services import ai_assistant_service, ai_academic_service
 from app.services.ai_interactive_service import ai_interactive_service
@@ -277,6 +278,106 @@ def get_question_suggestions(
 
 
 # ===========================================================================
+# Consolidated Unified Gateways: Insights & Actions
+# ===========================================================================
+
+@router.get(
+    "/insights",
+    summary="Unified query dispatcher for student academic, proactive, and study insights",
+)
+def get_student_assistant_insights(
+    type: str = Query(..., description="Insight type: briefing, daily-challenge, career-discovery, exam-prep, concept-map, class-notes, suggestions"),
+    subject: str | None = Query(None, description="Optional subject filter"),
+    topic: str | None = Query(None, description="Optional topic for concept map"),
+    interests: str | None = Query(None, description="Optional interests for career discovery"),
+    current_user: User = Depends(require_roles(UserRole.STUDENT.value, UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value)),
+    db: Session = Depends(get_db),
+):
+    """Consolidated high-performance gateway delivering read-only student academic and proactive intelligence."""
+    student = _get_current_student(current_user, db)
+    t = type.lower().strip()
+
+    if t in ("briefing", "morning-briefing"):
+        return ai_proactive_service.generate_morning_briefing(db, student.id)
+    elif t in ("daily-challenge", "challenge"):
+        return ai_proactive_service.get_daily_challenge(db, student.id)
+    elif t in ("career-discovery", "career", "careers"):
+        return ai_proactive_service.discover_career_pathways(db=db, student_id=student.id, interests=interests)
+    elif t in ("exam-prep", "examprep", "prep"):
+        return ai_academic_service.generate_exam_prep_plan(student=student, subject_name=subject, db=db)
+    elif t in ("concept-map", "conceptmap"):
+        grade = getattr(student, "class_name", "Grade 10")
+        return ai_interactive_service.generate_concept_map(topic=topic or "Photosynthesis", subject=subject, grade_level=grade)
+    elif t in ("class-notes", "notes", "lecture-notes"):
+        return ai_interactive_service.generate_class_topic_notes(db=db, student_id=student.id, subject_name=subject)
+    elif t in ("suggestions", "prompts"):
+        return get_question_suggestions(current_user=current_user)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown insight type '{type}'. Valid types: briefing, daily-challenge, career-discovery, exam-prep, concept-map, class-notes, suggestions",
+        )
+
+
+@router.post(
+    "/action",
+    summary="Unified execution dispatcher for academic quizzes, flashcards, homework hints, language, and debate",
+)
+def execute_student_assistant_action(
+    payload: ActionExecutionRequest,
+    current_user: User = Depends(require_roles(UserRole.STUDENT.value, UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value)),
+    db: Session = Depends(get_db),
+):
+    """Consolidated action gateway executing interactive learning tasks in a single endpoint."""
+    student = _get_current_student(current_user, db)
+    act = payload.action.lower().strip()
+    data = payload.payload or {}
+
+    if act in ("quiz_generate", "generate_quiz"):
+        return ai_academic_service.generate_quiz(
+            subject_name=data.get("subject_name", "Mathematics"),
+            chapter_title=data.get("chapter_title"),
+            difficulty=data.get("difficulty", "MEDIUM"),
+            question_count=int(data.get("question_count", 5)),
+        )
+    elif act in ("quiz_evaluate", "evaluate_quiz"):
+        return ai_academic_service.evaluate_quiz(
+            quiz_id=data.get("quiz_id", ""),
+            answers=data.get("answers", {}),
+        )
+    elif act in ("flashcards", "flashcards_generate", "generate_flashcards"):
+        return ai_academic_service.generate_flashcards(
+            subject_name=data.get("subject_name", "Science"),
+            chapter_title=data.get("chapter_title"),
+            card_count=int(data.get("card_count", 4)),
+        )
+    elif act in ("homework_hint", "solve_homework"):
+        grade = getattr(student, "class_name", "Grade 10")
+        return ai_academic_service.solve_homework_socratic(
+            problem_text=data.get("problem_text", ""),
+            grade_level=grade,
+        )
+    elif act in ("language_eval", "evaluate_language", "grammar_eval"):
+        grade = data.get("target_grade_level") or getattr(student, "class_name", "Grade 10")
+        return ai_interactive_service.evaluate_grammar(
+            student_text=data.get("student_text", ""),
+            student_grade=grade,
+        )
+    elif act in ("debate_round", "progress_debate"):
+        return ai_interactive_service.progress_debate_round(
+            topic=data.get("topic", "Artificial Intelligence in Education"),
+            stance=data.get("stance", "affirmative"),
+            current_round=int(data.get("current_round", 1)),
+            student_argument=data.get("student_argument", ""),
+        )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown action '{payload.action}'. Supported actions: quiz_generate, quiz_evaluate, flashcards, homework_hint, language_eval, debate_round",
+        )
+
+
+# ===========================================================================
 # Release 2: Academic Intelligence Endpoints
 # ===========================================================================
 
@@ -301,8 +402,13 @@ async def upload_image_question(
             detail=f"Unsupported image type '{file.content_type}'. Please upload a PNG, JPEG, or WebP picture.",
         )
 
-    # 2. Validate max file size (10 MB limit)
+    # 2. Validate file size (non-empty and within 10 MB limit)
     contents = await file.read()
+    if len(contents) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty (0 bytes). Please upload a valid image.",
+        )
     if len(contents) > 10 * 1024 * 1024:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -340,6 +446,11 @@ async def upload_document_notes(
         )
 
     contents = await file.read()
+    if len(contents) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded document is empty (0 bytes). Please upload a valid document.",
+        )
     if len(contents) > 10 * 1024 * 1024:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -218,3 +218,54 @@ def test_tc_rel4_04_in_chat_proactive_routing(client):
     dcar_data = res_car.json()
     assert "discover_careers" in dcar_data["tools_used"]
     assert "Career Discovery & Pathways" in dcar_data["content"]
+
+
+def test_tc_rel4_05_consolidated_insights_gateway(client):
+    """TC-REL4-05: Verifies unified /insights dispatcher handles multiple query types."""
+    # 1. Briefing insight
+    res_b = client.get("/api/v1/student/assistant/insights?type=briefing")
+    assert res_b.status_code == 200
+    assert "student_name" in res_b.json()
+
+    # 2. Daily challenge insight
+    res_c = client.get("/api/v1/student/assistant/insights?type=daily-challenge")
+    assert res_c.status_code == 200
+    assert "question_text" in res_c.json()
+
+    # 3. Career discovery insight
+    res_car = client.get("/api/v1/student/assistant/insights?type=career-discovery&interests=technology")
+    assert res_car.status_code == 200
+    assert "career_pathways" in res_car.json()
+
+    # 4. Suggestions insight
+    res_s = client.get("/api/v1/student/assistant/insights?type=suggestions")
+    assert res_s.status_code == 200
+    assert len(res_s.json()) >= 4
+
+
+def test_tc_rel4_06_consolidated_action_gateway(client):
+    """TC-REL4-06: Verifies unified /action dispatcher executes interactive tasks."""
+    # 1. Quiz generate action
+    res_q = client.post(
+        "/api/v1/student/assistant/action",
+        json={"action": "quiz_generate", "payload": {"subject_name": "Mathematics", "question_count": 3}},
+    )
+    assert res_q.status_code == 200
+    assert len(res_q.json()["questions"]) == 3
+
+    # 2. Flashcards action
+    res_f = client.post(
+        "/api/v1/student/assistant/action",
+        json={"action": "flashcards", "payload": {"subject_name": "Science", "card_count": 2}},
+    )
+    assert res_f.status_code == 200
+    assert len(res_f.json()["cards"]) == 2
+
+    # 3. Homework hint action
+    res_h = client.post(
+        "/api/v1/student/assistant/action",
+        json={"action": "homework_hint", "payload": {"problem_text": "Calculate the force on a 5kg mass accelerating at 2m/s²"}},
+    )
+    assert res_h.status_code == 200
+    assert "guidance" in res_h.json()
+

@@ -24,6 +24,7 @@ import HowToRegIcon from '@mui/icons-material/HowToReg';
 
 import RequireRole from '@/components/guards/RequireRole';
 import AppShell from '@/components/layout/AppShell';
+import { AnimatedCard, AnimatedNumber, PageMotionWrapper } from '@/components/ui/animated';
 import { useAuth } from '@/features/auth/hooks';
 import { ADMIN_ALLOWED_ROLES, ROLES } from '@/lib/constants';
 import { adminStudentApi } from '@/features/students/api';
@@ -97,7 +98,7 @@ export default function AdminDashboardPage() {
           <>
             <Grid container spacing={3} sx={{ mb: 4 }}>
               <Grid item xs={12} sm={6} md={3}>
-                <Card>
+                <AnimatedCard>
                   <CardContent>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                       <Typography variant="caption" color="text.secondary" fontWeight={600}>
@@ -111,7 +112,7 @@ export default function AdminDashboardPage() {
                       <Skeleton width={80} height={40} />
                     ) : (
                       <Typography variant="h4" fontWeight={700}>
-                        {studentData?.total ?? 0}
+                        <AnimatedNumber value={studentData?.total ?? 0} />
                       </Typography>
                     )}
                     <Box sx={{ mt: 1 }}>
@@ -122,11 +123,11 @@ export default function AdminDashboardPage() {
                       </Link>
                     </Box>
                   </CardContent>
-                </Card>
+                </AnimatedCard>
               </Grid>
 
               <Grid item xs={12} sm={6} md={3}>
-                <Card>
+                <AnimatedCard>
                   <CardContent>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                       <Typography variant="caption" color="text.secondary" fontWeight={600}>
@@ -140,7 +141,7 @@ export default function AdminDashboardPage() {
                       <Skeleton width={80} height={40} />
                     ) : (
                       <Typography variant="h4" fontWeight={700}>
-                        {teacherData?.total ?? 0}
+                        <AnimatedNumber value={teacherData?.total ?? 0} />
                       </Typography>
                     )}
                     <Box sx={{ mt: 1 }}>
@@ -151,13 +152,11 @@ export default function AdminDashboardPage() {
                       </Link>
                     </Box>
                   </CardContent>
-                </Card>
+                </AnimatedCard>
               </Grid>
 
-
-
               <Grid item xs={12} sm={6} md={3}>
-                <Card>
+                <AnimatedCard>
                   <CardContent>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                       <Typography variant="caption" color="text.secondary" fontWeight={600}>
@@ -171,7 +170,7 @@ export default function AdminDashboardPage() {
                       <Skeleton width={80} height={40} />
                     ) : (
                       <Typography variant="h4" fontWeight={700} color="primary.main">
-                        {enrolledCount}
+                        <AnimatedNumber value={enrolledCount} />
                       </Typography>
                     )}
                     <Box sx={{ mt: 1 }}>
@@ -182,7 +181,7 @@ export default function AdminDashboardPage() {
                       </Link>
                     </Box>
                   </CardContent>
-                </Card>
+                </AnimatedCard>
               </Grid>
             </Grid>
 

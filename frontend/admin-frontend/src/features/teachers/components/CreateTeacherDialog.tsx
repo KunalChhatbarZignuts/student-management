@@ -11,6 +11,7 @@ import Grid from '@mui/material/Grid';
 import TextField from '@mui/material/TextField';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
+import { SmoothDialogTransition } from '@/components/ui/animated/SmoothDialogTransition';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -62,10 +63,28 @@ export default function CreateTeacherDialog({
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="sm"
+      fullWidth
+      disableRestoreFocus
+      TransitionComponent={SmoothDialogTransition}
+      PaperProps={{
+        component: 'form',
+        onSubmit: handleSubmit(handleFormSubmit),
+        noValidate: true,
+        sx: {
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          borderRadius: 2.5,
+          overflow: 'hidden',
+        },
+      }}
+    >
       <DialogTitle fontWeight={700}>Add Faculty Member</DialogTitle>
-      <Box component="form" onSubmit={handleSubmit(handleFormSubmit)} noValidate>
-        <DialogContent dividers>
+      <DialogContent dividers sx={{ overflowY: 'auto' }}>
           <Alert severity="info" sx={{ mb: 2 }}>
             Employee code is generated strictly by the system sequentially upon creation (e.g., EMP-XXXXXX).
           </Alert>
@@ -130,7 +149,6 @@ export default function CreateTeacherDialog({
             {isSubmitting ? 'Creating...' : 'Create Teacher'}
           </Button>
         </DialogActions>
-      </Box>
     </Dialog>
   );
 }

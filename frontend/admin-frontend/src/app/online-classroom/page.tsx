@@ -17,14 +17,22 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AppShell from '@/components/layout/AppShell';
 import RequireRole from '@/components/guards/RequireRole';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import dynamic from 'next/dynamic';
 import { ROLES } from '@/lib/constants';
 
 import { teacherOnlineClassApi, onlineClassroomKeys } from '@/features/online-classroom/api';
 import { useOnlineClassroomFeed } from '@/features/online-classroom/useOnlineClassroomFeed';
 import OnlineClassroomStatsCards from '@/features/online-classroom/components/OnlineClassroomStatsCards';
 import OnlineClassesTable from '@/features/online-classroom/components/OnlineClassesTable';
-import ScheduleClassDialog from '@/features/online-classroom/components/ScheduleClassDialog';
-import InstantClassDialog from '@/features/online-classroom/components/InstantClassDialog';
+
+const ScheduleClassDialog = dynamic(
+  () => import('@/features/online-classroom/components/ScheduleClassDialog'),
+  { ssr: false }
+);
+const InstantClassDialog = dynamic(
+  () => import('@/features/online-classroom/components/InstantClassDialog'),
+  { ssr: false }
+);
 
 export default function OnlineClassroomPage() {
   const router = useRouter();

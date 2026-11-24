@@ -34,11 +34,11 @@ export const MorningBriefingBanner: React.FC<MorningBriefingBannerProps> = ({ br
       variant="outlined"
       sx={{
         mb: 2,
-        borderRadius: 3,
-        border: '1.5px solid',
-        borderColor: 'warning.light',
+        borderRadius: 2,
+        border: '1px solid',
+        borderColor: 'divider',
         bgcolor: 'background.paper',
-        boxShadow: '0 4px 16px rgba(237, 108, 2, 0.08)',
+        boxShadow: 'none',
       }}
     >
       <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
@@ -47,21 +47,23 @@ export const MorningBriefingBanner: React.FC<MorningBriefingBannerProps> = ({ br
           <Stack direction="row" alignItems="center" spacing={1.2}>
             <Box
               sx={{
-                width: 34,
-                height: 34,
-                borderRadius: '50%',
-                bgcolor: 'warning.light',
-                color: 'warning.contrastText',
+                width: 32,
+                height: 32,
+                borderRadius: 1,
+                bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)',
+                color: 'text.primary',
+                border: '1px solid',
+                borderColor: 'divider',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <WbSunnyIcon sx={{ fontSize: 20 }} />
+              <WbSunnyIcon sx={{ fontSize: 18 }} />
             </Box>
 
             <Box>
-              <Typography variant="subtitle2" fontWeight={800} color="text.primary">
+              <Typography variant="subtitle2" fontWeight={700} color="text.primary">
                 Daily Morning Briefing • {briefing.day_name}
               </Typography>
               <Typography variant="caption" color="text.secondary">

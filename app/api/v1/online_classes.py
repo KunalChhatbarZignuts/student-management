@@ -107,16 +107,16 @@ def search_students_for_teacher(
         query = query.filter(Student.current_section_id == section_id)
     if search:
         s = f"%{search.strip()}%"
-        query = query.filter((Student.first_name.ilike(s)) | (Student.last_name.ilike(s)) | (Student.student_id.ilike(s)))
+        query = query.filter((Student.first_name.ilike(s)) | (Student.last_name.ilike(s)) | (Student.student_code.ilike(s)))
     students = query.limit(limit).all()
     return {
         "items": [
             {
                 "id": str(st.id),
-                "student_code": st.student_id,
+                "student_code": st.student_code,
                 "first_name": st.first_name,
                 "last_name": st.last_name,
-                "class_name": f"{st.current_grade.name} - {st.current_section.name}" if (st.current_grade and st.current_section) else "",
+                "class_name": f"{st.current_grade.name} - {st.current_section.name}" if (st.current_grade and st.current_section) else (st.current_grade.name if st.current_grade else (st.class_name or "")),
             }
             for st in students
         ]

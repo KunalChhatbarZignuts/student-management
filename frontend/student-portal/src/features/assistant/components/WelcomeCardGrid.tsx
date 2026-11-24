@@ -117,28 +117,29 @@ export default function WelcomeCardGrid({
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: 56,
-            height: 56,
-            borderRadius: '50%',
-            bgcolor: 'primary.light',
-            color: 'primary.contrastText',
+            width: 48,
+            height: 48,
+            borderRadius: 2,
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+            color: 'primary.main',
+            border: '1px solid',
+            borderColor: 'divider',
             mx: 'auto',
             mb: 1,
-            boxShadow: '0 4px 14px rgba(0,0,0,0.1)',
           }}
         >
-          <AutoAwesomeIcon fontSize="large" />
+          <SchoolIcon sx={{ fontSize: 28 }} />
         </Box>
-        <Typography variant="h5" fontWeight={800} color="text.primary">
-          Hello{studentName ? `, ${studentName}` : ''}! I'm your AI Student Assistant.
+        <Typography variant="h5" fontWeight={700} color="text.primary">
+          Hello{studentName ? `, ${studentName}` : ''}.
         </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto' }}>
-          Ask me questions about your daily timetable, attendance, upcoming examinations, report cards, fees, online classes, or subject topics.
+        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 540, mx: 'auto', lineHeight: 1.6 }}>
+          Your digital academic assistant. Query your daily timetable, attendance records, upcoming examination schedules, report cards, tuition fees, and subject curriculum.
         </Typography>
       </Stack>
 
       {/* Suggested Questions Grid */}
-      <Typography variant="subtitle2" fontWeight={700} color="text.secondary" sx={{ mb: 2, textAlign: 'center' }}>
+      <Typography variant="subtitle2" fontWeight={600} color="text.secondary" sx={{ mb: 2, textAlign: 'center' }}>
         Common Questions to Get Started:
       </Typography>
 
@@ -150,32 +151,30 @@ export default function WelcomeCardGrid({
               onClick={() => onSelectPrompt(card.prompt)}
               sx={{
                 p: 2,
-                borderRadius: 2.5,
+                borderRadius: 2,
                 border: '1px solid',
                 borderColor: 'divider',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
+                transition: 'border-color 0.15s ease, background-color 0.15s ease',
                 '&:hover': {
                   borderColor: 'primary.main',
                   bgcolor: 'action.hover',
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
                 },
               }}
             >
               <Stack direction="row" alignItems="center" spacing={1.5} mb={0.8}>
                 {renderIcon(card.category)}
-                <Typography variant="subtitle2" fontWeight={700} color="text.primary">
+                <Typography variant="subtitle2" fontWeight={600} color="text.primary">
                   {card.label}
                 </Typography>
                 <Chip
                   label={card.category}
                   size="small"
                   variant="outlined"
-                  sx={{ ml: 'auto !important', fontSize: 10, height: 20 }}
+                  sx={{ ml: 'auto !important', fontSize: 10, height: 20, borderRadius: 1 }}
                 />
               </Stack>
-              <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13, lineHeight: 1.5 }}>
                 "{card.prompt}"
               </Typography>
             </Paper>

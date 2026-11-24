@@ -66,9 +66,9 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({ challeng
     <Card
       variant="outlined"
       sx={{
-        borderRadius: 3,
-        border: '1.5px solid',
-        borderColor: isSubmitted ? (isCorrect ? 'success.main' : 'error.main') : 'primary.light',
+        borderRadius: 2,
+        border: '1px solid',
+        borderColor: isSubmitted ? (isCorrect ? 'success.main' : 'error.main') : 'divider',
         bgcolor: 'background.paper',
         maxWidth: 620,
         my: 1.5,
@@ -78,8 +78,8 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({ challeng
         {/* Header */}
         <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1.5}>
           <Stack direction="row" alignItems="center" spacing={1}>
-            <LocalFireDepartmentIcon sx={{ color: '#ff6d00' }} fontSize="small" />
-            <Typography variant="subtitle2" fontWeight={800} color="text.primary">
+            <LocalFireDepartmentIcon sx={{ color: 'warning.main' }} fontSize="small" />
+            <Typography variant="subtitle2" fontWeight={700} color="text.primary">
               1-Minute Daily Challenge
             </Typography>
           </Stack>
@@ -88,19 +88,19 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({ challeng
             <Chip
               label={`${challenge.subject} • ${challenge.topic}`}
               size="small"
-              color="primary"
               variant="outlined"
-              sx={{ fontWeight: 700, fontSize: 11 }}
+              sx={{ fontWeight: 600, fontSize: 11, borderRadius: 1 }}
             />
             <Chip
-              icon={<LocalFireDepartmentIcon style={{ color: '#ff6d00', fontSize: 14 }} />}
+              icon={<LocalFireDepartmentIcon style={{ fontSize: 14 }} />}
               label={`${streakCount} Day Streak`}
               size="small"
+              color="warning"
+              variant="outlined"
               sx={{
-                fontWeight: 800,
+                fontWeight: 700,
                 fontSize: 11,
-                bgcolor: '#fff3e0',
-                color: '#e65100',
+                borderRadius: 1,
               }}
             />
           </Stack>

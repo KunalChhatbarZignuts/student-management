@@ -17,6 +17,7 @@ import ChatIcon from '@mui/icons-material/Chat';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { useRouter } from 'next/navigation';
+import { PulseLiveBadge } from '@/components/ui/animated/PulseLiveBadge';
 import { OnlineClass } from '../types';
 
 interface StudentClassCardProps {
@@ -90,34 +91,11 @@ export default function StudentClassCard({ onlineClass }: StudentClassCardProps)
           </Box>
           <Box sx={{ flexShrink: 0 }}>
             {isLive ? (
-              <Chip
-                icon={<FiberManualRecordIcon sx={{ fontSize: 10, color: '#ff1744 !important' }} />}
-                label="LIVE NOW"
-                color="error"
-                variant="filled"
-                size="small"
-                sx={{
-                  fontWeight: 700,
-                  fontSize: 10,
-                  height: 22,
-                  animation: 'pulse 1.8s infinite',
-                  '@keyframes pulse': {
-                    '0%': { opacity: 1 },
-                    '50%': { opacity: 0.7 },
-                    '100%': { opacity: 1 },
-                  },
-                }}
-              />
+              <PulseLiveBadge variant="live" label="LIVE NOW" pulse={true} />
             ) : isScheduled ? (
-              <Chip
-                label="Invited"
-                color="primary"
-                variant="outlined"
-                size="small"
-                sx={{ fontWeight: 600, fontSize: 10, height: 22 }}
-              />
+              <PulseLiveBadge variant="scheduled" label="Upcoming" pulse={false} />
             ) : isCompleted ? (
-              <Chip label="Completed" color="default" size="small" sx={{ fontSize: 10, height: 22 }} />
+              <PulseLiveBadge variant="completed" label="Completed" pulse={false} />
             ) : (
               <Chip label={onlineClass.status} color="default" size="small" sx={{ fontSize: 10, height: 22 }} />
             )}

@@ -18,6 +18,10 @@ from app.models.ai_student_assistant import (
     AIStudentMessage,
     MessageSender,
 )
+from app.models.school_knowledge import (
+    SchoolKnowledgeDocument,
+    SchoolKnowledgeChunk,
+)
 from app.models.academic import FeeInvoice, StudentMark
 from app.models.admission import Admission
 from app.models.examination import (

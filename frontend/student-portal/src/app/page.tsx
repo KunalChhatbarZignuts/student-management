@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import RequireRole from '@/components/guards/RequireRole';
 import AppShell from '@/components/layout/AppShell';
+import { PageMotionWrapper } from '@/components/ui/animated/PageMotionWrapper';
 import { useAuth } from '@/features/auth/hooks';
 import { useMyStudentProfile } from '@/features/students/hooks';
 import { useMyChildren, useParentNotifications } from '@/features/parents/hooks';
@@ -42,34 +43,34 @@ export default function DashboardPage() {
     <RequireRole roles={STUDENT_PORTAL_ALLOWED_ROLES}>
       <AppShell>
         {/* Welcome Greeting Header */}
-        <DashboardGreetingHeader
-          name={userName}
-          role={role || 'STUDENT'}
-          isStudent={isStudent}
-        />
-
-        {/* Student View */}
-        {isStudent && (
-          <StudentMetricsGrid
-            student={student}
-            attendance={attendance}
-            isLoading={loadingStudent}
-            error={studentError}
+          <DashboardGreetingHeader
+            name={userName}
+            role={role || 'STUDENT'}
+            isStudent={isStudent}
           />
-        )}
 
-        {/* Parent View */}
-        {isParent && (
-          <ParentChildrenOverview
-            childrenList={children}
-            notifications={notifications}
-            isLoading={loadingChildren}
-            error={childrenError}
-          />
-        )}
+          {/* Student View */}
+          {isStudent && (
+            <StudentMetricsGrid
+              student={student}
+              attendance={attendance}
+              isLoading={loadingStudent}
+              error={studentError}
+            />
+          )}
 
-        {/* Quick Navigation Cards */}
-        <DashboardQuickNavigation isParent={isParent} />
+          {/* Parent View */}
+          {isParent && (
+            <ParentChildrenOverview
+              childrenList={children}
+              notifications={notifications}
+              isLoading={loadingChildren}
+              error={childrenError}
+            />
+          )}
+
+          {/* Quick Navigation Cards */}
+          <DashboardQuickNavigation isParent={isParent} />
       </AppShell>
     </RequireRole>
   );

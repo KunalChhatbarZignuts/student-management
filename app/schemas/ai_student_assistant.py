@@ -378,4 +378,11 @@ class CareerDiscoveryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ActionExecutionRequest(BaseModel):
+    action: str = Field(..., description="Action name: quiz_generate, quiz_evaluate, flashcards, homework_hint, language_eval, debate_round")
+    payload: dict = Field(default_factory=dict, description="Parameters specific to the action")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 

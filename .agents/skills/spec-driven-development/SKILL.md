@@ -257,3 +257,25 @@ Before proceeding to implementation, confirm:
 - [ ] The spec is saved to a file in the repository
 - [ ] If the request bundles several independently testable capabilities, a capability map (module ids, dependency direction, build order) was approved before any module spec was written
 - [ ] Every module spec traces to a module id in the approved map
+
+## Autonomous Decision-Making and Approval Policy
+
+1. Analyze the existing project, requirements, architecture, and applicable rules before preparing a plan.
+2. Make normal technical decisions independently. Follow existing project conventions and choose the most suitable implementation.
+3. Do not present multiple-choice questions, alternative technical approaches, or unnecessary recommendations.
+4. Do not ask the user to confirm assumptions that can be reliably determined from the existing codebase or project rules.
+5. Ask questions only when essential business requirements are genuinely unclear or an explicit user decision is required.
+6. Produce one consolidated implementation plan containing:
+   - Requirement understanding and scope
+   - Existing implementation analysis
+   - Technical decisions and rationale
+   - Backend and frontend changes
+   - Database and API changes, if required
+   - File-level implementation breakdown
+   - Testing and verification strategy
+   - Risks and dependencies
+7. Present the complete plan for user approval.
+8. Do not write or modify implementation code before approval.
+9. After approval, proceed with implementation without repeatedly asking for approval of ordinary technical decisions.
+
+**Important:** The user's approval is required for the implementation plan, not for every technical decision within it.

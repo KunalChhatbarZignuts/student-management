@@ -52,6 +52,7 @@ import VideoCameraFrontIcon from '@mui/icons-material/VideoCameraFront';
 import { useAuth } from '@/features/auth/hooks';
 import { useUiStore } from '@/store/uiStore';
 import { ROLES, APP_NAME } from '@/lib/constants';
+import { PageMotionWrapper } from '@/components/ui/animated';
 
 const DRAWER_WIDTH = 260;
 
@@ -296,16 +297,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <ListItemButton
                 component={Link}
                 href={item.href}
-                prefetch={false}
                 selected={isActive}
                 onClick={() => setMobileOpen(false)}
                 sx={{
                   borderRadius: 2,
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                  '&:hover': {
+                    transform: 'translateX(4px)',
+                  },
                   '&.Mui-selected': {
                     bgcolor: 'primary.main',
                     color: '#ffffff',
                     '&:hover': {
                       bgcolor: 'primary.dark',
+                      transform: 'translateX(4px)',
                     },
                     '& .MuiListItemIcon-root': {
                       color: '#ffffff',
@@ -490,7 +495,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             minHeight: 'calc(100vh - 64px)',
           }}
         >
-          {children}
+          <PageMotionWrapper key={pathname}>
+            {children}
+          </PageMotionWrapper>
         </Box>
       </Box>
     </AppShellContext.Provider>

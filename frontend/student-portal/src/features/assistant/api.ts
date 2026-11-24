@@ -82,11 +82,22 @@ export const assistantApi = {
   },
 
   getSuggestions: async (): Promise<SuggestionCard[]> => {
-    const res = await apiClient.get<SuggestionCard[]>('/student/assistant/suggestions');
+    const res = await apiClient.get<SuggestionCard[]>('/student/assistant/insights', {
+      params: { type: 'suggestions' },
+    });
     return res.data;
   },
 
-  // Release 2 Methods
+  // Consolidated Action Dispatcher
+  executeAction: async <T = any>(action: string, payload: Record<string, any> = {}): Promise<T> => {
+    const res = await apiClient.post<T>('/student/assistant/action', {
+      action,
+      payload,
+    });
+    return res.data;
+  },
+
+  // Release 2 Methods: Academic Intelligence
   uploadImage: async (file: File): Promise<ImageQuestionResponse> => {
     const formData = new FormData();
     formData.append('file', file);
@@ -115,30 +126,22 @@ export const assistantApi = {
     difficulty: string = 'MEDIUM',
     questionCount: number = 3
   ): Promise<QuizGenerationResponse> => {
-    const res = await apiClient.post<QuizGenerationResponse>(
-      '/student/assistant/quiz/generate',
-      {
-        subject_name: subjectName,
-        chapter_title: chapterTitle || null,
-        difficulty,
-        question_count: questionCount,
-      }
-    );
-    return res.data;
+    return assistantApi.executeAction<QuizGenerationResponse>('quiz_generate', {
+      subject_name: subjectName,
+      chapter_title: chapterTitle || null,
+      difficulty,
+      question_count: questionCount,
+    });
   },
 
   evaluateQuiz: async (
     quizId: string,
     answers: QuizAnswerItem[]
   ): Promise<QuizEvaluationResponse> => {
-    const res = await apiClient.post<QuizEvaluationResponse>(
-      '/student/assistant/quiz/evaluate',
-      {
-        quiz_id: quizId,
-        answers,
-      }
-    );
-    return res.data;
+    return assistantApi.executeAction<QuizEvaluationResponse>('quiz_evaluate', {
+      quiz_id: quizId,
+      answers,
+    });
   },
 
   generateFlashcards: async (
@@ -146,51 +149,35 @@ export const assistantApi = {
     chapterTitle?: string,
     cardCount: number = 4
   ): Promise<FlashcardDeckResponse> => {
-    const res = await apiClient.post<FlashcardDeckResponse>(
-      '/student/assistant/flashcards/generate',
-      null,
-      {
-        params: {
-          subject_name: subjectName,
-          chapter_title: chapterTitle,
-          card_count: cardCount,
-        },
-      }
-    );
-    return res.data;
+    return assistantApi.executeAction<FlashcardDeckResponse>('flashcards', {
+      subject_name: subjectName,
+      chapter_title: chapterTitle,
+      card_count: cardCount,
+    });
   },
 
   getExamPrep: async (subjectName?: string): Promise<ExamPrepPlanResponse> => {
     const res = await apiClient.get<ExamPrepPlanResponse>(
-      '/student/assistant/exam-prep',
+      '/student/assistant/insights',
       {
-        params: subjectName ? { subject_name: subjectName } : {},
+        params: { type: 'exam-prep', subject: subjectName || undefined },
       }
     );
     return res.data;
   },
 
   getHomeworkHint: async (problemText: string): Promise<{ problem: string; guidance: string; method: string }> => {
-    const res = await apiClient.post<{ problem: string; guidance: string; method: string }>(
-      '/student/assistant/homework-hint',
-      null,
-      {
-        params: { problem_text: problemText },
-      }
-    );
-    return res.data;
+    return assistantApi.executeAction<{ problem: string; guidance: string; method: string }>('homework_hint', {
+      problem_text: problemText,
+    });
   },
 
   // Release 3 Methods: Interactive AI
   evaluateGrammar: async (studentText: string, targetGradeLevel?: string): Promise<GrammarEvaluationResponse> => {
-    const res = await apiClient.post<GrammarEvaluationResponse>(
-      '/student/assistant/language/evaluate',
-      {
-        student_text: studentText,
-        target_grade_level: targetGradeLevel || null,
-      }
-    );
-    return res.data;
+    return assistantApi.executeAction<GrammarEvaluationResponse>('language_eval', {
+      student_text: studentText,
+      target_grade_level: targetGradeLevel || null,
+    });
   },
 
   submitDebateRound: async (
@@ -199,23 +186,19 @@ export const assistantApi = {
     currentRound: number,
     studentArgument: string
   ): Promise<DebateRoundResponse> => {
-    const res = await apiClient.post<DebateRoundResponse>(
-      '/student/assistant/debate/round',
-      {
-        topic,
-        stance,
-        current_round: currentRound,
-        student_argument: studentArgument,
-      }
-    );
-    return res.data;
+    return assistantApi.executeAction<DebateRoundResponse>('debate_round', {
+      topic,
+      stance,
+      current_round: currentRound,
+      student_argument: studentArgument,
+    });
   },
 
   getConceptMap: async (topic: string, subjectName?: string): Promise<ConceptMapResponse> => {
     const res = await apiClient.get<ConceptMapResponse>(
-      '/student/assistant/concept-map',
+      '/student/assistant/insights',
       {
-        params: { topic, subject_name: subjectName || undefined },
+        params: { type: 'concept-map', topic, subject: subjectName || undefined },
       }
     );
     return res.data;
@@ -223,9 +206,9 @@ export const assistantApi = {
 
   getClassNotes: async (subjectName?: string): Promise<ClassTopicNotesResponse> => {
     const res = await apiClient.get<ClassTopicNotesResponse>(
-      '/student/assistant/class-notes',
+      '/student/assistant/insights',
       {
-        params: subjectName ? { subject_name: subjectName } : {},
+        params: { type: 'class-notes', subject: subjectName || undefined },
       }
     );
     return res.data;
@@ -233,20 +216,24 @@ export const assistantApi = {
 
   // Release 4 Methods: Proactive AI
   getMorningBriefing: async (): Promise<MorningBriefingResponse> => {
-    const res = await apiClient.get<MorningBriefingResponse>('/student/assistant/briefing');
+    const res = await apiClient.get<MorningBriefingResponse>('/student/assistant/insights', {
+      params: { type: 'briefing' },
+    });
     return res.data;
   },
 
   getDailyChallenge: async (): Promise<DailyChallengeResponse> => {
-    const res = await apiClient.get<DailyChallengeResponse>('/student/assistant/daily-challenge');
+    const res = await apiClient.get<DailyChallengeResponse>('/student/assistant/insights', {
+      params: { type: 'daily-challenge' },
+    });
     return res.data;
   },
 
   getCareerDiscovery: async (interests?: string): Promise<CareerDiscoveryResponse> => {
     const res = await apiClient.get<CareerDiscoveryResponse>(
-      '/student/assistant/career-discovery',
+      '/student/assistant/insights',
       {
-        params: interests ? { interests } : {},
+        params: { type: 'career-discovery', interests: interests || undefined },
       }
     );
     return res.data;

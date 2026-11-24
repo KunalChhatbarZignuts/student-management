@@ -8,6 +8,7 @@ import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
+import { SmoothDialogTransition } from '@/components/ui/animated/SmoothDialogTransition';
 
 interface ApplyLeaveDialogProps {
   open: boolean;
@@ -52,6 +53,17 @@ export const ApplyLeaveDialog: React.FC<ApplyLeaveDialogProps> = ({
       fullWidth
       component="form"
       onSubmit={handleSubmit}
+      disableRestoreFocus
+      TransitionComponent={SmoothDialogTransition}
+      PaperProps={{
+        sx: {
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          borderRadius: 2.5,
+          overflow: 'hidden',
+        },
+      }}
     >
       <DialogTitle>
         {isParent ? 'Submit Leave Request for Child' : 'New Leave Application'}

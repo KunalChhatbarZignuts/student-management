@@ -12,6 +12,7 @@ import Typography from '@mui/material/Typography';
 import VideoCameraFrontIcon from '@mui/icons-material/VideoCameraFront';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
+import { SmoothDialogTransition } from '@/components/ui/animated/SmoothDialogTransition';
 import { teacherOnlineClassApi, onlineClassroomKeys } from '../api';
 
 interface InstantClassDialogProps {
@@ -65,12 +66,29 @@ export default function InstantClassDialog({ open, onClose }: InstantClassDialog
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth disableRestoreFocus>
-      <form onSubmit={handleStart}>
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 600 }}>
-          <VideoCameraFrontIcon color="primary" /> Start Instant Online Class
-        </DialogTitle>
-        <DialogContent dividers>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      disableRestoreFocus
+      TransitionComponent={SmoothDialogTransition}
+      PaperProps={{
+        component: 'form',
+        onSubmit: handleStart,
+        sx: {
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          borderRadius: 2.5,
+          overflow: 'hidden',
+        },
+      }}
+    >
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 600 }}>
+        <VideoCameraFrontIcon color="primary" /> Start Instant Online Class
+      </DialogTitle>
+      <DialogContent dividers>
           {errorMsg && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setErrorMsg(null)}>
               {errorMsg}
@@ -103,7 +121,7 @@ export default function InstantClassDialog({ open, onClose }: InstantClassDialog
             <MenuItem value={90}>90 Minutes (1.5 Hours)</MenuItem>
           </TextField>
         </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
+        <DialogActions sx={{ px: 3, py: 2, flexShrink: 0 }}>
           <Button onClick={onClose} color="inherit" disabled={loading}>
             Cancel
           </Button>
@@ -111,7 +129,6 @@ export default function InstantClassDialog({ open, onClose }: InstantClassDialog
             {loading ? <CircularProgress size={24} color="inherit" /> : 'Launch & Join Now'}
           </Button>
         </DialogActions>
-      </form>
     </Dialog>
   );
 }

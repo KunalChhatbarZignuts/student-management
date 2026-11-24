@@ -14,6 +14,7 @@ import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import Divider from '@mui/material/Divider';
 import CircularProgress from '@mui/material/CircularProgress';
+import { SmoothDialogTransition } from '@/components/ui/animated/SmoothDialogTransition';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -112,12 +113,30 @@ export default function EditStudentDialog({
   };
 
   return (
-    <Dialog open={Boolean(editingStudent)} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog
+      open={Boolean(editingStudent)}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      disableRestoreFocus
+      TransitionComponent={SmoothDialogTransition}
+      PaperProps={{
+        component: 'form',
+        onSubmit: handleSubmit(handleFormSubmit),
+        noValidate: true,
+        sx: {
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          borderRadius: 2.5,
+          overflow: 'hidden',
+        },
+      }}
+    >
       <DialogTitle fontWeight={700}>
         Edit Student & Academic Enrollment
       </DialogTitle>
-      <Box component="form" onSubmit={handleSubmit(handleFormSubmit)} noValidate>
-        <DialogContent dividers>
+      <DialogContent dividers sx={{ overflowY: 'auto' }}>
           {/* Current Active Enrollment Read-only Header */}
           <Paper variant="outlined" sx={{ p: 2, mb: 3, bgcolor: 'background.default', borderRadius: 2 }}>
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
@@ -334,7 +353,6 @@ export default function EditStudentDialog({
             {isSubmitting ? 'Saving...' : 'Save Changes'}
           </Button>
         </DialogActions>
-      </Box>
     </Dialog>
   );
 }

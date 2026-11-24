@@ -12,6 +12,7 @@ import Alert from '@mui/material/Alert';
 import SchoolIcon from '@mui/icons-material/School';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import GradeIcon from '@mui/icons-material/Grade';
+import { AnimatedCard, AnimatedNumber } from '@/components/ui/animated';
 
 import { StudentResponse } from '@/features/students/types';
 import { AttendanceSummary } from '@/features/academic/api';
@@ -52,7 +53,7 @@ export const StudentMetricsGrid: React.FC<StudentMetricsGridProps> = ({
   return (
     <Grid container spacing={3} sx={{ mb: 4 }}>
       <Grid item xs={12} sm={4}>
-        <Card>
+        <AnimatedCard>
           <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'primary.light', color: '#fff' }}>
               <SchoolIcon />
@@ -75,11 +76,11 @@ export const StudentMetricsGrid: React.FC<StudentMetricsGridProps> = ({
               )}
             </Box>
           </CardContent>
-        </Card>
+        </AnimatedCard>
       </Grid>
 
       <Grid item xs={12} sm={4}>
-        <Card>
+        <AnimatedCard>
           <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'secondary.main', color: '#fff' }}>
               <EventAvailableIcon />
@@ -89,18 +90,24 @@ export const StudentMetricsGrid: React.FC<StudentMetricsGridProps> = ({
                 ATTENDANCE RATE
               </Typography>
               <Typography variant="h6" fontWeight={700}>
-                {attendance ? `${attendance.percentage}%` : 'Loading...'}
+                {attendance ? (
+                  <>
+                    <AnimatedNumber value={attendance.percentage} />%
+                  </>
+                ) : (
+                  'Loading...'
+                )}
               </Typography>
               <Typography variant="body2" color="success.main" fontWeight={500}>
                 Good standing
               </Typography>
             </Box>
           </CardContent>
-        </Card>
+        </AnimatedCard>
       </Grid>
 
       <Grid item xs={12} sm={4}>
-        <Card>
+        <AnimatedCard>
           <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'primary.dark', color: '#fff' }}>
               <GradeIcon />
@@ -117,7 +124,7 @@ export const StudentMetricsGrid: React.FC<StudentMetricsGridProps> = ({
               </Typography>
             </Box>
           </CardContent>
-        </Card>
+        </AnimatedCard>
       </Grid>
     </Grid>
   );

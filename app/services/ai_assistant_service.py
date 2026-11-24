@@ -1,4 +1,5 @@
 import datetime as dt
+import json
 import logging
 import os
 import re
@@ -6,11 +7,12 @@ import uuid
 from typing import Any
 
 from sqlalchemy import select, desc
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.ai_student_assistant import AIStudentConversation, AIStudentMessage, MessageSender
 from app.models.student import Student
 from app.services import ai_assistant_tools
+from app.services.ai_hf_provider import hf_provider
 
 logger = logging.getLogger(__name__)
 
@@ -31,19 +33,19 @@ def create_conversation(student_id: uuid.UUID, title: str | None, db: Session) -
 
 
 def list_conversations(student_id: uuid.UUID, db: Session) -> list[dict[str, Any]]:
+    # Eager-load messages in a single query to eliminate N+1 latency
     convs = db.execute(
         select(AIStudentConversation)
+        .options(selectinload(AIStudentConversation.messages))
         .where(AIStudentConversation.student_id == student_id)
         .order_by(AIStudentConversation.updated_at.desc())
     ).scalars().all()
 
     results = []
     for c in convs:
-        last_msg = db.execute(
-            select(AIStudentMessage)
-            .where(AIStudentMessage.conversation_id == c.id)
-            .order_by(AIStudentMessage.created_at.desc())
-        ).scalars().first()
+        # Sort in-memory from preloaded relationship
+        msgs = sorted(c.messages, key=lambda m: m.created_at, reverse=True)
+        last_msg = msgs[0] if msgs else None
 
         results.append({
             "id": c.id,
@@ -59,6 +61,7 @@ def list_conversations(student_id: uuid.UUID, db: Session) -> list[dict[str, Any
 def get_conversation_detail(student_id: uuid.UUID, conversation_id: uuid.UUID, db: Session) -> dict[str, Any] | None:
     conv = db.execute(
         select(AIStudentConversation)
+        .options(selectinload(AIStudentConversation.messages))
         .where(
             AIStudentConversation.id == conversation_id,
             AIStudentConversation.student_id == student_id,
@@ -210,6 +213,9 @@ def classify_query_intent(message: str) -> list[str]:
     if any(k in text for k in ("syllabus", "chapter", "topic", "curriculum")):
         tools.append("get_subject_curriculum")
 
+    if any(k in text for k in ("rule", "policy", "handbook", "guideline", "uniform", "fine", "cut-off", "cutoff", "passing mark", "grading system", "library", "dress code", "conduct", "late fee")):
+        tools.append("search_school_knowledge")
+
     return list(dict.fromkeys(tools))
 
 
@@ -229,7 +235,7 @@ def synthesize_fallback_response(
 
     # 1. Homework / Assignment check
     if any(k in text for k in ("assignment", "homework", "project submission")):
-        lines.append("📋 **Homework & Assignment Status**\n")
+        lines.append("### Homework & Assignment Status\n")
         lines.append(
             "Please note that online assignment and homework submissions are currently **not activated** in this school portal.\n"
             "Your teachers assign homework directly in class. For curriculum study topics or diagnostic practice, you can explore the Subject Syllabus or Adaptive Practice."
@@ -239,7 +245,7 @@ def synthesize_fallback_response(
 
     # 2. Recorded online classes check
     if "recorded" in text or "recording" in text:
-        lines.append("🎥 **Online Class Recordings**\n")
+        lines.append("### Online Class Recordings\n")
         lines.append(
             "Lecture recording is currently **disabled** across online classrooms in this institution in accordance with school privacy standards.\n"
             "You can join upcoming scheduled live sessions directly from your Online Classroom dashboard."
@@ -251,7 +257,7 @@ def synthesize_fallback_response(
     if "get_student_timetable" in tool_results:
         tt = tool_results["get_student_timetable"]
         date_label = "Tomorrow" if "tomorrow" in text else "Today"
-        lines.append(f"📅 **Your Timetable for {date_label} ({tt.get('date')}, {tt.get('day_of_week')})**\n")
+        lines.append(f"### Timetable for {date_label} ({tt.get('date')}, {tt.get('day_of_week')})\n")
         periods = tt.get("periods", [])
         if not periods or not tt.get("is_scheduled"):
             lines.append("You have **no scheduled periods** for this day. It may be a designated study day or school holiday.")
@@ -269,7 +275,7 @@ def synthesize_fallback_response(
         att = tool_results["get_student_attendance"]
         if lines:
             lines.append("\n---\n")
-        lines.append(f"📊 **Your Official Attendance Summary**\n")
+        lines.append("### Official Attendance Summary\n")
         lines.append(f"- **Current Attendance Rate**: **{att['attendance_percentage']}%** ({att['status']})")
         lines.append(f"- **Total Working Days**: {att['total_working_days']}")
         lines.append(f"- **Days Attended**: {att['attended_days']}")
@@ -286,10 +292,10 @@ def synthesize_fallback_response(
         exams = tool_results["get_student_examinations"]
         if lines:
             lines.append("\n---\n")
-        lines.append("📝 **Upcoming Examination Schedules**\n")
+        lines.append("### Upcoming Examination Schedules\n")
         upcoming = exams.get("upcoming_examinations", [])
         if not upcoming:
-            lines.append("Great news! You have no upcoming examinations scheduled right now.")
+            lines.append("You have no upcoming examinations scheduled right now.")
         else:
             for ex in upcoming:
                 lines.append(f"- **{ex['subject_name']}** ({ex['exam_name']}): `{ex['exam_date']}` at `{ex['start_time'][:5] if ex['start_time'] else 'TBD'}` (Max Marks: {int(ex['max_marks'])})")
@@ -300,7 +306,7 @@ def synthesize_fallback_response(
         res = tool_results["get_student_results"]
         if lines:
             lines.append("\n---\n")
-        lines.append("🏆 **Published Examination Results**\n")
+        lines.append("### Published Examination Results\n")
         results_list = res.get("results", [])
         if not results_list:
             lines.append("No published examination results are available for your current term yet. Please check back after term results are announced.")
@@ -320,7 +326,7 @@ def synthesize_fallback_response(
         cal = tool_results["get_school_calendar"]
         if lines:
             lines.append("\n---\n")
-        lines.append("🗓️ **School Calendar & Holiday Information**\n")
+        lines.append("### School Calendar & Holiday Information\n")
         lines.append(f"- **Target Date**: `{cal.get('date', 'Today')}`")
         if cal.get("is_working_day"):
             lines.append(f"- **Status**: Standard school working day.")
@@ -336,7 +342,7 @@ def synthesize_fallback_response(
         fee = tool_results["get_student_fees"]
         if lines:
             lines.append("\n---\n")
-        lines.append("💳 **Tuition Fee Schedule Summary**\n")
+        lines.append("### Tuition Fee Schedule Summary\n")
         insts = fee.get("installments", [])
         if not insts:
             lines.append("You have no pending fee invoices assigned. Your account is in clear standing!")
@@ -355,13 +361,13 @@ def synthesize_fallback_response(
         oc = tool_results["get_student_online_classes"]
         if lines:
             lines.append("\n---\n")
-        lines.append("🌐 **Online Classroom Sessions**\n")
+        lines.append("### Online Classroom Sessions\n")
         cls_list = oc.get("classes", [])
         if not cls_list:
             lines.append("You have no live or upcoming online classes right now.")
         else:
             for c in cls_list:
-                status_icon = "🔴 LIVE NOW" if c['status'] == "LIVE" else f"📅 {c['scheduled_date']} at {c['start_time'][:5]}"
+                status_icon = "LIVE NOW" if c['status'] == "LIVE" else f"{c['scheduled_date']} at {c['start_time'][:5]}"
                 lines.append(f"- **{c['title']}** with {c['teacher_name']} • {status_icon}")
         lines.append("\n*Note: Lecture recordings are not enabled on this platform.*")
         action_links.append({"label": "Join Online Classroom", "url": "/online-classroom"})
@@ -371,7 +377,7 @@ def synthesize_fallback_response(
         leaves = tool_results["get_student_leaves"]
         if lines:
             lines.append("\n---\n")
-        lines.append("📝 **Your Leave Applications**\n")
+        lines.append("### Leave Applications\n")
         l_list = leaves.get("leaves", [])
         if not l_list:
             lines.append("You have not submitted any leave applications recently.")
@@ -385,7 +391,7 @@ def synthesize_fallback_response(
         cur = tool_results["get_subject_curriculum"]
         if lines:
             lines.append("\n---\n")
-        lines.append("📚 **Enrolled Subjects & Syllabus Curriculum**\n")
+        lines.append("### Enrolled Subjects & Syllabus Curriculum\n")
         for s in cur.get("subjects", []):
             lines.append(f"### {s['subject_name']} (`{s['subject_code']}`)")
             for ch in s.get("chapters", [])[:3]:
@@ -508,18 +514,19 @@ def synthesize_fallback_response(
         br = tool_results["get_morning_briefing"]
         if lines:
             lines.append("\n---\n")
-        lines.append(f"☀️ **Good Morning, {br.get('student_name')}!** ({br.get('day_name')}, {br.get('date_str')})\n")
+        lines.append(f"### Morning Academic Briefing ({br.get('day_name')}, {br.get('date_str')})\n")
+        lines.append(f"Good Morning, {br.get('student_name')}!\n")
         lines.append(f"> {br.get('inspirational_quote')}\n")
-        lines.append(f"- 📅 **Classes Today**: {br.get('classes_count')} scheduled periods")
+        lines.append(f"- **Classes Today**: {br.get('classes_count')} scheduled periods")
         if br.get("next_class_summary"):
-            lines.append(f"- 🔔 **First Lecture**: {br.get('next_class_summary')}")
+            lines.append(f"- **First Lecture**: {br.get('next_class_summary')}")
         if br.get("nearest_exam_name"):
-            lines.append(f"- 📝 **Next Examination**: `{br.get('nearest_exam_name')}`")
+            lines.append(f"- **Next Examination**: `{br.get('nearest_exam_name')}`")
         if br.get("pending_fee_balance", 0) > 0:
-            lines.append(f"- 💳 **Account Notice**: Pending fee balance of ${br.get('pending_fee_balance'):.2f}")
+            lines.append(f"- **Account Notice**: Pending fee balance of ${br.get('pending_fee_balance'):.2f}")
         if br.get("calendar_notice"):
-            lines.append(f"- 🗓️ **Calendar Alert**: {br.get('calendar_notice')}")
-        lines.append(f"\n💡 *Recommendation*: {br.get('proactive_recommendation')}")
+            lines.append(f"- **Calendar Alert**: {br.get('calendar_notice')}")
+        lines.append(f"\n*Academic Focus*: {br.get('proactive_recommendation')}")
         action_links.append({"label": "View Full Timetable", "url": "/timetable"})
 
     # 21. Daily Knowledge Challenge response (Release 4)
@@ -527,19 +534,19 @@ def synthesize_fallback_response(
         dc = tool_results["get_daily_challenge"]
         if lines:
             lines.append("\n---\n")
-        lines.append(f"🔥 **Daily Knowledge Challenge ({dc.get('subject')} – {dc.get('topic')})**\n")
+        lines.append(f"### Daily Knowledge Challenge ({dc.get('subject')} – {dc.get('topic')})\n")
         lines.append(f"**Question**: {dc.get('question_text')}\n")
         for idx, opt in enumerate(dc.get("options", [])):
             lines.append(f"{chr(65 + idx)}. {opt}")
         lines.append(f"\n*(Hint: {dc.get('hint')})*")
-        lines.append("\n*Answer in chat or open the Daily Challenge banner to boost your streak!*")
+        lines.append("\n*Answer in chat or open the Daily Challenge banner to continue your daily streak.*")
 
     # 22. Career Discovery response (Release 4)
     if "discover_careers" in tool_results:
         cd = tool_results["discover_careers"]
         if lines:
             lines.append("\n---\n")
-        lines.append(f"🧭 **Personalized Career Discovery & Pathways** ({cd.get('student_grade')})\n")
+        lines.append(f"### Career Discovery & Pathways ({cd.get('student_grade')})\n")
         lines.append(f"> {cd.get('advice')}\n")
         for p in cd.get("career_pathways", []):
             lines.append(f"### {p['title']} ({p['match_score']}% Match)")
@@ -549,18 +556,33 @@ def synthesize_fallback_response(
             lines.append(f"- **Core Industry Skills**: {', '.join(p['key_skills'])}")
             lines.append("")
 
+    # 23. School Knowledge Base / RAG response
+    if "search_school_knowledge" in tool_results:
+        sk = tool_results["search_school_knowledge"]
+        docs = sk.get("documents", [])
+        if docs:
+            if lines:
+                lines.append("\n---\n")
+            lines.append("### Official School Information & Guidelines\n")
+            for doc in docs:
+                lines.append(f"### {doc['document_title']}")
+                lines.append(f"> Category: `{doc.get('category', 'GENERAL')}`")
+                lines.append(doc["chunk_content"])
+                lines.append("")
+            action_links.append({"label": "View School Calendar", "url": "/calendar"})
+
     # Educational or General question default
     if not lines:
         lines.append(
-            f"Hello {student.first_name}! I am your AI Student Assistant.\n\n"
-            "I can help you with:\n"
-            "- 📅 **Daily and weekly class timetables**\n"
-            "- 📊 **Your attendance summaries and absences**\n"
-            "- 📝 **Upcoming exams and published marks**\n"
-            "- 🗓️ **School calendar, breaks, and holidays**\n"
-            "- 🌐 **Online lectures and video classes**\n"
-            "- 📚 **Subject concept explanations and practice problems**\n\n"
-            "Try asking: *\"What is my next class?\"*, *\"What is my attendance rate?\"*, or *\"Explain Newton's third law!\"*"
+            f"Hello {student.first_name}. I am your AI Student Assistant.\n\n"
+            "I can assist you with:\n"
+            "- **Daily and weekly class timetables**\n"
+            "- **Attendance summaries and records**\n"
+            "- **Upcoming examinations and published marks**\n"
+            "- **School calendar and holiday schedule**\n"
+            "- **Online classroom sessions**\n"
+            "- **Subject curriculum and concept explanations**\n\n"
+            "Try asking: *\"What is my next class?\"*, *\"What is my attendance rate?\"*, or *\"Explain Newton's third law.\"*"
         )
         action_links.append({"label": "View Timetable", "url": "/timetable"})
 
@@ -645,49 +667,52 @@ def process_assistant_chat(
             args["topic"] = subj_top
         elif t_name == "get_class_notes":
             args["subject_name"] = "Mathematics"
+        elif t_name == "search_school_knowledge":
+            args["query"] = message
         tool_results[t_name] = ai_assistant_tools.execute_tool(t_name, args, student, db)
 
     # 4. Generate deterministic fallback response
     deterministic_content, action_links = synthesize_fallback_response(message, student, tool_results)
 
     final_content = deterministic_content
-    api_key = os.getenv("GEMINI_API_KEY")
 
-    # 5. Enhance via Gemini 1.5 Flash if available and educational/conversational
-    if api_key and (not required_tools or any(k in message.lower() for k in ("explain", "what is", "how", "why", "law", "rule", "calculate", "example"))):
+    # 5. Enhance via Hugging Face LLM (Qwen/Qwen2.5-7B-Instruct or configured model)
+    if hf_provider.is_configured():
         try:
-            from google import genai
-            client = genai.Client(api_key=api_key)
-            prompt = f"""
-You are the AI Student Assistant for {student.first_name} {student.last_name}, a student in {student.class_name or 'High School'}.
-Your role is to act as an encouraging, accurate, and supportive personal digital school copilot.
+            student_info = f"{student.first_name} {student.last_name} (Class: {student.class_name or 'High School'} {student.section or ''})"
+            system_prompt = f"""You are the official AI Student Assistant for {student_info} at St. Joseph Academy.
+Today's Date: {dt.date.today().isoformat()} ({dt.date.today().strftime('%A')}).
+Your mission is to be an encouraging, academically empowering, factual, and supportive digital school copilot.
 
-Verified Student Context:
-- Name: {student.first_name} {student.last_name}
-- Class/Grade: {student.class_name or 'N/A'} - Section: {student.section or 'N/A'}
-- Today's Date: {dt.date.today().isoformat()} ({dt.date.today().strftime('%A')})
+VERIFIED SCHOOL DATABASE & OFFICIAL KNOWLEDGE RETRIEVED:
+The following authoritative school data was retrieved from the database for this authenticated student:
+{json.dumps(tool_results, indent=2, default=str)}
 
-Verified Tool Data Retrieved:
-{tool_results}
-
-Student Question: "{message}"
-
-Instructions:
-1. Provide a clear, structured, and helpful response. Use Markdown with bullet points and bold headers.
-2. If the student asks a subject/educational question (e.g., science, math), explain clearly at a high-school level with real-world examples and KaTeX LaTeX formatting where appropriate.
-3. If the question asks about timetable, attendance, exams, or fees, use ONLY the verified tool data above. Never invent unverified grades, dates, or timetable periods.
-4. If asked about homework or assignments, politely clarify that homework tracking is not active in this portal version.
-5. If asked about recorded classes, clarify that class recording is disabled in accordance with school privacy standards.
-6. Keep answers concise, encouraging, and easy to read.
+OPERATIONAL RULES:
+1. Grounding: Answer strictly using the verified school data and official guidelines above. Never fabricate attendance rates, examination marks, fee balances, or timetable periods.
+2. If data shows no upcoming exams, zero fee dues, or a holiday, state that clearly and accurately.
+3. Tone: Warm, respectful, student-friendly, and educational. Format with clear Markdown headings, bullet points, and tables.
+4. Academics: When explaining science, math, or study concepts, provide clear step-by-step guidance with KaTeX LaTeX math ($...$) where helpful.
+5. School Policies: Accurately cite official guidelines (such as the 75% attendance rule, 14-day library loan, grading scale) from the retrieved knowledge.
+6. Scope: Note that online homework submissions and class recordings are currently disabled in this school portal.
 """
-            response = client.models.generate_content(
-                model="gemini-1.5-flash",
-                contents=prompt,
+            messages = [{"role": "system", "content": system_prompt}]
+            # Include recent turns for conversational continuity
+            recent_turns = conv.messages[-4:]
+            for m in recent_turns:
+                role = "user" if m.sender == MessageSender.STUDENT.value else "assistant"
+                messages.append({"role": role, "content": m.content})
+            messages.append({"role": "user", "content": message})
+
+            hf_result = hf_provider.chat_completion(
+                messages=messages,
+                max_tokens=1024,
+                temperature=0.7,
             )
-            if response and response.text:
-                final_content = response.text.strip()
-        except Exception as e:
-            logger.info(f"Gemini API generation bypassed or offline: {e}. Delivered verified deterministic response.")
+            if hf_result:
+                final_content = hf_result.strip()
+        except Exception as exc:
+            logger.info("Hugging Face LLM completion skipped or failed (%s); using verified deterministic response.", exc)
 
     # 6. Record assistant message turn
     asst_msg = AIStudentMessage(

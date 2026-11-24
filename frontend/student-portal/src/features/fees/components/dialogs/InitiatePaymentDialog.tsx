@@ -10,6 +10,7 @@ import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
 import InputAdornment from '@mui/material/InputAdornment';
 import PaymentIcon from '@mui/icons-material/Payment';
+import { SmoothDialogTransition } from '@/components/ui/animated/SmoothDialogTransition';
 
 import { PortalInstallmentItem } from '@/features/fees/types';
 
@@ -35,7 +36,23 @@ export const InitiatePaymentDialog: React.FC<InitiatePaymentDialogProps> = ({
   isProcessing,
 }) => {
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="xs"
+      fullWidth
+      disableRestoreFocus
+      TransitionComponent={SmoothDialogTransition}
+      PaperProps={{
+        sx: {
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          borderRadius: 2.5,
+          overflow: 'hidden',
+        },
+      }}
+    >
       <DialogTitle>Pay Fee Online</DialogTitle>
       <DialogContent dividers>
         {selectedInstallment && (

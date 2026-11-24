@@ -19,6 +19,7 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import VideoCameraFrontIcon from '@mui/icons-material/VideoCameraFront';
 import { useRouter } from 'next/navigation';
+import { PulseLiveBadge } from '@/components/ui/animated/PulseLiveBadge';
 import { OnlineClass } from '../types';
 
 interface OnlineClassesTableProps {
@@ -78,21 +79,13 @@ export default function OnlineClassesTable({
   const renderStatusChip = (status: string) => {
     switch (status) {
       case 'LIVE':
-        return (
-          <Chip
-            icon={<FiberManualRecordIcon sx={{ fontSize: 12, color: '#fff !important', animation: 'pulse 1.5s infinite' }} />}
-            label="LIVE NOW"
-            size="small"
-            color="success"
-            sx={{ fontWeight: 700 }}
-          />
-        );
+        return <PulseLiveBadge variant="live" label="LIVE NOW" pulse={true} />;
       case 'SCHEDULED':
-        return <Chip label="Scheduled" size="small" color="info" variant="outlined" sx={{ fontWeight: 600 }} />;
+        return <PulseLiveBadge variant="scheduled" label="Scheduled" pulse={false} />;
       case 'COMPLETED':
-        return <Chip label="Completed" size="small" color="default" sx={{ fontWeight: 500 }} />;
+        return <PulseLiveBadge variant="completed" label="Completed" pulse={false} />;
       case 'CANCELLED':
-        return <Chip label="Cancelled" size="small" color="error" variant="outlined" sx={{ fontWeight: 500 }} />;
+        return <PulseLiveBadge variant="danger" label="Cancelled" pulse={false} />;
       default:
         return <Chip label={status} size="small" />;
     }

@@ -22,15 +22,26 @@ import { adminTeacherApi, teacherKeys } from '@/features/teachers/api';
 import { adminStudentApi } from '@/features/students/api';
 import { TeacherCreatePayload } from '@/features/teachers/types';
 import { useSnackbar } from '@/components/ui/SnackbarProvider';
+import dynamic from 'next/dynamic';
 import { formatErrorMessage } from '@/lib/errorMapper';
 
 import SubjectAssignmentsTab from '@/features/teachers/components/SubjectAssignmentsTab';
-import AssignSubjectDialog from '@/features/teachers/components/AssignSubjectDialog';
-import TeacherProfileDialog from '@/features/teachers/components/TeacherProfileDialog';
 import SubjectsTab from '@/features/teachers/components/SubjectsTab';
 import TeachersFilterBar from '@/features/teachers/components/TeachersFilterBar';
 import TeachersTable from '@/features/teachers/components/TeachersTable';
-import CreateTeacherDialog from '@/features/teachers/components/CreateTeacherDialog';
+
+const AssignSubjectDialog = dynamic(
+  () => import('@/features/teachers/components/AssignSubjectDialog'),
+  { ssr: false }
+);
+const TeacherProfileDialog = dynamic(
+  () => import('@/features/teachers/components/TeacherProfileDialog'),
+  { ssr: false }
+);
+const CreateTeacherDialog = dynamic(
+  () => import('@/features/teachers/components/CreateTeacherDialog'),
+  { ssr: false }
+);
 
 export default function TeachersManagementPage() {
   const router = useRouter();

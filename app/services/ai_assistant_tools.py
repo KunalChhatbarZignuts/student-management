@@ -510,6 +510,19 @@ def tool_discover_careers(student: Student, db: Session, interests: str | None =
     return ai_proactive_service.discover_career_pathways(db, student.id, interests).model_dump()
 
 
+def tool_search_school_knowledge(
+    student: Student, db: Session, query: str = "", category: str | None = None
+) -> dict[str, Any]:
+    """Queries official school knowledge base, rules, policies, and FAQs via RAG."""
+    from app.services.ai_rag_service import ai_rag_service
+    matches = ai_rag_service.search_knowledge_base(db, query=query, limit=3, category=category)
+    return {
+        "query": query,
+        "results_count": len(matches),
+        "documents": matches,
+    }
+
+
 # Tool Dispatch Router
 TOOL_REGISTRY = {
     "get_student_profile": tool_get_student_profile,
@@ -533,6 +546,7 @@ TOOL_REGISTRY = {
     "get_morning_briefing": tool_get_morning_briefing,
     "get_daily_challenge": tool_get_daily_challenge,
     "discover_careers": tool_discover_careers,
+    "search_school_knowledge": tool_search_school_knowledge,
 }
 
 
@@ -576,6 +590,10 @@ def execute_tool(tool_name: str, args: dict[str, Any], student: Student, db: Ses
         elif tool_name == "discover_careers":
             intr = args.get("interests")
             return handler(student, db, interests=intr)
+        elif tool_name == "search_school_knowledge":
+            q = args.get("query", "")
+            cat = args.get("category")
+            return handler(student, db, query=q, category=cat)
         else:
             return handler(student, db)
     except Exception as e:

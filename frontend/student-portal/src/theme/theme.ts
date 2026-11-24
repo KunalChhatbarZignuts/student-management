@@ -53,26 +53,92 @@ export const getDesignTokens = (mode: 'light' | 'dark'): ThemeOptions => ({
       },
       styleOverrides: {
         root: {
-          borderRadius: 8,
+          borderRadius: 6,
           padding: '8px 16px',
+          fontWeight: 600,
+          transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
+          '&:hover': {
+            boxShadow: 'none',
+          },
+          '&:active': {
+            opacity: 0.92,
+          },
+        },
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          transition: 'background-color 0.15s ease, color 0.15s ease',
         },
       },
     },
     MuiCard: {
       styleOverrides: {
         root: {
-          borderRadius: 12,
-          boxShadow:
-            mode === 'light'
-              ? '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)'
-              : '0 1px 3px 0 rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.3)',
-          border: `1px solid ${mode === 'light' ? '#e2e8f0' : '#334155'}`,
+          borderRadius: 8,
+          transition: 'border-color 0.15s ease, background-color 0.15s ease',
+          boxShadow: 'none',
+          border: `1px solid ${mode === 'light' ? '#e2e8f0' : '#27272a'}`,
+          '&:hover': {
+            borderColor: mode === 'light' ? '#cbd5e1' : '#3f3f46',
+          },
         },
       },
     },
     MuiPaper: {
       defaultProps: {
         elevation: 0,
+      },
+      styleOverrides: {
+        root: {
+          transition: 'background-color 0.15s ease, border-color 0.15s ease',
+        },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          borderRadius: 4,
+          fontWeight: 600,
+          transition: 'background-color 0.15s ease, border-color 0.15s ease',
+        },
+      },
+    },
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: {
+          borderRadius: 6,
+          transition: 'border-color 0.15s ease',
+          '&.Mui-focused': {
+            boxShadow: 'none',
+          },
+        },
+      },
+    },
+    MuiTableRow: {
+      styleOverrides: {
+        root: {
+          transition: 'background-color 0.12s ease',
+        },
+      },
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          transition: 'color 0.15s ease',
+          fontWeight: 600,
+          '&:hover': {
+            color: mode === 'light' ? '#047857' : '#10b981',
+          },
+        },
+      },
+    },
+    MuiAccordion: {
+      styleOverrides: {
+        root: {
+          transition: 'background-color 0.15s ease',
+        },
       },
     },
   },

@@ -9,6 +9,7 @@ import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
+import { SmoothDialogTransition } from '@/components/ui/animated/SmoothDialogTransition';
 
 import { LeaveApplicationItem } from '@/features/leaves/types';
 
@@ -40,7 +41,17 @@ export default function LeaveApprovalDialog({
   const isReject = type === 'reject';
 
   return (
-    <Dialog open={Boolean(application)} onClose={onClose} maxWidth="xs" fullWidth>
+    <Dialog
+      open={Boolean(application)}
+      onClose={onClose}
+      maxWidth="xs"
+      fullWidth
+      disableRestoreFocus
+      TransitionComponent={SmoothDialogTransition}
+      PaperProps={{
+        sx: { borderRadius: 2.5, overflow: 'hidden' },
+      }}
+    >
       <DialogTitle fontWeight={700}>
         {isReject ? 'Reject Leave Application' : 'Approve Leave Application'}
       </DialogTitle>

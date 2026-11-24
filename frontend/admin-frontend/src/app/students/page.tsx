@@ -18,13 +18,25 @@ import { adminGradeApi, gradeKeys } from '@/features/grades/api';
 import { useSnackbar } from '@/components/ui/SnackbarProvider';
 import { formatErrorMessage } from '@/lib/errorMapper';
 
+import dynamic from 'next/dynamic';
+
 import StudentsFilterBar from '@/features/students/components/StudentsFilterBar';
 import StudentsTable from '@/features/students/components/StudentsTable';
-import CreateStudentDialog from '@/features/students/components/CreateStudentDialog';
-import StudentCredentialsDialog, {
-  CreatedStudentCredentials,
-} from '@/features/students/components/StudentCredentialsDialog';
-import EditStudentDialog, { EditStudentFormData } from '@/features/students/components/EditStudentDialog';
+import type { CreatedStudentCredentials } from '@/features/students/components/StudentCredentialsDialog';
+import type { EditStudentFormData } from '@/features/students/components/EditStudentDialog';
+
+const CreateStudentDialog = dynamic(
+  () => import('@/features/students/components/CreateStudentDialog'),
+  { ssr: false }
+);
+const StudentCredentialsDialog = dynamic(
+  () => import('@/features/students/components/StudentCredentialsDialog'),
+  { ssr: false }
+);
+const EditStudentDialog = dynamic(
+  () => import('@/features/students/components/EditStudentDialog'),
+  { ssr: false }
+);
 
 export default function StudentsManagementPage() {
   const router = useRouter();

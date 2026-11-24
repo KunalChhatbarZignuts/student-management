@@ -958,6 +958,33 @@ def test_online_classroom_feed_websocket_endpoint():
         assert data == "pong"
 
 
+def test_search_students_for_teacher_endpoint(test_db_session, seed_data):
+    """Verify searching and filtering students for online class invitation."""
+    teacher_user = seed_data["teacher_user"]
+    student1 = seed_data["student1"]
+
+    app.dependency_overrides[get_db] = lambda: test_db_session
+    app.dependency_overrides[get_current_user] = lambda: teacher_user
+
+    client = TestClient(app)
+
+    # 1. Search all students
+    res = client.get("/api/v1/teacher/online-classes/students?limit=10")
+    assert res.status_code == 200
+    items = res.json()["items"]
+    assert len(items) >= 1
+    assert items[0]["student_code"] is not None
+
+    # 2. Search by query string
+    res_search = client.get(f"/api/v1/teacher/online-classes/students?search={student1.first_name}")
+    assert res_search.status_code == 200
+    found = res_search.json()["items"]
+    assert any(s["first_name"] == student1.first_name for s in found)
+
+    app.dependency_overrides.clear()
+
+
+
 
 
 

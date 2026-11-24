@@ -15,6 +15,7 @@ import PrintIcon from '@mui/icons-material/Print';
 import DownloadIcon from '@mui/icons-material/Download';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import { SmoothDialogTransition } from '@/components/ui/animated/SmoothDialogTransition';
 
 import { FeeReceiptDetail } from '@/features/fees/types';
 import { portalFeeApi } from '@/features/fees/api';
@@ -54,7 +55,23 @@ export const FeeReceiptDialog: React.FC<FeeReceiptDialogProps> = ({
     }
   };
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      disableRestoreFocus
+      TransitionComponent={SmoothDialogTransition}
+      PaperProps={{
+        sx: {
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          borderRadius: 2.5,
+          overflow: 'hidden',
+        },
+      }}
+    >
       <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>Official Fee Payment Receipt</span>
         <Box>

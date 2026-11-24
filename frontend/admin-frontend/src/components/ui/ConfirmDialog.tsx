@@ -8,6 +8,7 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
+import { SmoothDialogTransition } from '@/components/ui/animated/SmoothDialogTransition';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -40,6 +41,10 @@ export default function ConfirmDialog({
       maxWidth="xs"
       fullWidth
       sx={{ zIndex: 10000 }}
+      TransitionComponent={SmoothDialogTransition}
+      PaperProps={{
+        sx: { borderRadius: 2.5, overflow: 'hidden' },
+      }}
     >
       <DialogTitle fontWeight={600}>{title}</DialogTitle>
       <DialogContent>

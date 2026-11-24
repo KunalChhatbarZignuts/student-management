@@ -59,6 +59,12 @@ class Settings(BaseSettings):
     LIVEKIT_API_KEY: str = "devkey"
     LIVEKIT_API_SECRET: str = "secretsecretsecretsecretsecretsecret32"
 
+    # Hugging Face AI Configuration
+    HUGGINGFACE_API_TOKEN: str = ""
+    HUGGINGFACE_MODEL_ID: str = "Qwen/Qwen2.5-7B-Instruct"
+    HUGGINGFACE_EMBEDDING_MODEL_ID: str = "sentence-transformers/all-MiniLM-L6-v2"
+    AI_FALLBACK_DETERMINISTIC: bool = True
+
     # Seed super admin (used by seed script only)
     SEED_SUPER_ADMIN_EMAIL: str = "admin@school.local"
     SEED_SUPER_ADMIN_PASSWORD: str = "ChangeMe@1234"
