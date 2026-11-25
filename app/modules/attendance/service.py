@@ -3,12 +3,13 @@ from datetime import date, datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.core.config import settings
 from app.modules.academics.structure_models import AcademicYear, Grade, Section, StudentEnrollment
 from app.modules.attendance.models import AttendanceAuditHistory, AttendanceRecord, AttendanceSession, AttendanceStatus
-from app.modules.academics.classroom_models import Class, Subject, TeacherAssignment
+from app.modules.academics.classroom_models import Subject, TeacherAssignment
+from app.modules.academics.structure_models import Grade, Section
 from app.modules.students.models import Student
 from app.modules.teachers.models import Teacher
 from app.modules.attendance.schemas import (
@@ -23,12 +24,12 @@ from app.modules.attendance.absence_notification_service import dispatch_absence
 from app.modules.audit.service import log_action
 
 
-def _verify_teacher_class_access(teacher_id: uuid.UUID, class_id: uuid.UUID, db: Session) -> Class:
-    """Verifies teacher assignment to class. Returns 404 if not assigned or class inactive."""
+def _verify_teacher_class_access(teacher_id: uuid.UUID, class_id: uuid.UUID, db: Session) -> Section:
+    """Verifies teacher assignment to section. Returns 404 if not assigned or section inactive."""
     assignment = db.execute(
         select(TeacherAssignment).where(
             TeacherAssignment.teacher_id == teacher_id,
-            TeacherAssignment.class_id == class_id,
+            TeacherAssignment.section_id == class_id,
             TeacherAssignment.status == "active",
         )
     ).scalars().first()
@@ -37,13 +38,13 @@ def _verify_teacher_class_access(teacher_id: uuid.UUID, class_id: uuid.UUID, db:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Class not found or not assigned to teacher",
         )
-    classroom = db.get(Class, class_id)
-    if not classroom or classroom.status != "active":
+    section = db.get(Section, class_id)
+    if not section or section.status != "active":
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Class not found or inactive",
         )
-    return classroom
+    return section
 
 
 def create_bulk_attendance(
@@ -300,7 +301,9 @@ def update_attendance_session(
             detail="Attendance session is locked and cannot be modified.",
         )
 
-    classroom = db.get(Class, session.class_id)
+    sec_id = session.section_id
+    section = db.get(Section, sec_id) if sec_id else None
+    grade = db.get(Grade, section.grade_id) if section else None
     subject = db.get(Subject, session.subject_id)
 
     # Map existing records by student_id
@@ -563,15 +566,20 @@ def get_teacher_assigned_sections(teacher_id: uuid.UUID, db: Session) -> list[As
         select(Section).where(Section.id.in_(section_ids), Section.status == "active")
     ).scalars().all()
 
-    results: list[AssignedSectionItem] = []
-    for sec in sections:
-        stu_count = db.execute(
-            select(func.count(StudentEnrollment.id)).where(
-                StudentEnrollment.section_id == sec.id,
+    # Batch query student counts per section in a single GROUP BY query
+    counts_map = dict(
+        db.execute(
+            select(StudentEnrollment.section_id, func.count(StudentEnrollment.id))
+            .where(
+                StudentEnrollment.section_id.in_(section_ids),
                 StudentEnrollment.status == "ACTIVE",
             )
-        ).scalar_one()
+            .group_by(StudentEnrollment.section_id)
+        ).all()
+    )
 
+    results: list[AssignedSectionItem] = []
+    for sec in sections:
         results.append(
             AssignedSectionItem(
                 section_id=sec.id,
@@ -580,7 +588,7 @@ def get_teacher_assigned_sections(teacher_id: uuid.UUID, db: Session) -> list[As
                 grade_name=sec.grade.name if sec.grade else "Grade",
                 academic_year_id=sec.academic_year_id,
                 role=section_roles.get(sec.id, "Teacher"),
-                enrolled_students_count=stu_count,
+                enrolled_students_count=counts_map.get(sec.id, 0),
             )
         )
     results.sort(key=lambda x: (x.grade_name, x.section_name))
@@ -1116,27 +1124,45 @@ def get_admin_attendance_overview(
 
     sections = db.execute(sec_stmt.order_by(Grade.level.asc(), Section.name.asc())).scalars().all()
 
+    sec_ids = [sec.id for sec in sections]
+
+    # Batch query student enrollment counts per section
+    counts_map = dict(
+        db.execute(
+            select(StudentEnrollment.section_id, func.count(StudentEnrollment.id))
+            .where(
+                StudentEnrollment.section_id.in_(sec_ids),
+                StudentEnrollment.status == "ACTIVE",
+            )
+            .group_by(StudentEnrollment.section_id)
+        ).all()
+    ) if sec_ids else {}
+
+    # Batch query sessions with records and teacher loaded
+    sessions_list = db.execute(
+        select(AttendanceSession)
+        .options(
+            joinedload(AttendanceSession.teacher),
+            joinedload(AttendanceSession.marked_by),
+            selectinload(AttendanceSession.records),
+        )
+        .where(
+            AttendanceSession.section_id.in_(sec_ids),
+            AttendanceSession.date == target_date,
+        )
+    ).scalars().all() if sec_ids else []
+    sessions_map = {s.section_id: s for s in sessions_list}
+
     section_items: list[SectionDailyOverviewItem] = []
     tot_students = 0
     tot_p = tot_a = tot_l = tot_e = 0
     marked_sections_count = 0
 
     for sec in sections:
-        stu_count = db.execute(
-            select(func.count(StudentEnrollment.id)).where(
-                StudentEnrollment.section_id == sec.id,
-                StudentEnrollment.status == "ACTIVE",
-            )
-        ).scalar_one()
-
+        stu_count = counts_map.get(sec.id, 0)
         tot_students += stu_count
 
-        session = db.execute(
-            select(AttendanceSession).where(
-                AttendanceSession.section_id == sec.id,
-                AttendanceSession.date == target_date,
-            )
-        ).scalars().first()
+        session = sessions_map.get(sec.id)
 
         p = a = l = e = 0
         marked_by_name = None

@@ -6,15 +6,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import app.models
+import app.modules.models
 from app.db.base import Base
 from app.core.deps import get_db, get_current_user
 from app.main import app
-from app.models.user import User, UserRole, UserStatus
-from app.models.student import Student
-from app.models.academic import AttendanceRecord
-from app.models.academic_structure import AcademicYear, Grade, Section
-from app.services import ai_assistant_tools, ai_interactive_service, ai_proactive_service, ai_academic_service
+from app.modules.auth.models import User, UserRole, UserStatus
+from app.modules.students.models import Student
+from app.modules.academics.models import AttendanceRecord
+from app.modules.academics.structure_models import AcademicYear, Grade, Section
+from app.modules.ai.assistant import tools as ai_assistant_tools, interactive_service as ai_interactive_service, proactive_service as ai_proactive_service; from app.modules.ai.learning import academic_service as ai_academic_service
 
 
 @pytest.fixture(scope="function")

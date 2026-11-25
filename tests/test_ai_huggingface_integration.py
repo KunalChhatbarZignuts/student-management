@@ -11,17 +11,17 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import app.models
+import app.modules.models
 from app.core.deps import get_current_user, get_db
 from app.db.base import Base
 from app.main import app
-from app.models.ai_student_assistant import AIStudentConversation, AIStudentMessage, MessageSender
-from app.models.school_knowledge import SchoolKnowledgeChunk, SchoolKnowledgeDocument
-from app.models.student import Student
-from app.models.user import User, UserRole, UserStatus
-from app.services import ai_assistant_service, ai_assistant_tools
-from app.services.ai_hf_provider import HuggingFaceProvider, hf_provider
-from app.services.ai_rag_service import AIRagService, ai_rag_service, chunk_text
+from app.modules.ai.assistant.models import AIStudentConversation, AIStudentMessage, MessageSender
+from app.modules.ai.assistant.knowledge_models import SchoolKnowledgeChunk, SchoolKnowledgeDocument
+from app.modules.students.models import Student
+from app.modules.auth.models import User, UserRole, UserStatus
+from app.modules.ai.assistant import service as ai_assistant_service, tools as ai_assistant_tools
+from app.modules.ai.assistant.hf_provider import HuggingFaceProvider, hf_provider
+from app.modules.ai.assistant.rag_service import AIRagService, ai_rag_service, chunk_text
 
 
 @pytest.fixture(scope="function")

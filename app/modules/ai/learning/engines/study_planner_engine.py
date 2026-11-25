@@ -11,7 +11,6 @@ from app.modules.examinations.models import Examination, ExaminationSchedule
 from app.modules.ai.learning.models import (
     AIDailyStudyPlan,
     AIStudyPlanItem,
-    AIWeeklyStudyPlan,
     AIStudentStudySettings,
     AILearningRecommendation,
     RecommendationStatus,

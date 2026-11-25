@@ -2,7 +2,6 @@
 
 from app.modules.ai.learning.models import (
     AIDailyStudyPlan,
-    AILearningProfile,
     AILearningRecommendation,
     AIPracticeQuestion,
     AIPracticeSession,
@@ -10,7 +9,6 @@ from app.modules.ai.learning.models import (
     AIStudentStudySettings,
     AIStudyPlanItem,
     AITopicMastery,
-    AIWeeklyStudyPlan,
     ChapterTopic,
     RecommendationPriority,
     RecommendationStatus,
@@ -27,13 +25,11 @@ from app.modules.ai.assistant.knowledge_models import (
     SchoolKnowledgeDocument,
     SchoolKnowledgeChunk,
 )
-from app.modules.academics.models import FeeInvoice, StudentMark
 from app.modules.students.admission_models import Admission
 from app.modules.examinations.models import (
     ExamStatus,
     ExamType,
     Examination,
-    ExaminationNotification,
     ExaminationSchedule,
     GradingScale,
     MarksStatus,
@@ -76,7 +72,6 @@ from app.modules.attendance.models import (
 )
 from app.modules.audit.models import AuditLog
 from app.modules.academics.calendar_models import (
-    CalendarSpecialWorkingDay,
     HolidayAuditHistory,
     HolidayCategory,
     SchoolCalendarSettings,
@@ -84,21 +79,18 @@ from app.modules.academics.calendar_models import (
     holiday_grade_associations,
     holiday_section_associations,
 )
-from app.modules.academics.classroom_models import Class, Subject, TeacherAssignment
+from app.modules.academics.classroom_models import Subject, TeacherAssignment
 from app.modules.audit.counter_models import IdCounter
 from app.modules.auth.invite_models import Invite
 from app.modules.attendance.leave_models import LeaveStatus, LeaveSubmissionRole, StudentLeaveApplication
 from app.modules.online_classroom.models import (
     OnlineClass,
-    OnlineClassMaterial,
     OnlineClassParticipant,
     OnlineClassRecording,
     OnlineClassStatus,
     OnlineClassroomAuditLog,
     OnlineMeetingSession,
     OnlineSessionAttendee,
-    OnlineWhiteboardEvent,
-    OnlineWhiteboardSession,
 )
 from app.modules.students.parent_models import Parent, ParentStudentLink
 from app.modules.auth.password_reset_models import PasswordReset
@@ -124,17 +116,13 @@ __all__ = [
     "AttendanceSession",
     "AttendanceStatus",
     "AuditLog",
-    "CalendarSpecialWorkingDay",
-    "Class",
     "EnrollmentStatus",
     "ExamStatus",
     "ExamType",
     "Examination",
-    "ExaminationNotification",
     "ExaminationSchedule",
     "FeeComponent",
     "FeeInstallment",
-    "FeeInvoice",
     "FeePayment",
     "FeeStructure",
     "FeeStructureItem",
@@ -166,19 +154,14 @@ __all__ = [
     "LeaveSubmissionRole",
     "MarksStatus",
     "OnlineClass",
-    "OnlineClassMaterial",
-    "OnlineClassParticipant",
     "OnlineClassRecording",
     "OnlineClassStatus",
     "OnlineClassroomAuditLog",
     "OnlineMeetingSession",
     "OnlineSessionAttendee",
-    "OnlineWhiteboardEvent",
-    "OnlineWhiteboardSession",
     "ResultStatus",
     "StudentExamMark",
     "StudentExamResult",
-    "StudentMark",
     "Subject",
     "Teacher",
     "TeacherAssignment",
@@ -189,7 +172,6 @@ __all__ = [
     "User",
     "SubjectChapter",
     "ChapterTopic",
-    "AILearningProfile",
     "AILearningRecommendation",
     "AIDailyStudyPlan",
     "AIStudyPlanItem",

@@ -20,7 +20,7 @@ from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.modules.academics.structure_models import AcademicYear, Grade, Section, StudentEnrollment
-    from app.modules.academics.classroom_models import Class, Subject
+    from app.modules.academics.classroom_models import Subject
     from app.modules.students.parent_models import Parent
     from app.modules.students.models import Student
     from app.modules.teachers.models import Teacher
@@ -47,9 +47,6 @@ class AttendanceSession(TimestampMixin, Base):
     section_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("sections.id", ondelete="RESTRICT"), nullable=True
     )
-    class_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey("classes.id", ondelete="CASCADE"), nullable=True
-    )
     subject_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=True
     )
@@ -68,7 +65,6 @@ class AttendanceSession(TimestampMixin, Base):
     academic_year: Mapped["AcademicYear | None"] = relationship("AcademicYear")
     grade: Mapped["Grade | None"] = relationship("Grade")
     section: Mapped["Section | None"] = relationship("Section")
-    classroom: Mapped["Class | None"] = relationship("Class")
     subject: Mapped["Subject | None"] = relationship("Subject")
     teacher: Mapped["Teacher | None"] = relationship("Teacher")
     marked_by: Mapped["User | None"] = relationship("User")

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_teacher, get_db, require_class_access
-from app.modules.academics.classroom_models import Class
+from app.modules.academics.models import Section
 from app.modules.teachers.models import Teacher
 from app.modules.academics.classroom_schemas import ClassRosterResponse, TeacherAssignmentResponse
 from app.modules.academics import assignment_service
@@ -26,7 +26,7 @@ def get_assigned_class_students(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     search: str | None = Query(None, description="Search by student name or code"),
-    classroom: Class = Depends(require_class_access),
+    section: Section = Depends(require_class_access),
     db: Session = Depends(get_db),
 ):
     """Retrieve student roster for a class assigned to the teacher.
@@ -35,7 +35,7 @@ def get_assigned_class_students(
     Only active students appear.
     """
     return assignment_service.get_class_roster(
-        classroom=classroom,
+        classroom=section,
         page=page,
         size=size,
         search=search,

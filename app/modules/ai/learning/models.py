@@ -153,29 +153,6 @@ class ChapterTopic(TimestampMixin, Base):
         return f"<ChapterTopic {self.title}>"
 
 
-class AILearningProfile(TimestampMixin, Base):
-    __tablename__ = "ai_learning_profiles"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    student_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("students.id", ondelete="CASCADE"), unique=True, nullable=False, index=True
-    )
-    academic_year_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey("academic_years.id", ondelete="SET NULL"), nullable=True
-    )
-    strong_subjects: Mapped[Any] = mapped_column(JsonType, nullable=False, default=list)
-    weak_subjects: Mapped[Any] = mapped_column(JsonType, nullable=False, default=list)
-    learning_pace: Mapped[str] = mapped_column(String(30), nullable=False, default="MODERATE")
-    last_analyzed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
-    # Relationships
-    student: Mapped["Student"] = relationship("Student")
-    academic_year: Mapped["AcademicYear | None"] = relationship("AcademicYear")
-
-    def __repr__(self) -> str:
-        return f"<AILearningProfile student={self.student_id}>"
-
-
 class AILearningRecommendation(TimestampMixin, Base):
     __tablename__ = "ai_learning_recommendations"
 
@@ -445,27 +422,3 @@ class AIStudentMistake(TimestampMixin, Base):
 
     def __repr__(self) -> str:
         return f"<AIStudentMistake student={self.student_id} resolved={self.is_resolved}>"
-
-
-class AIWeeklyStudyPlan(TimestampMixin, Base):
-    __tablename__ = "ai_weekly_study_plans"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    student_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    week_start_date: Mapped[date] = mapped_column(Date, nullable=False)
-    total_planned_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=300)
-    completed_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    status: Mapped[str] = mapped_column(String(30), nullable=False, default=StudyPlanStatus.PLANNED.value)
-
-    # Relationships
-    student: Mapped["Student"] = relationship("Student")
-
-    __table_args__ = (
-        UniqueConstraint("student_id", "week_start_date", name="uq_student_weekly_plan_date"),
-        Index("ix_ai_weekly_study_plans_student_date", "student_id", "week_start_date"),
-    )
-
-    def __repr__(self) -> str:
-        return f"<AIWeeklyStudyPlan student={self.student_id} week={self.week_start_date}>"

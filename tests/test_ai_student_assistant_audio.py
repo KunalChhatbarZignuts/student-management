@@ -7,12 +7,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import app.models
+import app.modules.models
 from app.db.base import Base
 from app.core.deps import get_db, get_current_user
 from app.main import app
-from app.models.student import Student
-from app.models.user import User, UserRole, UserStatus
+from app.modules.students.models import Student
+from app.modules.auth.models import User, UserRole, UserStatus
 
 client = TestClient(app)
 

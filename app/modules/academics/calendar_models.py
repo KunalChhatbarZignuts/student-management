@@ -25,19 +25,9 @@ if TYPE_CHECKING:
 
 
 # Many-to-many associations for holiday grade and section applicability
-holiday_grade_associations = Table(
-    "holiday_grade_associations",
-    Base.metadata,
-    Column("holiday_id", Uuid, ForeignKey("school_holidays.id", ondelete="CASCADE"), primary_key=True),
-    Column("grade_id", Uuid, ForeignKey("grades.id", ondelete="CASCADE"), primary_key=True),
-)
-
-holiday_section_associations = Table(
-    "holiday_section_associations",
-    Base.metadata,
-    Column("holiday_id", Uuid, ForeignKey("school_holidays.id", ondelete="CASCADE"), primary_key=True),
-    Column("section_id", Uuid, ForeignKey("sections.id", ondelete="CASCADE"), primary_key=True),
-)
+# Secondary associations consolidated to JSONB columns on school_holidays
+holiday_grade_associations = None
+holiday_section_associations = None
 
 
 class HolidayCategory(TimestampMixin, Base):
@@ -71,6 +61,7 @@ class SchoolHoliday(TimestampMixin, Base):
     end_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")  # active, cancelled
+    event_type: Mapped[str] = mapped_column(String(30), nullable=False, default="HOLIDAY")
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -80,12 +71,43 @@ class SchoolHoliday(TimestampMixin, Base):
     academic_year: Mapped["AcademicYear"] = relationship("AcademicYear")
     created_by: Mapped["User | None"] = relationship("User")
 
-    applicable_grades: Mapped[list["Grade"]] = relationship(
-        "Grade", secondary=holiday_grade_associations, lazy="selectin"
-    )
-    applicable_sections: Mapped[list["Section"]] = relationship(
-        "Section", secondary=holiday_section_associations, lazy="selectin"
-    )
+    applicable_grade_ids: Mapped[list[Any]] = mapped_column(JSON, default=list, nullable=False)
+    applicable_section_ids: Mapped[list[Any]] = mapped_column(JSON, default=list, nullable=False)
+
+    @property
+    def applicable_grades(self) -> list[Any]:
+        from app.db.session import SessionLocal
+        from app.modules.academics.structure_models import Grade
+        from sqlalchemy import select
+        if not self.applicable_grade_ids:
+            return []
+        try:
+            with SessionLocal() as db:
+                return db.execute(select(Grade).where(Grade.id.in_([uuid.UUID(str(gid)) for gid in self.applicable_grade_ids]))).scalars().all()
+        except Exception:
+            return []
+
+    @applicable_grades.setter
+    def applicable_grades(self, grades: list[Any]) -> None:
+        self.applicable_grade_ids = [str(g.id) if hasattr(g, 'id') else str(g) for g in grades]
+
+    @property
+    def applicable_sections(self) -> list[Any]:
+        from app.db.session import SessionLocal
+        from app.modules.academics.structure_models import Section
+        from sqlalchemy import select
+        if not self.applicable_section_ids:
+            return []
+        try:
+            with SessionLocal() as db:
+                return db.execute(select(Section).where(Section.id.in_([uuid.UUID(str(sid)) for sid in self.applicable_section_ids]))).scalars().all()
+        except Exception:
+            return []
+
+    @applicable_sections.setter
+    def applicable_sections(self, sections: list[Any]) -> None:
+        self.applicable_section_ids = [str(s.id) if hasattr(s, 'id') else str(s) for s in sections]
+
     audit_history: Mapped[list["HolidayAuditHistory"]] = relationship(
         "HolidayAuditHistory", back_populates="holiday", cascade="all, delete-orphan"
     )
@@ -120,28 +142,8 @@ class SchoolCalendarSettings(TimestampMixin, Base):
         return f"<SchoolCalendarSettings year={self.academic_year_id} offs={self.weekly_off_days}>"
 
 
-class CalendarSpecialWorkingDay(TimestampMixin, Base):
-    __tablename__ = "calendar_special_working_days"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    academic_year_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("academic_years.id", ondelete="RESTRICT"), nullable=False
-    )
-    date: Mapped[dt.date] = mapped_column(Date, nullable=False)
-    reason: Mapped[str] = mapped_column(String(255), nullable=False)
-    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
-
-    academic_year: Mapped["AcademicYear"] = relationship("AcademicYear")
-    created_by: Mapped["User | None"] = relationship("User")
-
-    __table_args__ = (
-        Index("ix_special_working_days_year_date", "academic_year_id", "date"),
-    )
-
-    def __repr__(self) -> str:
-        return f"<CalendarSpecialWorkingDay date={self.date} reason={self.reason}>"
+# CalendarSpecialWorkingDay consolidated into SchoolHoliday (event_type='SPECIAL_WORKING_DAY')
+CalendarSpecialWorkingDay = None
 
 
 class HolidayAuditHistory(Base):

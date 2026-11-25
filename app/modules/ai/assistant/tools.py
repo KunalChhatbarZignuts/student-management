@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.modules.academics.models import AttendanceRecord
+from app.modules.attendance.models import AttendanceRecord
 from app.modules.academics.structure_models import AcademicYear, Grade, Section, StudentEnrollment
 from app.modules.ai.learning.models import SubjectChapter, ChapterTopic
 from app.modules.academics.classroom_models import Subject

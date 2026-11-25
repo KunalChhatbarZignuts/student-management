@@ -12,31 +12,6 @@ if TYPE_CHECKING:
     from app.modules.teachers.models import Teacher
 
 
-class Class(TimestampMixin, Base):
-    __tablename__ = "classes"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    name: Mapped[str] = mapped_column(String(50), nullable=False)
-    section: Mapped[str] = mapped_column(String(20), nullable=False)
-    academic_year: Mapped[str] = mapped_column(String(20), nullable=False, default="2026-2027")
-    department: Mapped[str] = mapped_column(String(50), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
-
-    # Relationships
-    teacher_assignments: Mapped[list["TeacherAssignment"]] = relationship(
-        "TeacherAssignment", back_populates="classroom",
-    )
-
-    __table_args__ = (
-        UniqueConstraint("name", "section", "academic_year", name="uq_class_name_section_year"),
-        Index("ix_classes_department", "department"),
-        Index("ix_classes_name_section", "name", "section"),
-    )
-
-    def __repr__(self) -> str:
-        return f"<Class {self.name}-{self.section} ({self.academic_year})>"
-
-
 class Subject(TimestampMixin, Base):
     __tablename__ = "subjects"
 
@@ -66,9 +41,6 @@ class TeacherAssignment(TimestampMixin, Base):
     teacher_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False,
     )
-    class_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey("classes.id", ondelete="CASCADE"), nullable=True,
-    )
     section_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("sections.id", ondelete="CASCADE"), nullable=True,
     )
@@ -85,20 +57,18 @@ class TeacherAssignment(TimestampMixin, Base):
 
     # Relationships
     teacher: Mapped["Teacher"] = relationship("Teacher")
-    classroom: Mapped["Class | None"] = relationship("Class", back_populates="teacher_assignments")
     section: Mapped["Section | None"] = relationship("Section", back_populates="teacher_assignments")
     subject: Mapped["Subject | None"] = relationship("Subject", back_populates="teacher_assignments")
 
     __table_args__ = (
         UniqueConstraint(
-            "teacher_id", "class_id", "subject_id", "academic_year",
-            name="uq_teacher_assignment",
+            "teacher_id", "section_id", "subject_id", "academic_year",
+            name="uq_teacher_assignment_section",
         ),
         Index("ix_teacher_assignments_teacher", "teacher_id"),
-        Index("ix_teacher_assignments_class", "class_id"),
         Index("ix_teacher_assignments_section", "section_id"),
     )
 
     def __repr__(self) -> str:
-        return f"<TeacherAssignment teacher={self.teacher_id} class={self.class_id} subject={self.subject_id}>"
+        return f"<TeacherAssignment teacher={self.teacher_id} section={self.section_id} subject={self.subject_id}>"
 

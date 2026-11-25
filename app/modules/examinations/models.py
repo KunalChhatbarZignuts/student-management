@@ -241,32 +241,3 @@ class StudentExamResult(TimestampMixin, Base):
     def __repr__(self) -> str:
         return f"<StudentExamResult exam={self.examination_id} student={self.student_id} pct={self.percentage}% grade={self.overall_grade}>"
 
-
-class ExaminationNotification(TimestampMixin, Base):
-    __tablename__ = "examination_notifications"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=True,
-    )
-    student_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey("students.id", ondelete="CASCADE"), nullable=True,
-    )
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
-    message: Mapped[str] = mapped_column(Text, nullable=False)
-    event_type: Mapped[str] = mapped_column(String(50), nullable=False, default="SCHEDULED")
-    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-
-    # Relationships
-    user: Mapped["User | None"] = relationship("User")
-    student: Mapped["Student | None"] = relationship("Student")
-
-    __table_args__ = (
-        Index("ix_exam_notifs_user", "user_id"),
-        Index("ix_exam_notifs_student", "student_id"),
-        Index("ix_exam_notifs_read", "is_read"),
-    )
-
-    def __repr__(self) -> str:
-        return f"<ExaminationNotification user={self.user_id} title={self.title}>"
-

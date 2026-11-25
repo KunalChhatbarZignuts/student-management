@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.deps import get_current_user, get_db, require_roles
 from app.modules.academics.structure_models import Grade, Section, TeacherSubject
-from app.modules.academics.classroom_models import Class, Subject, TeacherAssignment
+from app.modules.academics.classroom_models import Subject, TeacherAssignment
 from app.modules.diary.models import DiaryConversation, DiaryEntry, DiaryMessage, DiaryNotification
 from app.modules.students.parent_models import Parent, ParentStudentLink
 from app.modules.students.models import Student
@@ -130,7 +130,7 @@ def get_teacher_context(
     assignments = db.execute(
         select(TeacherAssignment)
         .options(
-            joinedload(TeacherAssignment.classroom),
+            joinedload(TeacherAssignment.section),
             joinedload(TeacherAssignment.subject),
         )
         .where(

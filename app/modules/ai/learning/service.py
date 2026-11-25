@@ -12,7 +12,6 @@ from app.modules.examinations.models import StudentExamMark, ExaminationSchedule
 from app.modules.ai.learning.models import (
     SubjectChapter,
     ChapterTopic,
-    AILearningProfile,
     AILearningRecommendation,
     AIDailyStudyPlan,
     AIStudyPlanItem,

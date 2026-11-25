@@ -5,9 +5,10 @@ export function createQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 30 * 1000, // 30 seconds
-        gcTime: 5 * 60 * 1000, // 5 minutes
+        staleTime: 60 * 1000, // 1 minute (optimized to prevent duplicate background refetches on navigation)
+        gcTime: 10 * 60 * 1000, // 10 minutes cache lifetime
         refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
         retry: (failureCount, error) => {
           if (failureCount >= 2) return false;
           if (error instanceof AxiosError) {

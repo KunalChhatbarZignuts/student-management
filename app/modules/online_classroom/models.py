@@ -75,12 +75,9 @@ class OnlineClass(TimestampMixin, Base):
     recordings: Mapped[list["OnlineClassRecording"]] = relationship(
         "OnlineClassRecording", back_populates="online_class", cascade="all, delete-orphan"
     )
-    materials: Mapped[list["OnlineClassMaterial"]] = relationship(
-        "OnlineClassMaterial", back_populates="online_class", cascade="all, delete-orphan"
-    )
-    whiteboard_sessions: Mapped[list["OnlineWhiteboardSession"]] = relationship(
-        "OnlineWhiteboardSession", back_populates="online_class", cascade="all, delete-orphan"
-    )
+    whiteboard_state: Mapped[dict[str, Any]] = mapped_column(JsonType, default=dict, nullable=False)
+    materials_list: Mapped[list[Any]] = mapped_column(JsonType, default=list, nullable=False)
+
     audit_logs: Mapped[list["OnlineClassroomAuditLog"]] = relationship(
         "OnlineClassroomAuditLog", back_populates="online_class", cascade="all, delete-orphan"
     )
@@ -187,58 +184,6 @@ class OnlineClassRecording(TimestampMixin, Base):
     # Relationships
     online_class: Mapped["OnlineClass"] = relationship("OnlineClass", back_populates="recordings")
     session: Mapped["OnlineMeetingSession | None"] = relationship("OnlineMeetingSession", back_populates="recordings")
-
-
-class OnlineClassMaterial(TimestampMixin, Base):
-    __tablename__ = "online_class_materials"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    online_class_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("online_classes.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    file_url: Mapped[str] = mapped_column(String(1000), nullable=False)
-    file_type: Mapped[str] = mapped_column(String(100), nullable=False)
-    file_size_bytes: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
-
-    # Relationships
-    online_class: Mapped["OnlineClass"] = relationship("OnlineClass", back_populates="materials")
-
-
-class OnlineWhiteboardSession(TimestampMixin, Base):
-    __tablename__ = "online_whiteboard_sessions"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    online_class_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("online_classes.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    current_page: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    snapshot_data: Mapped[dict[str, Any]] = mapped_column(JsonType, default=dict, nullable=False)
-
-    # Relationships
-    online_class: Mapped["OnlineClass"] = relationship("OnlineClass", back_populates="whiteboard_sessions")
-    events: Mapped[list["OnlineWhiteboardEvent"]] = relationship(
-        "OnlineWhiteboardEvent", back_populates="whiteboard_session", cascade="all, delete-orphan"
-    )
-
-
-class OnlineWhiteboardEvent(TimestampMixin, Base):
-    __tablename__ = "online_whiteboard_events"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    whiteboard_session_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("online_whiteboard_sessions.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    page_number: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    event_type: Mapped[str] = mapped_column(String(30), nullable=False)
-    event_payload: Mapped[dict[str, Any]] = mapped_column(JsonType, default=dict, nullable=False)
-
-    # Relationships
-    whiteboard_session: Mapped["OnlineWhiteboardSession"] = relationship("OnlineWhiteboardSession", back_populates="events")
-    user: Mapped["User"] = relationship("User")
 
 
 class OnlineClassroomAuditLog(TimestampMixin, Base):

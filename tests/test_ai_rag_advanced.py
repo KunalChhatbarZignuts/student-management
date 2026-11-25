@@ -9,14 +9,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import app.models
+import app.modules.models
 from app.db.base import Base
-from app.models.school_knowledge import SchoolKnowledgeChunk, SchoolKnowledgeDocument
-from app.models.student import Student
-from app.models.user import User, UserRole, UserStatus
-from app.services import ai_assistant_service, ai_assistant_tools
-from app.services.ai_hf_provider import HuggingFaceProvider
-from app.services.ai_rag_service import AIRagService, chunk_text
+from app.modules.ai.assistant.knowledge_models import SchoolKnowledgeChunk, SchoolKnowledgeDocument
+from app.modules.students.models import Student
+from app.modules.auth.models import User, UserRole, UserStatus
+from app.modules.ai.assistant import service as ai_assistant_service, tools as ai_assistant_tools
+from app.modules.ai.assistant.hf_provider import HuggingFaceProvider
+from app.modules.ai.assistant.rag_service import AIRagService, chunk_text
 
 
 @pytest.fixture(scope="function")
@@ -162,7 +162,7 @@ def test_rag_keyword_fallback_when_embedding_fails(test_db):
     )
 
     # Force provider to return None for embeddings (simulating offline/mock network failure)
-    with patch("app.services.ai_hf_provider.hf_provider.generate_embedding", return_value=None):
+    with patch("app.modules.ai.assistant.hf_provider.hf_provider.generate_embedding", return_value=None):
         results = rag_service.search_knowledge_base(
             db=test_db,
             query="navy blue blazer",

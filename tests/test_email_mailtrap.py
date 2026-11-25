@@ -187,7 +187,7 @@ def test_forgot_password_endpoint_triggers_email():
     from fastapi.testclient import TestClient
     from app.main import app as fastapi_app
     from app.core.deps import get_db
-    from app.models.user import User, UserStatus
+    from app.modules.auth.models import User, UserStatus
     import uuid
 
     mock_user = User(
@@ -207,7 +207,7 @@ def test_forgot_password_endpoint_triggers_email():
     client = TestClient(fastapi_app)
 
     try:
-        with patch("app.api.v1.auth.send_password_reset_email") as mock_send_email:
+        with patch("app.modules.auth.router.send_password_reset_email") as mock_send_email:
             response = client.post(
                 "/api/v1/auth/forgot-password",
                 json={"email": "target_user@school.edu"},

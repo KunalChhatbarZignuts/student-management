@@ -6,14 +6,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import app.models
+import app.modules.models
 from app.db.base import Base
 from app.core.deps import get_db, get_current_user
 from app.main import app
-from app.models.user import User, UserRole, UserStatus
-from app.models.student import Student
-from app.models.academic_structure import AcademicYear, Grade, Section
-from app.models.ai_learning import (
+from app.modules.auth.models import User, UserRole, UserStatus
+from app.modules.students.models import Student
+from app.modules.academics.structure_models import AcademicYear, Grade, Section
+from app.modules.ai.learning.models import (
     AIDailyStudyPlan,
     AIStudyPlanItem,
     AIStudySession,

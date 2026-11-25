@@ -3,17 +3,18 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select, String
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.deps import get_client_ip, get_db, require_roles
 from app.core.email import send_invite_email
 from app.core.security import generate_secure_token, hash_token, hash_password
-from app.modules.academics.models import FeeInvoice, StudentMark
 from app.modules.attendance.models import AttendanceRecord
-from app.modules.academics.structure_models import AcademicYear, Grade, Section, StudentEnrollment
-from app.modules.academics.classroom_models import Class, TeacherAssignment
+from app.modules.examinations.models import Examination, ExaminationSchedule, StudentExamMark
+from app.modules.academics.classroom_models import Subject, TeacherAssignment
+from app.modules.academics.models import Section
+from app.modules.fees.models import FeeInstallment, StudentFeeAssignment
 from app.modules.auth.invite_models import Invite
 from app.modules.students.parent_models import Parent, ParentStudentLink
 from app.modules.students.models import Student
@@ -1062,20 +1063,48 @@ def get_child_academics(
     current_user: User = Depends(require_roles(UserRole.PARENT.value)),
     db: Session = Depends(get_db),
 ):
-    """Parent Portal: view child's examination marks and evaluations."""
+    """Parent Portal: view child's examination marks and evaluations computed from examination marks."""
     parent = _get_parent_profile(current_user.id, db)
     _verify_parent_child_link(parent.id, student_id, db)
 
-    marks = (
+    rows = (
         db.execute(
-            select(StudentMark)
-            .where(StudentMark.student_id == student_id)
-            .order_by(StudentMark.subject.asc())
+            select(
+                StudentExamMark.id,
+                Subject.name.label("subject"),
+                Subject.code.label("code"),
+                ExaminationSchedule.max_marks.label("max_score"),
+                StudentExamMark.marks_obtained.label("obtained_score"),
+                func.coalesce(StudentExamMark.grade, "N/A").label("grade"),
+                case(
+                    (StudentExamMark.is_absent.is_(True), "Absent"),
+                    (StudentExamMark.is_passed.is_(True), "Pass"),
+                    else_="Fail",
+                ).label("status"),
+                (Examination.name + " (" + Examination.term + ")").label("term"),
+            )
+            .join(ExaminationSchedule, StudentExamMark.schedule_id == ExaminationSchedule.id)
+            .join(Subject, ExaminationSchedule.subject_id == Subject.id)
+            .join(Examination, ExaminationSchedule.examination_id == Examination.id)
+            .where(StudentExamMark.student_id == student_id)
+            .order_by(Subject.name.asc())
         )
-        .scalars()
+        .mappings()
         .all()
     )
-    return [StudentMarkRead.model_validate(m) for m in marks]
+    return [
+        StudentMarkRead(
+            id=r["id"],
+            subject=r["subject"],
+            code=r["code"],
+            max_score=int(r["max_score"] or 100),
+            obtained_score=int(r["obtained_score"] or 0),
+            grade=r["grade"],
+            status=r["status"],
+            term=r["term"],
+        )
+        for r in rows
+    ]
 
 
 @router.get("/parent/children/{student_id}/fees", response_model=list[FeeInvoiceRead])
@@ -1085,20 +1114,41 @@ def get_child_fees(
     current_user: User = Depends(require_roles(UserRole.PARENT.value)),
     db: Session = Depends(get_db),
 ):
-    """Parent Portal: view child's tuition fees and invoice records."""
+    """Parent Portal: view child's tuition fees and invoice records computed dynamically from fee installments."""
     parent = _get_parent_profile(current_user.id, db)
     _verify_parent_child_link(parent.id, student_id, db)
 
-    invoices = (
+    rows = (
         db.execute(
-            select(FeeInvoice)
-            .where(FeeInvoice.student_id == student_id)
-            .order_by(FeeInvoice.due_date.asc())
+            select(
+                FeeInstallment.id,
+                ("INV-" + func.substring(func.cast(FeeInstallment.id, String), 1, 8)).label("invoice_number"),
+                FeeInstallment.installment_name.label("description"),
+                FeeInstallment.amount,
+                FeeInstallment.due_date,
+                case(
+                    (FeeInstallment.status == "paid", "Paid"),
+                    else_="Pending",
+                ).label("status"),
+            )
+            .join(StudentFeeAssignment, FeeInstallment.assignment_id == StudentFeeAssignment.id)
+            .where(StudentFeeAssignment.student_id == student_id)
+            .order_by(FeeInstallment.due_date.asc())
         )
-        .scalars()
+        .mappings()
         .all()
     )
-    return [FeeInvoiceRead.model_validate(inv) for inv in invoices]
+    return [
+        FeeInvoiceRead(
+            id=r["id"],
+            invoice_number=r["invoice_number"],
+            description=r["description"],
+            amount=float(r["amount"] or 0.0),
+            due_date=r["due_date"],
+            status=r["status"],
+        )
+        for r in rows
+    ]
 
 
 @router.get("/parent/children/{student_id}/timetable")

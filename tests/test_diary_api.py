@@ -6,17 +6,17 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import app.models
+import app.modules.models
 from app.core.deps import get_current_user, get_db
 from app.db.base import Base
 from app.main import app
-from app.models.academic_structure import AcademicYear, Grade, Section
-from app.models.classroom import Subject, TeacherAssignment
-from app.models.diary import DiaryAcknowledgement, DiaryConversation, DiaryEntry, DiaryEntryRecipient, DiaryMessage
-from app.models.parent import Parent, ParentStudentLink
-from app.models.student import Student
-from app.models.teacher import Teacher
-from app.models.user import User, UserRole, UserStatus
+from app.modules.academics.structure_models import AcademicYear, Grade, Section
+from app.modules.academics.classroom_models import Subject, TeacherAssignment
+from app.modules.diary.models import DiaryAcknowledgement, DiaryConversation, DiaryEntry, DiaryEntryRecipient, DiaryMessage
+from app.modules.students.parent_models import Parent, ParentStudentLink
+from app.modules.students.models import Student
+from app.modules.teachers.models import Teacher
+from app.modules.auth.models import User, UserRole, UserStatus
 
 
 @pytest.fixture(scope="function")

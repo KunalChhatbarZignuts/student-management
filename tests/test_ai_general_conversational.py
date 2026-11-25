@@ -17,12 +17,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import app.models
+import app.modules.models
 from app.db.base import Base
-from app.models.user import User, UserRole, UserStatus
-from app.models.student import Student
-from app.services import ai_assistant_service
-from app.services.ai_hf_provider import hf_provider
+from app.modules.auth.models import User, UserRole, UserStatus
+from app.modules.students.models import Student
+from app.modules.ai.assistant import service as ai_assistant_service
+from app.modules.ai.assistant.hf_provider import hf_provider
 
 
 @pytest.fixture(scope="function")

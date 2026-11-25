@@ -8,13 +8,12 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.modules.academics.structure_models import AcademicYear, Grade, Section, StudentEnrollment
-from app.modules.academics.calendar_models import SchoolHoliday, holiday_grade_associations, holiday_section_associations
+from app.modules.academics.calendar_models import SchoolHoliday
 from app.modules.academics.classroom_models import Subject, TeacherAssignment
 from app.modules.examinations.models import (
     ExamStatus,
     ExamType,
     Examination,
-    ExaminationNotification,
     ExaminationSchedule,
     GradingScale,
     MarksStatus,
@@ -501,13 +500,9 @@ def _check_holiday_conflict(exam_date: dt.date, grade_id: uuid.UUID, section_id:
     ).scalars().all()
 
     for h in holidays:
-        # Check if holiday is school-wide or scoped to this grade/section
-        app_grades = db.execute(
-            select(holiday_grade_associations.c.grade_id).where(holiday_grade_associations.c.holiday_id == h.id)
-        ).scalars().all()
-        app_sections = db.execute(
-            select(holiday_section_associations.c.section_id).where(holiday_section_associations.c.holiday_id == h.id)
-        ).scalars().all()
+        # Check if holiday is school-wide or scoped to this grade/section using JSONB columns
+        app_grades = [uuid.UUID(g) for g in (h.applicable_grade_ids or [])]
+        app_sections = [uuid.UUID(s) for s in (h.applicable_section_ids or [])]
 
         is_school_wide = len(app_grades) == 0 and len(app_sections) == 0
         is_grade_match = grade_id in app_grades
@@ -991,34 +986,8 @@ def publish_results(
             for m in marks:
                 m.status = MarksStatus.PUBLISHED.value
 
-        # Generate notification for student and parent
-        std = res.student
-        if std:
-            # Student notif
-            notif = ExaminationNotification(
-                user_id=std.user_id,
-                student_id=std.id,
-                title=f"Results Published: {exam.name}",
-                message=f"Results for {exam.name} ({exam.term}) have been published. Your overall grade is {res.overall_grade} ({res.percentage}%).",
-                event_type="PUBLISHED",
-            )
-            db.add(notif)
-
-            # Parent notifs
-            links = db.execute(
-                select(ParentStudentLink).where(ParentStudentLink.student_id == std.id)
-            ).scalars().all()
-            for lnk in links:
-                parent = lnk.parent
-                if parent and parent.user_id:
-                    p_notif = ExaminationNotification(
-                        user_id=parent.user_id,
-                        student_id=std.id,
-                        title=f"Examination Results Published: {std.first_name}",
-                        message=f"Official results for {std.first_name} in {exam.name} are now available for viewing and report card download.",
-                        event_type="PUBLISHED",
-                    )
-                    db.add(p_notif)
+        # Status updated to PUBLISHED
+        pass
 
     # Check if ALL sections and schedules for this exam have been published before setting COMPLETED
     all_schedules = db.execute(

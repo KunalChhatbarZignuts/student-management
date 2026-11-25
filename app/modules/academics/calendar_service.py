@@ -141,24 +141,32 @@ def add_special_working_day(
     payload: SpecialWorkingDayCreate,
     actor_user_id: uuid.UUID,
     db: Session,
-) -> CalendarSpecialWorkingDay:
+) -> SchoolHoliday:
+    cat = db.execute(select(HolidayCategory).limit(1)).scalar_one_or_none()
+    cat_id = cat.id if cat else uuid.uuid4()
     existing = db.execute(
-        select(CalendarSpecialWorkingDay).where(
-            CalendarSpecialWorkingDay.academic_year_id == payload.academic_year_id,
-            CalendarSpecialWorkingDay.date == payload.date,
+        select(SchoolHoliday).where(
+            SchoolHoliday.academic_year_id == payload.academic_year_id,
+            SchoolHoliday.start_date == payload.date,
+            SchoolHoliday.event_type == "SPECIAL_WORKING_DAY",
         )
     ).scalar_one_or_none()
     if existing:
-        existing.reason = payload.reason
+        existing.description = payload.reason
+        existing.name = payload.reason
         existing.created_by_user_id = actor_user_id
         db.commit()
         db.refresh(existing)
         return existing
 
-    special = CalendarSpecialWorkingDay(
+    special = SchoolHoliday(
         academic_year_id=payload.academic_year_id,
-        date=payload.date,
-        reason=payload.reason,
+        category_id=cat_id,
+        start_date=payload.date,
+        end_date=payload.date,
+        name=payload.reason,
+        description=payload.reason,
+        event_type="SPECIAL_WORKING_DAY",
         created_by_user_id=actor_user_id,
     )
     db.add(special)
@@ -170,12 +178,15 @@ def add_special_working_day(
 def get_special_working_days(
     academic_year_id: uuid.UUID,
     db: Session,
-) -> list[CalendarSpecialWorkingDay]:
+) -> list[SchoolHoliday]:
     return list(
         db.execute(
-            select(CalendarSpecialWorkingDay)
-            .where(CalendarSpecialWorkingDay.academic_year_id == academic_year_id)
-            .order_by(CalendarSpecialWorkingDay.date.asc())
+            select(SchoolHoliday)
+            .where(
+                SchoolHoliday.academic_year_id == academic_year_id,
+                SchoolHoliday.event_type == "SPECIAL_WORKING_DAY",
+            )
+            .order_by(SchoolHoliday.start_date.asc())
         ).scalars().all()
     )
 
@@ -184,8 +195,8 @@ def delete_special_working_day(
     special_id: uuid.UUID,
     db: Session,
 ) -> None:
-    special = db.get(CalendarSpecialWorkingDay, special_id)
-    if not special:
+    special = db.get(SchoolHoliday, special_id)
+    if not special or special.event_type != "SPECIAL_WORKING_DAY":
         raise HTTPException(status_code=404, detail="Special working day not found")
     db.delete(special)
     db.commit()
@@ -201,9 +212,10 @@ def check_date_working_status(
     """Evaluates whether a given date is a working day or non-working day."""
     # 1. Check special compensatory working day override
     special = db.execute(
-        select(CalendarSpecialWorkingDay).where(
-            CalendarSpecialWorkingDay.academic_year_id == academic_year_id,
-            CalendarSpecialWorkingDay.date == target_date,
+        select(SchoolHoliday).where(
+            SchoolHoliday.academic_year_id == academic_year_id,
+            SchoolHoliday.start_date == target_date,
+            SchoolHoliday.event_type == "SPECIAL_WORKING_DAY",
         )
     ).scalar_one_or_none()
     if special:
@@ -211,7 +223,7 @@ def check_date_working_status(
             date=target_date,
             is_working_day=True,
             day_type="special_working_day",
-            reason=f"Compensatory Working Day: {special.reason}",
+            reason=f"Compensatory Working Day: {special.description or special.name}",
             holiday_name=None,
             holiday_category=None,
             can_mark_attendance=True,
@@ -223,6 +235,7 @@ def check_date_working_status(
         .where(
             SchoolHoliday.academic_year_id == academic_year_id,
             SchoolHoliday.status == "active",
+            SchoolHoliday.event_type != "SPECIAL_WORKING_DAY",
             SchoolHoliday.start_date <= target_date,
             SchoolHoliday.end_date >= target_date,
         )
@@ -533,6 +546,7 @@ def get_monthly_calendar(
         select(SchoolHoliday).where(
             SchoolHoliday.academic_year_id == academic_year_id,
             SchoolHoliday.status == "active",
+            SchoolHoliday.event_type != "SPECIAL_WORKING_DAY",
             SchoolHoliday.start_date <= end_date,
             SchoolHoliday.end_date >= start_date,
         )
@@ -540,13 +554,14 @@ def get_monthly_calendar(
 
     # Fetch special working days in this month
     specials = db.execute(
-        select(CalendarSpecialWorkingDay).where(
-            CalendarSpecialWorkingDay.academic_year_id == academic_year_id,
-            CalendarSpecialWorkingDay.date >= start_date,
-            CalendarSpecialWorkingDay.date <= end_date,
+        select(SchoolHoliday).where(
+            SchoolHoliday.academic_year_id == academic_year_id,
+            SchoolHoliday.event_type == "SPECIAL_WORKING_DAY",
+            SchoolHoliday.start_date >= start_date,
+            SchoolHoliday.start_date <= end_date,
         )
     ).scalars().all()
-    special_map = {s.date: s for s in specials}
+    special_map = {s.start_date: s for s in specials}
 
     days_list: list[MonthlyCalendarDay] = []
     working_days_count = 0

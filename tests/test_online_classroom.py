@@ -7,20 +7,20 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import app.models  # Ensure all models are registered
+import app.modules.models  # Ensure all models are registered
 from app.core.deps import get_current_teacher, get_current_user, get_db
 from app.db.base import Base
 from app.main import app
-from app.models.online_classroom import (
+from app.modules.online_classroom.models import (
     OnlineClass,
     OnlineClassParticipant,
     OnlineClassRecording,
     OnlineClassStatus,
     OnlineMeetingSession,
 )
-from app.models.student import Student
-from app.models.teacher import Teacher
-from app.models.user import User, UserRole, UserStatus
+from app.modules.students.models import Student
+from app.modules.teachers.models import Teacher
+from app.modules.auth.models import User, UserRole, UserStatus
 
 
 @pytest.fixture(scope="function")
@@ -800,7 +800,7 @@ async def test_classroom_ws_manager_terminate_room_strict_isolation():
     """Verify that when a room is terminated, all participants in that room receive CLASS_ENDED and are closed, while other classes remain completely connected and untouched."""
     import uuid
     from unittest.mock import AsyncMock
-    from app.services.classroom_ws_manager import ClassroomWSManager
+    from app.modules.online_classroom.ws_manager import ClassroomWSManager
 
     manager = ClassroomWSManager()
     class_a = uuid.uuid4()
@@ -851,7 +851,7 @@ async def test_classroom_ws_manager_kick_by_user_id_resolution():
     """Verify kick_client resolves target by user_id and client_id accurately."""
     import uuid
     from unittest.mock import AsyncMock
-    from app.services.classroom_ws_manager import ClassroomWSManager
+    from app.modules.online_classroom.ws_manager import ClassroomWSManager
 
     manager = ClassroomWSManager()
     class_id = uuid.uuid4()
@@ -879,7 +879,7 @@ async def test_classroom_ws_manager_resolve_client_and_media_moderation():
     """Verify resolve_client_info resolution across IDs and names for host mute/allow rights."""
     import uuid
     from unittest.mock import AsyncMock
-    from app.services.classroom_ws_manager import ClassroomWSManager
+    from app.modules.online_classroom.ws_manager import ClassroomWSManager
 
     manager = ClassroomWSManager()
     class_id = uuid.uuid4()
@@ -928,7 +928,7 @@ async def test_classroom_ws_manager_resolve_client_and_media_moderation():
 async def test_classroom_ws_manager_global_feed():
     """Verify global feed subscribers receive real-time class lifecycle events."""
     from unittest.mock import AsyncMock
-    from app.services.classroom_ws_manager import ClassroomWSManager
+    from app.modules.online_classroom.ws_manager import ClassroomWSManager
 
     manager = ClassroomWSManager()
     ws_admin = AsyncMock()

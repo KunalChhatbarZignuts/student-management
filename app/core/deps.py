@@ -189,12 +189,13 @@ def require_class_access(
     class_id: uuid.UUID,
     teacher: "Teacher" = Depends(get_current_teacher),
     db: Session = Depends(get_db),
-) -> "Class":
-    from app.modules.academics.classroom_models import Class, TeacherAssignment
+) -> "Section":
+    from app.modules.academics.classroom_models import TeacherAssignment
+    from app.modules.academics.models import Section
     assignment = db.execute(
         select(TeacherAssignment).where(
             TeacherAssignment.teacher_id == teacher.id,
-            TeacherAssignment.class_id == class_id,
+            TeacherAssignment.section_id == class_id,
             TeacherAssignment.status == "active",
         )
     ).scalars().first()
@@ -203,11 +204,11 @@ def require_class_access(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Class not found or not assigned to teacher",
         )
-    classroom = db.get(Class, class_id)
-    if not classroom or classroom.status != "active":
+    section = db.get(Section, class_id)
+    if not section or section.status != "active":
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Class not found or inactive",
         )
-    return classroom
+    return section
 

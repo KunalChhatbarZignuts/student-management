@@ -763,22 +763,24 @@ def get_fee_dashboard_metrics(db: Session) -> FeeDashboardMetricsResponse:
         select(func.count(StudentFeeAssignment.id)).where(StudentFeeAssignment.status == "active")
     ).scalar_one()
 
-    # Grade-wise summaries
-    grade_summaries = []
+    # Grade-wise summaries in a single GROUP BY query (eliminating 2*N queries)
     grades = db.execute(select(Grade).where(Grade.status == "active")).scalars().all()
+    grade_metrics_map = {
+        row[0]: (row[1], row[2])
+        for row in db.execute(
+            select(
+                StudentFeeAssignment.grade_id,
+                func.count(StudentFeeAssignment.id),
+                func.coalesce(func.sum(StudentFeeAssignment.final_payable_amount), Decimal("0.00")),
+            )
+            .where(StudentFeeAssignment.status == "active")
+            .group_by(StudentFeeAssignment.grade_id)
+        ).all()
+    }
+
+    grade_summaries = []
     for g in grades:
-        g_assigned = db.execute(
-            select(func.coalesce(func.sum(StudentFeeAssignment.final_payable_amount), Decimal("0.00"))).where(
-                StudentFeeAssignment.grade_id == g.id,
-                StudentFeeAssignment.status == "active",
-            )
-        ).scalar_one()
-        g_count = db.execute(
-            select(func.count(StudentFeeAssignment.id)).where(
-                StudentFeeAssignment.grade_id == g.id,
-                StudentFeeAssignment.status == "active",
-            )
-        ).scalar_one()
+        g_count, g_assigned = grade_metrics_map.get(g.id, (0, Decimal("0.00")))
         grade_summaries.append(
             {
                 "grade_id": str(g.id),
