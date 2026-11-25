@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.core.config import settings
 from app.db.base import Base
-import app.models  # noqa: F401 — registers all ORM models with Base.metadata
+import app.modules.models  # noqa: F401 — registers all ORM models with Base.metadata
 
 config = context.config
 

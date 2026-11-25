@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import decode_token
 from app.db.session import get_db
-from app.models.user import User, UserRole, UserStatus
+from app.modules.auth.models import User, UserRole, UserStatus
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +173,7 @@ def get_current_teacher(
     current_user: User = Depends(require_roles(UserRole.TEACHER.value)),
     db: Session = Depends(get_db),
 ) -> "Teacher":
-    from app.models.teacher import Teacher
+    from app.modules.teachers.models import Teacher
     teacher = db.execute(
         select(Teacher).where(Teacher.user_id == current_user.id)
     ).scalar_one_or_none()
@@ -190,7 +190,7 @@ def require_class_access(
     teacher: "Teacher" = Depends(get_current_teacher),
     db: Session = Depends(get_db),
 ) -> "Class":
-    from app.models.classroom import Class, TeacherAssignment
+    from app.modules.academics.classroom_models import Class, TeacherAssignment
     assignment = db.execute(
         select(TeacherAssignment).where(
             TeacherAssignment.teacher_id == teacher.id,

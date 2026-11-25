@@ -3,42 +3,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from slowapi.errors import RateLimitExceeded
 
-from app.api.v1 import (
-    admin_classes,
-    absence_notifications,
-    admin_attendance,
-    admin_grades,
-    admin_sections,
-    admin_students,
-    admin_teachers,
-    admin_teacher_subjects,
-    admin_users,
-    admissions,
-    ai_learning,
-    ai_student_assistant,
-    audit_logs,
-    auth,
-    calendar,
-    diary,
-    enrollments,
-    examinations,
-    fee_pos,
-    fees,
-    leaves,
-    parents,
-    online_classes,
-    rollover,
-    students,
-    substitutions,
-    teacher_classes,
-    teacher_attendance,
-    teacher_sections,
-    teacher_subjects,
-    teachers,
-    timetables,
-)
 from app.core.config import settings
 from app.core.rate_limit import _rate_limit_exceeded_handler, limiter
+from app.modules import (
+    academics,
+    ai,
+    attendance,
+    audit,
+    auth,
+    diary,
+    examinations,
+    fees,
+    online_classroom,
+    students,
+    teachers,
+)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -61,39 +40,18 @@ app.add_middleware(
 # GZip compression for payloads >= 1KB (70-85% size reduction)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# Include API Routers
+# Include Domain Module Routers
 app.include_router(auth.router, prefix="/api/v1")
-app.include_router(admin_students.router, prefix="/api/v1")
-app.include_router(admissions.router, prefix="/api/v1")
-app.include_router(admin_teachers.router, prefix="/api/v1")
-app.include_router(admin_teacher_subjects.router, prefix="/api/v1")
-app.include_router(admin_users.router, prefix="/api/v1")
-app.include_router(admin_classes.router, prefix="/api/v1")
-app.include_router(admin_grades.router, prefix="/api/v1")
-app.include_router(admin_attendance.router, prefix="/api/v1")
-app.include_router(admin_sections.router, prefix="/api/v1")
-app.include_router(audit_logs.router, prefix="/api/v1")
-app.include_router(calendar.router, prefix="/api/v1")
-app.include_router(fees.router, prefix="/api/v1")
-app.include_router(parents.router, prefix="/api/v1")
-app.include_router(teachers.router, prefix="/api/v1")
-app.include_router(teacher_classes.router, prefix="/api/v1")
-app.include_router(teacher_attendance.router, prefix="/api/v1")
-app.include_router(teacher_sections.router, prefix="/api/v1")
-app.include_router(teacher_subjects.router, prefix="/api/v1")
 app.include_router(students.router, prefix="/api/v1")
-app.include_router(leaves.router, prefix="/api/v1")
+app.include_router(teachers.router, prefix="/api/v1")
+app.include_router(academics.router, prefix="/api/v1")
+app.include_router(attendance.router, prefix="/api/v1")
 app.include_router(examinations.router, prefix="/api/v1")
-app.include_router(enrollments.router, prefix="/api/v1")
-app.include_router(timetables.router, prefix="/api/v1")
-app.include_router(substitutions.router, prefix="/api/v1")
-app.include_router(fee_pos.router, prefix="/api/v1")
-app.include_router(absence_notifications.router, prefix="/api/v1")
-app.include_router(rollover.router, prefix="/api/v1")
-app.include_router(online_classes.router, prefix="/api/v1")
-app.include_router(ai_learning.router, prefix="/api/v1")
-app.include_router(ai_student_assistant.router, prefix="/api/v1")
+app.include_router(fees.router, prefix="/api/v1")
 app.include_router(diary.router, prefix="/api/v1")
+app.include_router(online_classroom.router, prefix="/api/v1")
+app.include_router(ai.router, prefix="/api/v1")
+app.include_router(audit.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Root"])

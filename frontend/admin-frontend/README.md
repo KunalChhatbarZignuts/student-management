@@ -4,13 +4,39 @@ The administrative web application for the Student Management System, serving **
 
 ---
 
+## Tech Stack & Required Versions
+
+| Library / Tool | Specified Version | Installed Version | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Node.js Runtime** | `18.x` / `20.x` / `22.x` | `v22.23.2` | JavaScript runtime environment |
+| **npm** | `10.x+` | `10.9.8` | Package manager |
+| **Next.js** | `^14.2.18` | `14.2.35` | React framework with App Router |
+| **React** | `^18.3.1` | `18.3.1` | UI rendering library |
+| **React DOM** | `^18.3.1` | `18.3.1` | React DOM renderer |
+| **TypeScript** | `^5.6.3` | `5.6.3` | Type system |
+| **Material-UI (@mui/material)** | `^6.1.6` | `6.1.6` | Component library (MUI v6) |
+| **MUI Icons (@mui/icons-material)** | `^6.1.6` | `6.1.6` | Material Design icons |
+| **MUI DataGrid (@mui/x-data-grid)** | `^7.22.1` | `7.22.1` | Administrative data tables |
+| **MUI Pickers (@mui/x-date-pickers)** | `^7.29.4` | `7.29.4` | Date & time pickers |
+| **Emotion (@emotion/react, @emotion/styled)** | `^11.14.0` | `11.14.0` | Styling engine |
+| **TanStack React Query** | `^5.60.5` | `5.60.5` | Async server state caching |
+| **Zustand** | `^5.0.1` | `5.0.1` | Client state management (Auth store) |
+| **Zod** | `^3.23.8` | `3.23.8` | Schema validation |
+| **React Hook Form** | `^7.53.2` | `7.53.2` | Form management |
+| **Motion** | `^14.14.0` | `14.14.0` | Spring animations |
+| **Axios** | `^1.7.7` | `1.7.7` | HTTP REST client |
+| **Day.js** | `^1.11.13` | `1.11.13` | Date parsing & formatting |
+| **Vitest** | `^2.1.9` | `2.1.9` | Component & unit test runner |
+
+---
+
 ## Roles & Route Access Matrix
 
 | Role | Permitted Pages & Capabilities |
 | :--- | :--- |
 | **SUPER_ADMIN** | Full access to all modules: Dashboard, User Accounts, School Calendar, Attendance, Admissions Wizard, Students, Teachers, Grades & Classes, Fees, Applications, Parent Linking, and Audit Logs |
-| **ADMIN** | Dashboard, School Calendar, Attendance Overview, Admissions Wizard, Students, Teachers, Grades & Classes, Fees, Applications, Parent Linking, Audit Logs |
-| **TEACHER** | Dashboard, Daily Roll-Call Attendance, My Classes & Sections, Report Missing Student, Profile & Security Settings |
+| **ADMIN** | Dashboard, School Calendar, Attendance Overview, Admissions Wizard, Students, Teachers, Grades & Classes, Fees, Applications, Parent Linking, Audit Logs, Online Classroom Monitoring |
+| **TEACHER** | Dashboard, Daily Roll-Call Attendance, My Classes & Sections, Digital School Diary (`/diary`), Online Classroom Host (`/online-classroom`), Report Missing Student, Profile & Security Settings |
 | **STUDENT / PARENT** | **Blocked.** Displays *"You don't have access to this portal"* and initiates instant logout. |
 
 ---

@@ -4,12 +4,38 @@ The learner and guardian web application for the Student Management System, serv
 
 ---
 
+## Tech Stack & Required Versions
+
+| Library / Tool | Specified Version | Installed Version | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Node.js Runtime** | `18.x` / `20.x` / `22.x` | `v22.23.2` | JavaScript runtime environment |
+| **npm** | `10.x+` | `10.9.8` | Package manager |
+| **Next.js** | `^14.2.18` | `14.2.35` | React framework with App Router |
+| **React** | `^18.3.1` | `18.3.1` | UI rendering library |
+| **React DOM** | `^18.3.1` | `18.3.1` | React DOM renderer |
+| **TypeScript** | `^5.6.3` | `5.6.3` | Static typing compiler |
+| **Material-UI (@mui/material)** | `^6.1.6` | `6.1.6` | Component library (MUI v6) |
+| **MUI Icons (@mui/icons-material)** | `^6.1.6` | `6.1.6` | Material Design icon set |
+| **MUI DataGrid (@mui/x-data-grid)** | `^7.22.1` | `7.22.1` | Data tables |
+| **Emotion (@emotion/react, @emotion/styled)** | `^11.14.0` | `11.14.0` | Styling engine |
+| **TanStack React Query** | `^5.60.5` | `5.60.5` | Server state caching & mutations |
+| **Zustand** | `^5.0.1` | `5.0.1` | Global client store (Auth & children) |
+| **Zod** | `^3.23.8` | `3.23.8` | Client schema validation |
+| **React Hook Form** | `^7.53.2` | `7.53.2` | Form management |
+| **Motion** | `^14.14.0` | `14.14.0` | Micro-interactions & animations |
+| **Axios** | `^1.7.7` | `1.7.7` | HTTP REST client |
+| **Day.js** | `^1.11.13` | `1.11.13` | Date parsing & formatting |
+| **Vitest** | `^2.1.9` | `2.1.9` | Unit & component testing |
+| **Playwright (@playwright/test)** | `^1.65.1` | `1.65.1` | Visual regression testing |
+
+---
+
 ## Roles & Route Access Matrix
 
 | Role | Permitted Areas & Capabilities |
 | :--- | :--- |
-| **STUDENT** | Personal Dashboard, My Attendance, Marks & Grades, Fee Details, Profile & Security Settings |
-| **PARENT** | Parent Dashboard, Multi-Child Switcher, Linked Children Directory, Child Attendance Records, Child Marks & Report Cards, Child Fee Invoices & Payment History |
+| **STUDENT** | Personal Dashboard, My Attendance, Marks & Grades, Fee Details, Digital Diary (`/diary`), Online Classroom (`/online-classroom`), AI Student Assistant (`/assistant`), AI Study Planner (`/learning-assistant`), Profile & Security Settings |
+| **PARENT** | Parent Dashboard, Multi-Child Switcher, Linked Children Directory (`/children`), Child Attendance Records, Child Marks & Report Cards, Digital Diary Signatures & Discussions (`/diary`), Online Fee Payments via Razorpay (`/fees`) |
 | **STAFF / ADMIN** | **Blocked.** Displays *"You don't have access to this portal"* and initiates instant logout to protect role boundaries. |
 
 ---
@@ -49,6 +75,34 @@ The learner and guardian web application for the Student Management System, serv
   - View detailed marks, term report cards, and subject evaluation for each linked child.
 - **Child Fee Management:**
   - Review outstanding tuition fee balances, download fee receipts, and monitor payment schedules per child.
+  - 1-click Razorpay checkout for pending fee installments.
+
+---
+
+### 3. Digital School Diary (`/diary`)
+- **Student View:** Feed of homework updates, behavioral remarks, attendance notes, and teacher announcements with automatic read-receipt dispatch.
+- **Parent View:** Multi-child diary feed with verified 1-click digital signature acknowledgements.
+- **1-on-1 Discussions:** Contextual inquiry drawer allowing parents to direct questions to the teacher for any specific diary remark.
+
+---
+
+### 4. Interactive Online Classroom (`/online-classroom`)
+- **Pre-Join Green Room (`/join`):** Device verification screen (camera, microphone, speaker test).
+- **Live Classroom Meeting (`/live`):** Interactive WebRTC video and audio powered by LiveKit SFU, in-class chat, raise-hand queue, and live shared whiteboard view.
+
+---
+
+### 5. Conversational AI Student Assistant (`/assistant`)
+- **Dual-Intelligence Architecture:** General conversational knowledge + grounded database tools (timetable, marks, attendance, leaves, fees, syllabus).
+- **School Policy RAG:** Semantic similarity search over school handbooks and policies powered by PostgreSQL `pgvector`.
+- **Interactive Tools:** Audio transcription, voice tutor speech synthesis, 3-round AI debate partner, and interactive SVG concept maps.
+
+---
+
+### 6. AI Academic Performance & Study Planner (`/learning-assistant`)
+- **Academic Analytics:** Automated subject strength and weakness discovery from published exam marks.
+- **Study Routine Checklist:** Daily tasks and customized study time goals with a persistent focus timer.
+- **Exam Horizon Lookahead:** 14-day upcoming examination scheduler.
 
 ---
 
