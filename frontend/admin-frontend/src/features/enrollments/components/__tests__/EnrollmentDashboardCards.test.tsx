@@ -12,6 +12,8 @@ describe('EnrollmentDashboardCards Component', () => {
     transferred_students: 8,
     promoted_students: 395,
     inactive_students: 4,
+    grade_distribution: [],
+    section_distribution: [],
   };
 
   it('TC-METRICS-01: renders all 5 metric cards with correct labels and numeric values', () => {
@@ -39,6 +41,8 @@ describe('EnrollmentDashboardCards Component', () => {
       transferred_students: 0,
       promoted_students: 0,
       inactive_students: 0,
+      grade_distribution: [],
+      section_distribution: [],
     };
 
     renderWithProviders(<EnrollmentDashboardCards metrics={zeroMetrics} />);

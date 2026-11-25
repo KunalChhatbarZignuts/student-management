@@ -89,7 +89,7 @@ def get_teacher_comprehensive_details(
         .outerjoin(AcademicYear, Grade.academic_year_id == AcademicYear.id)
         .where(
             TeacherAssignment.teacher_id == teacher.id,
-            TeacherAssignment.is_active == True,
+            TeacherAssignment.is_active.is_(True),
         )
     )
     ct_row = db.execute(ct_stmt).first()

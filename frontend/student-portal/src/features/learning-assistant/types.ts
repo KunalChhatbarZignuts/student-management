@@ -104,24 +104,176 @@ export interface Recommendation {
   created_at: string;
 }
 
+export interface StudySession {
+  id: string;
+  student_id: string;
+  plan_item_id: string;
+  status: 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+  start_time: string;
+  end_time: string | null;
+  paused_at: string | null;
+  accumulated_seconds: number;
+  target_duration_seconds: number;
+  notes: string | null;
+  activity_title?: string | null;
+  subject_name?: string | null;
+  elapsed_seconds: number;
+  remaining_seconds: number;
+}
+
 export interface StudyPlanItem {
   id: string;
+  plan_id?: string | null;
   subject_name: string;
   topic_title: string;
+  title?: string | null;
+  description?: string | null;
   activity_type: string;
+  priority?: 'HIGH' | 'MEDIUM' | 'LOW';
+  status?: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'PAUSED' | 'SKIPPED';
   duration_minutes: number;
   is_completed: boolean;
+  is_custom?: boolean;
   time_spent_seconds: number;
   order_index: number;
+  start_time?: string | null;
+  end_time?: string | null;
+  notes?: string | null;
+  recommended_resource_url?: string | null;
+  exam_id?: string | null;
+  is_rescheduled?: boolean;
+  is_deleted?: boolean;
+}
+
+export interface CreateRoutineActivityPayload {
+  subject_name: string;
+  topic_title: string;
+  title?: string;
+  description?: string;
+  activity_type: string;
+  duration_minutes: number;
+  priority: 'HIGH' | 'MEDIUM' | 'LOW';
+  start_time?: string;
+  end_time?: string;
+  notes?: string;
+  recommended_resource_url?: string;
+  target_date?: string;
+}
+
+export interface UpdateRoutineActivityPayload {
+  subject_name?: string;
+  topic_title?: string;
+  title?: string;
+  description?: string;
+  activity_type?: string;
+  duration_minutes?: number;
+  priority?: 'HIGH' | 'MEDIUM' | 'LOW';
+  status?: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'PAUSED' | 'SKIPPED';
+  is_completed?: boolean;
+  start_time?: string;
+  end_time?: string;
+  notes?: string;
+  recommended_resource_url?: string;
+}
+
+export interface UpdateActivityStatusPayload {
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'PAUSED' | 'SKIPPED';
+  additional_seconds_spent?: number;
+}
+
+export interface DuplicateRoutinePayload {
+  source_date: string;
+  target_date: string;
+  include_completed?: boolean;
+}
+
+export interface StartSessionPayload {
+  plan_item_id: string;
+  target_duration_seconds?: number;
+}
+
+export interface FinishSessionPayload {
+  mark_activity_completed: boolean;
+  notes?: string;
+}
+
+export interface StudentStudySettings {
+  student_id: string;
+  weekday_daily_minutes: number;
+  weekend_daily_minutes: number;
+  preferred_study_time: string;
+  break_interval_minutes: number;
+  notifications_enabled: boolean;
+}
+
+export interface WeeklyStudyPlan {
+  week_start_date: string;
+  total_planned_minutes: number;
+  completed_minutes: number;
+  daily_plans: DailyStudyPlan[];
+  upcoming_exams_count: number;
+  completion_percentage: number;
+}
+
+export interface TopicMasteryItem {
+  topic_id: string;
+  topic_title: string;
+  chapter_title: string;
+  subject_name: string;
+  mastery_level: 'NOT_STARTED' | 'RECOMMENDED' | 'IN_PROGRESS' | 'NEEDS_PRACTICE' | 'IMPROVING' | 'MASTERED';
+  accuracy_percentage: number;
+  attempts_count: number;
+  consecutive_correct: number;
+  last_assessed_at: string | null;
+}
+
+export interface TopicMasteryMatrix {
+  total_topics: number;
+  mastered_count: number;
+  in_progress_count: number;
+  needs_practice_count: number;
+  topics: TopicMasteryItem[];
+}
+
+export interface StudentMistake {
+  id: string;
+  topic_id: string | null;
+  subject_name: string;
+  topic_title: string;
+  question_text: string;
+  student_answer: string;
+  correct_answer: string;
+  misconception_explanation: string;
+  is_resolved: boolean;
+  created_at: string;
+}
+
+export interface ConceptTutorExplainResponse {
+  subject_name: string;
+  topic_title: string;
+  explanation_markdown: string;
+  worked_example: string | null;
+  key_takeaways: string[];
+  practice_prompt: string | null;
+  attribution: string;
 }
 
 export interface DailyStudyPlan {
   id: string;
+  student_id?: string | null;
   plan_date: string;
   total_planned_minutes: number;
   completed_minutes: number;
+  remaining_minutes?: number;
+  completion_percentage?: number;
   status: string;
+  notes?: string | null;
+  is_archived?: boolean;
+  total_activities_count?: number;
+  completed_activities_count?: number;
+  pending_activities_count?: number;
   items: StudyPlanItem[];
+  active_session?: StudySession | null;
 }
 
 export interface PracticeQuestion {

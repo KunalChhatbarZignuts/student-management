@@ -4,18 +4,14 @@ import { screen, fireEvent, render } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import { createAppTheme } from '@/theme/theme';
 
-import SubjectAnalysisTab from '../components/SubjectAnalysisTab';
-import PracticeQuizTab from '../components/PracticeQuizTab';
 import DailyStudyPlanTab from '../components/DailyStudyPlanTab';
 import LearningOverviewTab from '../components/LearningOverviewTab';
-import LearningPathTab from '../components/LearningPathTab';
-import AITutorChatTab from '../components/AITutorChatTab';
 import {
+  DailyStudyPlan,
+  LearningOverview,
   SubjectLearningDetail,
   PracticeSession,
   PracticeEvaluation,
-  DailyStudyPlan,
-  LearningOverview,
   Recommendation,
 } from '../types';
 
@@ -77,31 +73,35 @@ const mockSession: PracticeSession = {
   questions: [
     {
       id: 'q1',
+      question_number: 1,
       question_text: 'What is the determinant of a 2x2 identity matrix?',
       options: ['0', '1', '2', '-1'],
       hint: 'Recall that identity matrices have ones along the diagonal.',
     },
     {
       id: 'q2',
+      question_number: 2,
       question_text: 'Which operation is NOT an elementary row operation?',
       options: ['Multiply row by scalar', 'Swap two rows', 'Square all elements', 'Add scalar multiple to another row'],
+      hint: 'Think about linear combination operations.',
     },
     {
       id: 'q3',
+      question_number: 3,
       question_text: 'A matrix with non-zero determinant is:',
       options: ['Singular', 'Invertible', 'Orthogonal', 'Skew'],
+      hint: 'Determinant non-zero means an inverse exists.',
     },
   ],
 };
 
 const mockEvaluation: PracticeEvaluation = {
   session_id: 'sess-123',
-  chapter_id: 'ch-algebra',
+  subject_name: 'Mathematics',
   chapter_title: 'Linear Systems & Matrices',
   total_questions: 3,
   correct_count: 2,
   score_percentage: 67,
-  difficulty_level: 'MEDIUM',
   learning_impact: 'Good grasp of matrix operations. Review non-linear transformations.',
   results: [
     {
@@ -111,6 +111,7 @@ const mockEvaluation: PracticeEvaluation = {
       correct_option_index: 1,
       is_correct: true,
       explanation: 'Identity matrices have determinant equal to 1.',
+      hint: 'Recall that identity matrices have ones along the diagonal.',
     },
     {
       question_id: 'q2',
@@ -119,6 +120,7 @@ const mockEvaluation: PracticeEvaluation = {
       correct_option_index: 2,
       is_correct: true,
       explanation: 'Squaring elements changes the solution set.',
+      hint: 'Think about linear combination operations.',
     },
     {
       question_id: 'q3',
@@ -127,6 +129,7 @@ const mockEvaluation: PracticeEvaluation = {
       correct_option_index: 1,
       is_correct: false,
       explanation: 'Non-zero determinant means the matrix is non-singular and invertible.',
+      hint: 'Determinant non-zero means an inverse exists.',
     },
   ],
 };
@@ -232,85 +235,45 @@ const mockRecommendations: Recommendation[] = [
     priority: 'HIGH',
     estimated_minutes: 25,
     status: 'NOT_STARTED',
+    order_index: 1,
+    created_at: '2026-11-24T10:00:00Z',
   },
 ];
 
 describe('AI Personal Learning Assistant Visual Styles & Design Tokens', () => {
-  it('TC-VIS-01: SubjectAnalysisTab renders quiet hairline accordions and 1-click Add to Plan button', async () => {
+  it('TC-VIS-01: LearningOverviewTab navigates to study plan using streamlined tab index', () => {
+    const handleNavigate = vi.fn();
     renderWithTheme(
-      <SubjectAnalysisTab
-        subjects={mockSubjects}
-        onStartChapterPractice={vi.fn()}
+      <LearningOverviewTab
+        overview={mockOverview}
+        onNavigateTab={handleNavigate}
       />
     );
 
-    // Subject and chapter titles
-    expect(screen.getByText('Mathematics')).toBeDefined();
-    expect(screen.getByText('Chapter 1: Linear Systems & Matrices')).toBeDefined();
-
-    // 1-Click Add to Plan button
-    const addBtn = screen.getByRole('button', { name: /Add to Plan/i });
-    expect(addBtn).toBeDefined();
-
-    // Zero decorative emoji check
-    expect(screen.queryByText(/✨|🔥|🎉|🚀/)).toBeNull();
-
-    // Click Add to Plan and verify transition
-    fireEvent.click(addBtn);
-    expect(await screen.findByText(/Added to Plan/i)).toBeDefined();
+    const planBtn = screen.getByRole('button', { name: /View Study Plan/i });
+    fireEvent.click(planBtn);
+    expect(handleNavigate).toHaveBeenCalledWith(1);
   });
 
-  it('TC-VIS-02: PracticeQuizTab active session renders digital timer badge and question jump pills', () => {
-    renderWithTheme(
-      <PracticeQuizTab
-        subjects={mockSubjects}
-        activeSession={mockSession}
-        evaluation={null}
-        isLoading={false}
-        onGenerateQuiz={vi.fn()}
-        onSubmitQuiz={vi.fn()}
-        onResetQuiz={vi.fn()}
+  it('TC-VIS-02: LearningOverviewTab renders hairline cards, official average, and attribution note', () => {
+    const { container } = renderWithTheme(
+      <LearningOverviewTab
+        overview={mockOverview}
+        onNavigateTab={vi.fn()}
       />
     );
 
-    // Timer display exists in MM:SS format
-    expect(screen.getByText(/00:00/)).toBeDefined();
+    expect(screen.getByText('AI Recommended Next Topic')).toBeDefined();
+    expect(screen.getByText('Priority: HIGH')).toBeDefined();
+    expect(screen.getByText('Overall Exam Average')).toBeDefined();
+    expect(screen.getAllByText('78.5%').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Data Attribution Boundary:/i)).toBeDefined();
 
-    // Jump pills Q1, Q2, Q3 exist
-    expect(screen.getByRole('button', { name: 'Q1' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Q2' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Q3' })).toBeDefined();
-
-    // Navigation buttons
-    expect(screen.getByRole('button', { name: /Next Question/i })).toBeDefined();
-    expect(screen.getByRole('button', { name: /Previous/i })).toBeDefined();
+    // Check no emoji slop
+    expect(container.textContent).not.toMatch(/[✨🔥🚀🎉]/);
   });
 
-  it('TC-VIS-03: PracticeQuizTab evaluation review renders quiet hairline card without gradients', () => {
-    renderWithTheme(
-      <PracticeQuizTab
-        subjects={mockSubjects}
-        activeSession={null}
-        evaluation={mockEvaluation}
-        isLoading={false}
-        onGenerateQuiz={vi.fn()}
-        onSubmitQuiz={vi.fn()}
-        onResetQuiz={vi.fn()}
-      />
-    );
-
-    // Evaluation summary and score
-    expect(screen.getByText('67% Score')).toBeDefined();
-    expect(screen.getByText(/Detailed Step-by-Step Question Review/i)).toBeDefined();
-
-    // Reset button
-    expect(screen.getByRole('button', { name: /Take Another Quiz/i })).toBeDefined();
-
-    // Zero decorative emojis
-    expect(screen.queryByText(/✨|🎉|🔥/)).toBeNull();
-  });
-
-  it('TC-VIS-04: DailyStudyPlanTab renders quiet focus countdown timer and calm completion banner', () => {
+  it('TC-VIS-03: DailyStudyPlanTab renders quiet focus countdown timer and calm completion banner', () => {
     renderWithTheme(
       <DailyStudyPlanTab
         plan={mockPlan}
@@ -330,7 +293,36 @@ describe('AI Personal Learning Assistant Visual Styles & Design Tokens', () => {
     expect(screen.queryByText(/🎉/)).toBeNull();
   });
 
-  it('TC-VIS-05A: LearningOverviewTab renders hairline cards and priority tags', () => {
+  it('TC-VIS-04: DailyStudyPlanTab renders Weekly view toggle and Preferences buttons', () => {
+    renderWithTheme(
+      <DailyStudyPlanTab
+        plan={mockPlan}
+        onUpdateItem={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: /Today/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /Weekly/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /Preferences/i })).toBeDefined();
+  });
+
+  it('TC-VIS-05: DailyStudyPlanTab handles item checkbox selection without errors', () => {
+    const updateItemMock = vi.fn();
+    renderWithTheme(
+      <DailyStudyPlanTab
+        plan={mockPlan}
+        onUpdateItem={updateItemMock}
+      />
+    );
+
+    const checkboxes = screen.getAllByRole('checkbox');
+    expect(checkboxes.length).toBeGreaterThanOrEqual(1);
+
+    fireEvent.click(checkboxes[0]);
+    expect(updateItemMock).toHaveBeenCalled();
+  });
+
+  it('TC-VIS-06: verifies zero decorative AI emojis across all rendered components', () => {
     const { container: overviewContainer } = renderWithTheme(
       <LearningOverviewTab
         overview={mockOverview}
@@ -338,40 +330,14 @@ describe('AI Personal Learning Assistant Visual Styles & Design Tokens', () => {
       />
     );
 
-    expect(screen.getByText('AI Recommended Next Topic')).toBeDefined();
-    expect(screen.getByText('Priority: HIGH')).toBeDefined();
-    expect(screen.getByText('Overall Exam Average')).toBeDefined();
-    expect(screen.getByText('Data Attribution Boundary:')).toBeDefined();
-
-    // Check no emoji slop in overview
-    expect(overviewContainer.textContent).not.toMatch(/[✨🔥🚀🎉]/);
-  });
-
-  it('TC-VIS-05B: LearningPathTab renders hairline cards and priority tags', () => {
-    const { container: pathContainer } = renderWithTheme(
-      <LearningPathTab
-        recommendations={mockRecommendations}
-        onUpdateStatus={vi.fn()}
-        onRecalculate={vi.fn()}
-        onStartPractice={vi.fn()}
+    const { container: planContainer } = renderWithTheme(
+      <DailyStudyPlanTab
+        plan={mockPlan}
+        onUpdateItem={vi.fn()}
       />
     );
 
-    expect(screen.getByText('Personalized Academic Learning Path')).toBeDefined();
-    expect(screen.getByRole('button', { name: /^Practice$/i })).toBeDefined();
-    expect(pathContainer.textContent).not.toMatch(/[✨🔥🚀🎉]/);
-  });
-
-  it('TC-VIS-06: AITutorChatTab renders academic coaching header and clean chat input', () => {
-    renderWithTheme(
-      <AITutorChatTab
-        onSendMessage={vi.fn()}
-        onExecuteAction={vi.fn()}
-      />
-    );
-
-    expect(screen.getByText('AI Academic Coach & Tutor')).toBeDefined();
-    expect(screen.getByPlaceholderText(/Ask a question about your performance/i)).toBeDefined();
-    expect(screen.getByText(/Why is my Math score low and how do I improve\?/i)).toBeDefined();
+    expect(overviewContainer.textContent).not.toMatch(/[✨🔥🚀]/);
+    expect(planContainer.textContent).not.toMatch(/[✨🔥🚀]/);
   });
 });

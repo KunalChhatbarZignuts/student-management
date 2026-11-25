@@ -539,7 +539,7 @@ def get_teacher_assigned_sections(teacher_id: uuid.UUID, db: Session) -> list[As
     assignments = db.execute(
         select(TeacherAssignment).where(
             TeacherAssignment.teacher_id == teacher_id,
-            TeacherAssignment.is_active == True,
+            TeacherAssignment.is_active.is_(True),
         )
     ).scalars().all()
 
@@ -597,7 +597,7 @@ def verify_teacher_section_access(teacher_id: uuid.UUID, section_id: uuid.UUID, 
         select(TeacherAssignment).where(
             TeacherAssignment.teacher_id == teacher_id,
             TeacherAssignment.section_id == section.id,
-            TeacherAssignment.is_active == True,
+            TeacherAssignment.is_active.is_(True),
         )
     ).scalars().first()
 
@@ -1102,7 +1102,7 @@ def get_admin_attendance_overview(
     """Institutional overview across all grades and sections for a specific date."""
     # Find active academic year if not provided
     if not academic_year_id:
-        ay = db.execute(select(AcademicYear).where(AcademicYear.is_current == True)).scalars().first()
+        ay = db.execute(select(AcademicYear).where(AcademicYear.is_current.is_(True))).scalars().first()
         academic_year_id = ay.id if ay else None
 
     sec_stmt = select(Section).join(Grade, Section.grade_id == Grade.id)

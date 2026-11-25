@@ -143,7 +143,7 @@ def get_student_comprehensive_details(
             .join(TeacherAssignment, TeacherAssignment.teacher_id == Teacher.id)
             .where(
                 TeacherAssignment.section_id == enr.section_id,
-                TeacherAssignment.is_active == True,
+                TeacherAssignment.is_active.is_(True),
             )
         )
         ct = db.execute(ct_stmt).scalars().first()
@@ -185,7 +185,7 @@ def get_student_comprehensive_details(
             .join(TeacherAssignment, TeacherAssignment.teacher_id == Teacher.id)
             .where(
                 TeacherAssignment.section_id == active_enrollment.section_id,
-                TeacherAssignment.is_active == True,
+                TeacherAssignment.is_active.is_(True),
             )
         )
         ct = db.execute(ct_stmt).scalars().first()

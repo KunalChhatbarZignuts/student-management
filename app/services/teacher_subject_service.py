@@ -373,7 +373,7 @@ def get_teacher_profile_with_subjects(
     class_assignments = db.execute(
         select(TeacherAssignment).where(
             TeacherAssignment.teacher_id == teacher.id,
-            TeacherAssignment.is_active == True,
+            TeacherAssignment.is_active.is_(True),
             TeacherAssignment.section_id.isnot(None),
         )
     ).scalars().all()

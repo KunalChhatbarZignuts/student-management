@@ -671,7 +671,7 @@ def get_teacher_personal_schedule(
     if academic_year_id:
         ay_query = ay_query.where(AcademicYear.id == academic_year_id)
     else:
-        ay_query = ay_query.where(AcademicYear.is_current == True)
+        ay_query = ay_query.where(AcademicYear.is_current.is_(True))
     ay = db.execute(ay_query).scalars().first()
     if not ay:
         ay = db.execute(select(AcademicYear).order_by(AcademicYear.start_date.desc())).scalars().first()

@@ -18,6 +18,7 @@ const mockOverview = {
       trend: 'IMPROVING',
     },
   ],
+
   weak_subjects: [
     {
       subject_id: 'sub-2',
@@ -195,7 +196,98 @@ test.beforeEach(async ({ page }) => {
     });
   });
 
+  await page.route('**/api/v1/students/me/learning-assistant/settings', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        daily_target_minutes: 60,
+        weekend_target_minutes: 90,
+        preferred_study_time: 'EVENING',
+        break_interval_minutes: 25,
+        break_duration_minutes: 5,
+        notifications_enabled: true,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/students/me/learning-assistant/weekly-plan', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        student_id: 'stu-123',
+        week_start_date: '2026-11-23',
+        week_end_date: '2026-11-29',
+        total_target_minutes: 420,
+        completed_minutes: 120,
+        days: [
+          {
+            plan_date: '2026-11-24',
+            day_name: 'Tuesday',
+            is_today: true,
+            total_minutes: 45,
+            completed_minutes: 20,
+            items_count: 3,
+            completed_count: 1,
+            items: mockDailyPlan.items,
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/students/me/learning-assistant/mistakes', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    });
+  });
+
+  await page.route('**/api/v1/students/me/learning-assistant/mastery', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        total_topics: 10,
+        mastered_count: 4,
+        in_progress_count: 3,
+        needs_practice_count: 3,
+        topics: [],
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/students/me/learning-assistant/daily-routine**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(mockDailyPlan),
+    });
+  });
+
+  await page.route('**/api/v1/students/me/learning-assistant/study-sessions/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: 'null',
+    });
+  });
+
+  await page.route('**/api/v1/auth/refresh**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ access_token: 'fake', refresh_token: 'fake' }),
+    });
+  });
+
   // Mock student profile/auth endpoints
+  await page.addInitScript(() => {
+    window.localStorage.setItem('token', 'fake-jwt-token-for-visual-testing');
+  });
+
   await page.route('**/api/v1/auth/me', async (route) => {
     await route.fulfill({
       status: 200,
@@ -203,20 +295,37 @@ test.beforeEach(async ({ page }) => {
       body: JSON.stringify({
         id: 'usr-1',
         email: 'student@school.edu',
-        role: 'STUDENT',
+        role: 'student',
         first_name: 'Alice',
         last_name: 'Johnson',
       }),
     });
   });
+
+  await page.route('**/api/v1/student/profile**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'stu-1',
+        user_id: 'usr-1',
+        first_name: 'Alice',
+        last_name: 'Johnson',
+        admission_number: 'ADM-2026-001',
+        class_name: 'Grade 10',
+        section: 'A',
+        roll_number: '12',
+      }),
+    });
+  });
 });
 
-test.describe('AI Personal Learning Assistant Visual Tests', () => {
-  test('Tab 1: Learning Overview visual baseline', async ({ page }) => {
+test.describe('Academic Performance & Study Planner Visual Tests', () => {
+  test('Tab 1: Academic Overview visual baseline', async ({ page }) => {
     await page.goto('/learning-assistant');
 
     // Wait for title and key metrics to appear
-    await expect(page.getByText('AI Personal Learning Assistant')).toBeVisible();
+    await expect(page.getByText('Academic Performance & Study Planner')).toBeVisible();
     await expect(page.getByText('AI Recommended Next Topic')).toBeVisible();
     await expect(page.getByText('Overall Exam Average')).toBeVisible();
 
@@ -227,50 +336,14 @@ test.describe('AI Personal Learning Assistant Visual Tests', () => {
     });
   });
 
-  test('Tab 2: Subject Analysis & Curriculum visual baseline', async ({ page }) => {
+  test('Tab 2: Study Planner & Routine visual baseline', async ({ page }) => {
     await page.goto('/learning-assistant');
-    await expect(page.getByText('AI Personal Learning Assistant')).toBeVisible();
+    await expect(page.getByText('Academic Performance & Study Planner')).toBeVisible();
 
-    // Click Subject Analysis tab
-    const tab = page.getByRole('tab', { name: /Subject Analysis/i });
-    await tab.scrollIntoViewIfNeeded();
-    await tab.click({ force: true });
-    await expect(page.getByText('Enrolled Subjects & Curriculum Syllabus')).toBeVisible();
-    await expect(page.getByText('Number Systems & Arithmetic')).toBeVisible();
-
-    await expect(page).toHaveScreenshot('subject-analysis-tab.png', {
-      mask: [page.locator('.MuiAvatar-root')],
-      animations: 'disabled',
-    });
-  });
-
-  test('Tab 3: Personalized Learning Path visual baseline', async ({ page }) => {
-    await page.goto('/learning-assistant');
-    await expect(page.getByText('AI Personal Learning Assistant')).toBeVisible();
-
-    // Click My Learning Path tab
-    const tab = page.getByRole('tab', { name: /My Learning Path/i });
-    await tab.scrollIntoViewIfNeeded();
-    await tab.click({ force: true });
-    await expect(page.getByText('Personalized Academic Learning Path')).toBeVisible();
-    await expect(page.getByText('Priority: HIGH')).toBeVisible();
-
-    await expect(page).toHaveScreenshot('learning-path-tab.png', {
-      mask: [page.locator('.MuiAvatar-root')],
-      animations: 'disabled',
-    });
-  });
-
-  test('Tab 4: Today Study Plan visual baseline', async ({ page }) => {
-    await page.goto('/learning-assistant');
-    await expect(page.getByText('AI Personal Learning Assistant')).toBeVisible();
-
-    // Click Today's Study Plan tab
-    const tab = page.getByRole('tab', { name: /Today's Study Plan/i });
-    await tab.scrollIntoViewIfNeeded();
-    await tab.click({ force: true });
+    // Click Study Planner & Routine tab
+    await page.getByRole('tab', { name: /Study Planner & Routine/i }).dispatchEvent('click');
     await expect(page.getByText(/Today's Personalized Study Routine/i)).toBeVisible();
-    await expect(page.getByText('Linear Equations Review')).toBeVisible();
+    await expect(page.getByText('Linear Equations Review').first()).toBeVisible();
 
     await expect(page).toHaveScreenshot('daily-study-plan-tab.png', {
       mask: [page.locator('.MuiAvatar-root'), page.locator('.MuiChip-label:has-text("Date:")')],
@@ -278,36 +351,19 @@ test.describe('AI Personal Learning Assistant Visual Tests', () => {
     });
   });
 
-  test('Tab 5: Practice & Quizzes visual baseline', async ({ page }) => {
+  test('Tab 2: Add Activity Dialog visual baseline', async ({ page }) => {
     await page.goto('/learning-assistant');
-    await expect(page.getByText('AI Personal Learning Assistant')).toBeVisible();
+    await page.getByRole('tab', { name: /Study Planner & Routine/i }).click();
+    await expect(page.getByText(/Today's Personalized Study Routine/i)).toBeVisible();
+    await expect(page.getByText('Linear Equations Review').first()).toBeVisible();
 
-    // Click Practice & Quizzes tab
-    const tab = page.getByRole('tab', { name: /Practice & Quizzes/i });
-    await tab.scrollIntoViewIfNeeded();
-    await tab.click({ force: true });
-    await expect(page.getByText('Adaptive Diagnostic Practice')).toBeVisible();
-    await expect(page.getByText('Start 5-Question Quiz')).toBeVisible();
+    const addBtn = page.getByRole('button', { name: 'Add Activity' }).first();
+    await expect(addBtn).toBeVisible();
+    await addBtn.click();
+    await expect(page.getByText('Add Activity to Routine')).toBeVisible();
 
-    await expect(page).toHaveScreenshot('practice-quiz-tab.png', {
+    await expect(page).toHaveScreenshot('add-activity-dialog.png', {
       mask: [page.locator('.MuiAvatar-root')],
-      animations: 'disabled',
-    });
-  });
-
-  test('Tab 6: AI Tutor Chat visual baseline', async ({ page }) => {
-    await page.goto('/learning-assistant');
-    await expect(page.getByText('AI Personal Learning Assistant')).toBeVisible();
-
-    // Click AI Tutor Chat tab
-    const tab = page.getByRole('tab', { name: /AI Tutor Chat/i });
-    await tab.scrollIntoViewIfNeeded();
-    await tab.click({ force: true });
-    await expect(page.getByText('AI Academic Coach & Tutor')).toBeVisible();
-    await expect(page.getByText(/Hello! I am your AI Personal Learning Assistant/i)).toBeVisible();
-
-    await expect(page).toHaveScreenshot('ai-tutor-chat-tab.png', {
-      mask: [page.locator('.MuiAvatar-root'), page.locator('text=/\\d{1,2}:\\d{2}/')],
       animations: 'disabled',
     });
   });

@@ -4,7 +4,7 @@ import logging
 import os
 import re
 import uuid
-from typing import Any
+from typing import Any, AsyncGenerator
 
 from sqlalchemy import select, desc
 from sqlalchemy.orm import Session, selectinload
@@ -34,7 +34,7 @@ def create_conversation(student_id: uuid.UUID, title: str | None, db: Session) -
 
 def list_conversations(student_id: uuid.UUID, db: Session) -> list[dict[str, Any]]:
     # Eager-load messages in a single query to eliminate N+1 latency
-    convs = db.execute(
+    conversations = db.execute(
         select(AIStudentConversation)
         .options(selectinload(AIStudentConversation.messages))
         .where(AIStudentConversation.student_id == student_id)
@@ -42,24 +42,24 @@ def list_conversations(student_id: uuid.UUID, db: Session) -> list[dict[str, Any
     ).scalars().all()
 
     results = []
-    for c in convs:
+    for conversation in conversations:
         # Sort in-memory from preloaded relationship
-        msgs = sorted(c.messages, key=lambda m: m.created_at, reverse=True)
-        last_msg = msgs[0] if msgs else None
+        sorted_messages = sorted(conversation.messages, key=lambda msg: msg.created_at, reverse=True)
+        last_message = sorted_messages[0] if sorted_messages else None
 
         results.append({
-            "id": c.id,
-            "title": c.title,
-            "last_message_preview": (last_msg.content[:80] + "...") if last_msg else None,
-            "message_count": len(c.messages),
-            "created_at": c.created_at,
-            "updated_at": c.updated_at,
+            "id": conversation.id,
+            "title": conversation.title,
+            "last_message_preview": (last_message.content[:80] + "...") if last_message else None,
+            "message_count": len(conversation.messages),
+            "created_at": conversation.created_at,
+            "updated_at": conversation.updated_at,
         })
     return results
 
 
 def get_conversation_detail(student_id: uuid.UUID, conversation_id: uuid.UUID, db: Session) -> dict[str, Any] | None:
-    conv = db.execute(
+    conversation = db.execute(
         select(AIStudentConversation)
         .options(selectinload(AIStudentConversation.messages))
         .where(
@@ -68,24 +68,24 @@ def get_conversation_detail(student_id: uuid.UUID, conversation_id: uuid.UUID, d
         )
     ).scalar_one_or_none()
 
-    if not conv:
+    if not conversation:
         return None
 
     messages_data = []
-    for m in conv.messages:
+    for message in conversation.messages:
         messages_data.append({
-            "id": m.id,
-            "sender": m.sender,
-            "content": m.content,
-            "tools_used": m.tools_used or [],
-            "action_links": m.action_links or [],
-            "created_at": m.created_at,
+            "id": message.id,
+            "sender": message.sender,
+            "content": message.content,
+            "tools_used": message.tools_used or [],
+            "action_links": message.action_links or [],
+            "created_at": message.created_at,
         })
 
     return {
-        "id": conv.id,
-        "title": conv.title,
-        "created_at": conv.created_at,
+        "id": conversation.id,
+        "title": conversation.title,
+        "created_at": conversation.created_at,
         "messages": messages_data,
     }
 
@@ -182,38 +182,50 @@ def classify_query_intent(message: str) -> list[str]:
         tools.append("discover_careers")
         return tools
 
+    import re
+
+    def has_any_word(pattern_list: tuple[str, ...]) -> bool:
+        for p in pattern_list:
+            if " " in p:
+                if p in text:
+                    return True
+            else:
+                if re.search(r'\b' + re.escape(p) + r'\b', text):
+                    return True
+        return False
+
     # Combined preparation check (Tomorrow's schedule preparation)
     if ("what" in text and "tomorrow" in text and "do" in text) or text.strip() == "prepare for tomorrow":
         return ["get_student_timetable", "get_student_examinations", "get_school_calendar"]
 
-    if any(k in text for k in ("timetable", "class today", "classes today", "schedule", "period", "next class", "first lecture", "who teaches")):
+    if has_any_word(("timetable", "class today", "classes today", "schedule", "period", "next class", "first lecture", "who teaches")):
         tools.append("get_student_timetable")
 
-    if any(k in text for k in ("attendance", "absent", "present", "attendance rate", "working days")):
+    if has_any_word(("attendance", "absent", "present", "attendance rate", "working days")):
         tools.append("get_student_attendance")
 
-    if any(k in text for k in ("exam", "examination", "midterm", "upcoming test")):
+    if has_any_word(("exam", "exams", "examination", "examinations", "midterm", "upcoming test")):
         tools.append("get_student_examinations")
 
-    if any(k in text for k in ("mark", "marks", "score", "grade", "result", "report card")):
+    if has_any_word(("mark", "marks", "score", "scores", "grade", "grades", "result", "results", "report card")):
         tools.append("get_student_results")
 
-    if any(k in text for k in ("holiday", "vacation", "calendar", "sunday", "working day")):
+    if has_any_word(("holiday", "holidays", "vacation", "calendar", "sunday", "working day")):
         tools.append("get_school_calendar")
 
-    if any(k in text for k in ("fee", "fees", "invoice", "payment", "due amount", "balance")):
+    if has_any_word(("fee", "fees", "invoice", "payment", "due amount", "balance")):
         tools.append("get_student_fees")
 
-    if any(k in text for k in ("online class", "online lecture", "live class", "meeting", "recorded")):
+    if has_any_word(("online class", "online lecture", "live class", "meeting", "recorded")):
         tools.append("get_student_online_classes")
 
-    if any(k in text for k in ("leave", "sick leave", "leave application")):
+    if has_any_word(("leave", "leaves", "sick leave", "leave application")):
         tools.append("get_student_leaves")
 
-    if any(k in text for k in ("syllabus", "chapter", "topic", "curriculum")):
+    if has_any_word(("syllabus", "chapters", "curriculum")):
         tools.append("get_subject_curriculum")
 
-    if any(k in text for k in ("rule", "policy", "handbook", "guideline", "uniform", "fine", "cut-off", "cutoff", "passing mark", "grading system", "library", "dress code", "conduct", "late fee")):
+    if has_any_word(("rule", "rules", "policy", "policies", "handbook", "guideline", "guidelines", "uniform", "fine", "cut-off", "cutoff", "passing mark", "grading system", "library", "dress code", "conduct", "late fee")):
         tools.append("search_school_knowledge")
 
     return list(dict.fromkeys(tools))
@@ -571,26 +583,288 @@ def synthesize_fallback_response(
                 lines.append("")
             action_links.append({"label": "View School Calendar", "url": "/calendar"})
 
-    # Educational or General question default
+    # Educational or General question fallback
     if not lines:
-        lines.append(
-            f"Hello {student.first_name}. I am your AI Student Assistant.\n\n"
-            "I can assist you with:\n"
-            "- **Daily and weekly class timetables**\n"
-            "- **Attendance summaries and records**\n"
-            "- **Upcoming examinations and published marks**\n"
-            "- **School calendar and holiday schedule**\n"
-            "- **Online classroom sessions**\n"
-            "- **Subject curriculum and concept explanations**\n\n"
-            "Try asking: *\"What is my next class?\"*, *\"What is my attendance rate?\"*, or *\"Explain Newton's third law.\"*"
-        )
-        action_links.append({"label": "View Timetable", "url": "/timetable"})
+        edu_content, edu_links = synthesize_educational_response(message, student)
+        return edu_content, edu_links
 
     return "\n".join(lines), action_links
 
 
+def synthesize_educational_response(
+    message: str,
+    student: Student,
+) -> tuple[str, list[dict[str, str]]]:
+    """Synthesizes rich, structured educational responses for general AI questions
+    (science, mathematics, programming, writing, creative tasks, and conversation)
+    when offline or operating without an active Hugging Face API key.
+    """
+    text = message.lower().strip()
+    action_links: list[dict[str, str]] = []
+
+    # 1. Artificial Intelligence / Machine Learning
+    if any(k in text for k in ("artificial intelligence", "what is ai", "machine learning", "deep learning", "neural network", "how ai works")):
+        content = f"""### Artificial Intelligence & Machine Learning
+
+**Artificial Intelligence (AI)** is the branch of computer science dedicated to building systems capable of performing tasks that typically require human cognition, such as reasoning, problem-solving, understanding natural language, and visual perception.
+
+#### 1. Core Branches of AI
+- **Machine Learning (ML)**: Algorithms that identify statistical patterns from data rather than following rigidly programmed rules.
+- **Deep Learning**: A subset of ML utilizing multi-layered artificial neural networks inspired by biological neural architectures.
+- **Natural Language Processing (NLP)**: Enables computers to read, comprehend, synthesize, and generate human languages (e.g., modern Large Language Models).
+
+#### 2. How Modern AI Learns
+1. **Training Phase**: Models process vast datasets, iteratively adjusting numerical parameters (weights) to minimize error via gradient descent.
+2. **Inference Phase**: Once trained, the model predicts outputs or generates text in response to new, unseen prompts.
+
+> **Key Takeaway**: AI systems do not "think" with consciousness—they perform high-dimensional probabilistic pattern matching and mathematical optimization."""
+        action_links.append({"label": "Explore Computer Science Syllabus", "url": "/curriculum"})
+        return content, action_links
+
+    # 2. Photosynthesis & Biology
+    if any(k in text for k in ("photosynthesis", "how plants make food", "calvin cycle", "chloroplast", "chlorophyll")):
+        content = r"""### Photosynthesis: The Engine of Terrestrial Life
+
+**Photosynthesis** is the biochemical process by which photoautotrophic organisms (green plants, algae, and cyanobacteria) convert radiant light energy into chemical energy stored in carbohydrates.
+
+#### The Balanced Chemical Equation:
+$$6\text{CO}_2 + 6\text{H}_2\text{O} + \text{photons} \xrightarrow{\text{chlorophyll}} \text{C}_6\text{H}_{12}\text{O}_6 + 6\text{O}_2$$
+
+#### The Two Main Stages:
+1. **Light-Dependent Reactions (Thylakoid Membrane)**:
+   - Sunlight photons excite electrons in chlorophyll within Photosystem II and I.
+   - Water molecules are split via photolysis:
+     $$2\text{H}_2\text{O} \rightarrow 4\text{H}^+ + 4e^- + \text{O}_2 \uparrow$$
+   - Generates high-energy currency molecules: **ATP** (adenosine triphosphate) and **NADPH**.
+2. **Light-Independent Reactions / The Calvin Cycle (Stroma)**:
+   - Atmospheric $\text{CO}_2$ is fixed by the enzyme **RuBisCO** into 3-phosphoglycerate.
+   - ATP and NADPH reduce these intermediates to produce **G3P**, which combines to form glucose ($\text{C}_6\text{H}_{12}\text{O}_6$).
+
+#### Ecological Importance:
+- Produces molecular oxygen required for aerobic cellular respiration.
+- Acts as the primary global carbon sink regulating atmospheric temperatures."""
+        action_links.append({"label": "Review Biology Curriculum", "url": "/curriculum"})
+        return content, action_links
+
+    # 3. Newton's Laws of Motion & Physics
+    if any(k in text for k in ("newton", "laws of motion", "first law", "second law", "third law", "inertia")):
+        content = r"""### Sir Isaac Newton's Three Laws of Motion
+
+Newton's laws of motion form the classical bedrock of Newtonian mechanics, describing the relationship between the forces acting on a body and its motion through space.
+
+#### 1. First Law of Motion (Law of Inertia)
+> *An object at rest stays at rest, and an object in uniform motion remains in motion along a straight path unless acted upon by a net external force.*
+- **Mathematical Form**: If $\sum \vec{F} = 0$, then $\frac{d\vec{v}}{dt} = 0$.
+- **Real-World Example**: A passenger lunges forward when a bus suddenly brakes because their body tends to maintain its state of velocity.
+
+#### 2. Second Law of Motion (Force and Acceleration)
+> *The rate of change of momentum of a body is directly proportional to the applied resultant force and occurs in the direction of the force.*
+- **Mathematical Form**:
+  $$\vec{F}_{\text{net}} = m \vec{a} = \frac{d\vec{p}}{dt}$$
+- **Key Insight**: Doubling the net force on an object doubles its acceleration; doubling its mass halves its acceleration.
+
+#### 3. Third Law of Motion (Action and Reaction)
+> *For every action force exerted on a body, there is an equal and opposite reaction force exerted on the other body.*
+- **Mathematical Form**: $\vec{F}_{AB} = -\vec{F}_{BA}$.
+- **Real-World Example**: A rocket propulsion engine expels combustion exhaust gases downward at high velocity; the reacting gas thrust forces the rocket upward into orbit."""
+        action_links.append({"label": "Practice Physics Problems", "url": "/learning-assistant"})
+        return content, action_links
+
+    # 4. Internet & Networking
+    if any(k in text for k in ("how the internet works", "how internet works", "networking", "dns", "http", "tcp/ip", "packet")):
+        content = r"""### How the Global Internet Works: A Step-by-Step Overview
+
+The **Internet** is a decentralized global network of interconnected computers communicating via standardized communication protocols (**TCP/IP**).
+
+#### What Happens When You Navigate to a Website:
+1. **Domain Name System (DNS) Resolution**:
+   - Computers route numerical IP addresses (e.g. `192.0.2.1` or `2606:4700::6810`).
+   - Your browser queries a DNS resolver to resolve a domain name into an IP address.
+2. **TCP Three-Way Handshake**:
+   - Client and server establish a reliable virtual connection: `SYN` $\rightarrow$ `SYN-ACK` $\rightarrow$ `ACK`.
+   - TLS/SSL handshake negotiates cryptographic symmetric encryption keys for HTTPS security.
+3. **HTTP/HTTPS Request & Response**:
+   - The browser issues a `GET / HTTP/2` request with headers.
+   - The server processes the request and responds with status codes (e.g. `200 OK`) and payloads (HTML, CSS, JavaScript).
+4. **Packet Switching Across Physical Infrastructure**:
+   - Data is sliced into discrete binary packets (typically $\le 1500$ bytes MTU) and routed over fiber-optic cables using the **BGP** protocol.
+5. **Browser Rendering Engine**:
+   - The browser parses HTML into the Document Object Model (DOM), parses CSS into CSSOM, calculates layout reflow, and paints pixels onto your display."""
+        action_links.append({"label": "Computer Science Concepts", "url": "/curriculum"})
+        return content, action_links
+
+    # 5. Frontend vs Backend Development
+    if any(k in text for k in ("frontend and backend", "difference between frontend", "frontend vs backend", "client and server", "full stack")):
+        content = r"""### Frontend vs. Backend Development: Architecture & Differences
+
+In software engineering, web applications are cleanly divided into client-facing (presentation) and server-facing (data and computation) layers.
+
+| Dimension | **Frontend (Client-Side)** | **Backend (Server-Side)** |
+| :--- | :--- | :--- |
+| **Execution Environment** | Runs inside the user's web browser or mobile client. | Runs on dedicated cloud servers or containerized nodes. |
+| **Primary Objective** | User experience, visual layout, responsive interactions, and state. | Business logic, authentication, data persistence, and security. |
+| **Core Languages** | HTML5, CSS3, JavaScript, TypeScript. | Python, TypeScript/Node.js, Go, Rust, Java. |
+| **Common Frameworks** | React, Next.js, Vue, Angular, Material-UI, Tailwind. | FastAPI, Django, Express, NestJS, Spring Boot. |
+| **Database Access** | **Never directly access DB** (security boundary violation). | Interacts directly with PostgreSQL, Redis, MongoDB via ORMs. |
+| **Security Concerns** | XSS (Cross-Site Scripting), CSRF, input validation. | SQL Injection, broken access control, authentication, data leakage. |
+
+#### How They Communicate:
+The frontend issues asynchronous requests (via `fetch` or `Axios`) to backend REST or GraphQL API endpoints, exchanging structured JSON data securely authenticated with JWT tokens."""
+        return content, action_links
+
+    # 6. Object-Oriented Programming (OOP)
+    if any(k in text for k in ("object-oriented", "oop", "inheritance", "polymorphism", "encapsulation", "abstraction", "classes and objects")):
+        content = r"""### Object-Oriented Programming (OOP): The Four Pillars
+
+**Object-Oriented Programming (OOP)** is a programming paradigm that organizes software design around data, or **objects**, rather than functions and logic.
+
+#### The 4 Core Principles:
+1. **Encapsulation**:
+   - Bundling state (attributes) and behavior (methods) into a class while restricting direct outside access.
+2. **Abstraction**:
+   - Hiding complex background implementation details and exposing only an intuitive, clean interface to consumers.
+3. **Inheritance**:
+   - Mechanism where a child class derives attributes and methods from an existing parent class, eliminating duplicated code.
+4. **Polymorphism**:
+   - The ability for different classes to respond to the same method invocation in their own unique way."""
+        return content, action_links
+
+    # 7. Active vs Passive Voice
+    if any(k in text for k in ("active and passive", "active voice", "passive voice", "grammar", "voice in english")):
+        content = r"""### Active vs. Passive Voice in English Grammar
+
+Understanding voice helps you write clearer, more persuasive, and academically rigorous essays.
+
+#### 1. Active Voice
+The grammatical subject of the sentence **performs** the action denoted by the verb.
+- **Formula**: $\text{Subject} + \text{Action Verb} + \text{Object}$
+- **Example 1**: *The student wrote an insightful history essay.*
+- **Example 2**: *Newton discovered the law of universal gravitation.*
+- **Best For**: Direct, energetic, clear writing where the actor is important.
+
+#### 2. Passive Voice
+The grammatical subject of the sentence **receives** the action. The doer is placed after the verb or omitted.
+- **Formula**: $\text{Target Object} + [\text{to be} + \text{Past Participle}] + (\text{by } \text{Subject})$
+- **Example 1**: *An insightful history essay was written by the student.*
+- **Example 2**: *The experiment was conducted under controlled laboratory conditions.*
+- **Best For**: Scientific reports where the objective process matters more than who performed it."""
+        return content, action_links
+
+    # 8. Writing Assistance (Email / Presentation / Essay)
+    if any(k in text for k in ("write an email", "help me write", "draft an email", "prepare a presentation", "write an essay", "write a short story", "speech")):
+        content = f"""### Academic Writing & Communication Assistant
+
+Here is a clear, professional template tailored for student communication and presentation structuring:
+
+#### Professional Email Draft to a Teacher or School Official:
+```text
+Subject: Query Regarding [Subject Name] Class Assignment / Curriculum — {student.first_name} {student.last_name}
+
+Dear [Teacher Name or Title],
+
+I hope you are having a productive week.
+
+I am writing to respectfully request clarification on [specific topic/assignment] discussed during our [Period / Date] class. Specifically, I am working through [mention concept or question] and wanted to ensure I am approaching the solution correctly.
+
+Could you please advise if you have a few minutes during your office hours or after class tomorrow for a brief check-in?
+
+Thank you for your time, guidance, and support.
+
+Sincerely,
+{student.first_name} {student.last_name}
+Grade: {student.class_name or 'Student'} | Section: {student.section or ''}
+```
+
+#### Best Practices for Academic Writing:
+- **Clarity over Complexity**: State your thesis statement or central message in the first paragraph.
+- **Evidence-Based Arguments**: Support every claim with verified historical, scientific, or mathematical evidence.
+- **Proofreading**: Check for run-on sentences and maintain consistent verb tense throughout."""
+        return content, action_links
+
+    # 9. General Mathematics / Algebra / Problem Solving
+    if any(k in text for k in ("solve", "equation", "math", "algebra", "formula", "step by step", "calculate")):
+        content = r"""### Mathematics & Problem-Solving Step-by-Step
+
+When approaching mathematical equations and word problems, follow this systematic framework:
+
+#### 1. Formulate the Knowns and Unknowns
+Identify the given variables and define what you are asked to determine.
+- *Example Equation*: $3x + 12 = 33$
+- *Goal*: Isolate the independent variable $x$.
+
+#### 2. Step-by-Step Algebraic Solution
+1. **Subtract 12 from both sides** to isolate the variable term:
+   $$3x + 12 - 12 = 33 - 12$$
+   $$3x = 21$$
+2. **Divide both sides by the coefficient 3**:
+   $$\frac{3x}{3} = \frac{21}{3}$$
+   $$x = 7$$
+
+#### 3. Verification & Proof
+Substitute $x = 7$ back into the original equation:
+$$3(7) + 12 = 21 + 12 = 33 \quad \checkmark \text{ (Verified True)}$$
+
+> *Tip: Always state the units of measurement (e.g. meters, seconds, kilograms) with your final answer when solving applied word problems.*"""
+        action_links.append({"label": "Explore Mathematics Syllabus", "url": "/curriculum"})
+        return content, action_links
+
+    # 10. School Project Ideas / Science Fair
+    if any(k in text for k in ("project ideas", "school project", "science fair", "experiment ideas")):
+        content = r"""### Innovative School Project & Science Fair Ideas
+
+Here are three high-impact, curriculum-aligned project concepts:
+
+#### 1. Sustainable Energy: Solar Desalination Still
+- **Concept**: Construct a small passive solar distillation unit using acrylic panes and black absorptive lining to purify brackish water.
+- **Scientific Principle**: Phase transitions (evaporation $\rightarrow$ condensation) driven by solar thermal absorption.
+- **Key Metric**: Liters of potable water produced per square meter of daily solar irradiance.
+
+#### 2. Data Science & Machine Learning: Campus Microclimate Predictor
+- **Concept**: Deploy a low-cost temperature/humidity sensor and train a simple regression model to predict classroom temperatures and optimize ventilation.
+- **Scientific Principle**: Time-series statistical analysis, correlation coefficients, and sensor calibration.
+
+#### 3. Environmental Biology: Microplastics in Urban Runoff
+- **Concept**: Collect local runoff water samples and quantify microplastic concentration using density separation (saltwater buoyancy) and optical microscopy.
+- **Scientific Principle**: Density gradients, particulate filtration, and environmental impact assessment."""
+        return content, action_links
+
+    # 11. Conversational Greetings / General Introduction
+    if any(k == text or k in text for k in ("hello", "hi", "hey", "good morning", "good afternoon", "who are you", "what can you do")):
+        content = f"""### Hello {student.first_name}! How can I help you today?
+
+I am your **AI Student Assistant**, powered by conversational AI and directly integrated with your school records.
+
+#### What you can ask me:
+- **General AI & Learning**: Ask me to explain concepts in science, physics, mathematics, history, or literature (*"Explain how electricity flows"*, *"Teach me quadratic equations"*).
+- **Writing & Problem-Solving**: Get step-by-step homework guidance, email drafting, speech preparation, or essay outlines.
+- **Your School Records**: Instant access to your personal schedule, attendance percentage, upcoming exams, fee dues, and syllabus (*"What is my timetable tomorrow?"*, *"What is my attendance rate?"*).
+- **School Rules & Guidelines**: Check handbook policies, grading scales, and library rules.
+
+Feel free to ask any question or describe what you are currently studying!"""
+        action_links.append({"label": "View My Timetable", "url": "/timetable"})
+        action_links.append({"label": "Open Study Plan", "url": "/learning-assistant"})
+        return content, action_links
+
+    # 12. Universal Fallback
+    content = f"""### Educational Assistant Analysis
+
+Thank you for your question, **{student.first_name}**.
+
+To provide the most thorough and accurate assistance, here is an initial structured breakdown:
+
+1. **Core Concept Overview**:
+   - The topic you mentioned involves exploring fundamental principles and practical applications in your coursework.
+2. **Recommended Next Steps**:
+   - Break down the question into its primary components.
+   - For curriculum-related study, check your subject syllabus or review your textbook chapters.
+   - You can also ask follow-up questions such as: *"Give me an example"*, *"Explain step-by-step"*, or *"How does this apply in real life?"*
+
+Please feel free to provide more details or ask a follow-up question!"""
+    return content, action_links
+
+
 # ---------------------------------------------------------------------------
-# Main Chat Orchestrator (Gemini LLM with Fallback)
+# Main Chat Orchestrator (Autonomous Agentic Dual-Intelligence Loop)
 # ---------------------------------------------------------------------------
 
 def process_assistant_chat(
@@ -599,7 +873,7 @@ def process_assistant_chat(
     conversation_id: uuid.UUID | None,
     db: Session,
 ) -> dict[str, Any]:
-    """Processes student query using intelligent tool execution and resilient LLM delivery."""
+    """Processes student query using autonomous tool calling and general-purpose LLM reasoning."""
     # 1. Resolve or create conversation session
     if conversation_id:
         conv = db.execute(
@@ -612,7 +886,6 @@ def process_assistant_chat(
         conv = None
 
     if not conv:
-        # Generate initial title from first query
         words = message.strip().split()
         title = " ".join(words[:5]) if words else "New Conversation"
         if len(title) > 40:
@@ -628,103 +901,139 @@ def process_assistant_chat(
     db.add(student_msg)
     db.commit()
 
-    # 3. Classify intent and execute relevant tools
-    required_tools = classify_query_intent(message)
-    tool_results: dict[str, Any] = {}
+    # 3. Assemble sliding conversation history (last 10 messages)
+    history_records = db.execute(
+        select(AIStudentMessage)
+        .where(AIStudentMessage.conversation_id == conv.id)
+        .order_by(AIStudentMessage.created_at.asc())
+    ).scalars().all()
 
-    # Always fetch profile for context
-    profile_data = ai_assistant_tools.tool_get_student_profile(student, db)
-    tool_results["profile"] = profile_data
+    recent_turns = history_records[-10:] if len(history_records) > 10 else history_records
+    conversation_messages: list[dict[str, str]] = []
+    for m in recent_turns:
+        role = "user" if m.sender == MessageSender.STUDENT.value else "assistant"
+        conversation_messages.append({"role": role, "content": m.content})
 
-    # Parse potential target date (e.g. tomorrow)
-    target_date_str = None
-    if "tomorrow" in message.lower():
-        target_date_str = (dt.date.today() + dt.timedelta(days=1)).isoformat()
+    student_info = f"{student.first_name} {student.last_name} (Class: {student.class_name or 'High School'} {student.section or ''})"
+    system_prompt = f"""You are the official AI Student Assistant for {student_info} at St. Joseph Academy.
+Today's Date: {dt.date.today().isoformat()} ({dt.date.today().strftime('%A')}).
 
-    for t_name in required_tools:
-        args = {}
-        if target_date_str:
-            args["target_date"] = target_date_str
-        if t_name == "evaluate_grammar":
-            # Extract sentence if prefixed by prompt text
-            clean_eval = message
-            for pfx in ("check my english grammar and sentence:", "check my english grammar:", "correct this sentence:"):
-                if pfx in message.lower():
-                    clean_eval = message[message.lower().find(pfx) + len(pfx) :].strip()
-                    break
-            args["text"] = clean_eval
-        elif t_name == "debate_round":
-            args["student_argument"] = message
-            args["topic"] = "Renewable Energy vs Fossil Fuels" if "energy" in message.lower() else "Artificial Intelligence in Education"
-            args["stance"] = "negative" if "negative" in message.lower() else "affirmative"
-            args["current_round"] = 1
-        elif t_name == "generate_concept_map":
-            subj_top = "Photosynthesis"
-            if "newton" in message.lower():
-                subj_top = "Newton's Laws of Motion"
-            elif "cell" in message.lower():
-                subj_top = "Cellular Respiration"
-            args["topic"] = subj_top
-        elif t_name == "get_class_notes":
-            args["subject_name"] = "Mathematics"
-        elif t_name == "search_school_knowledge":
-            args["query"] = message
-        tool_results[t_name] = ai_assistant_tools.execute_tool(t_name, args, student, db)
+MISSION & CAPABILITIES:
+You are a real, general-purpose educational AI assistant similar to ChatGPT, seamlessly integrated with the school's student management system.
+You help students with:
+1. General knowledge, science, mathematics, literature, programming, and educational concepts.
+2. Writing assistance, brainstorming, study techniques, problem-solving, and creative exploration.
+3. Accessing their personal school records (timetables, attendance, grades, fee dues, exam dates, syllabus) by calling the available school tools.
 
-    # 4. Generate deterministic fallback response
-    deterministic_content, action_links = synthesize_fallback_response(message, student, tool_results)
+TOOL USAGE GUIDELINES:
+- When a student asks about their personal school schedule, timetable, attendance percentage, exam dates, fee dues, school holidays, or handbook policies, call the corresponding tool.
+- For general knowledge questions (e.g. "What is AI?", "Explain photosynthesis", "Help me write an essay", "Solve 3x + 5 = 20"), answer directly with high academic rigor, structured formatting, and step-by-step clarity WITHOUT calling tools.
+- When tool results are provided, synthesize a natural, encouraging, and complete response that answers the student's question accurately.
+- Never invent or hallucinate student records. Always ground personal school data in the returned tool outputs.
+- Format all mathematical equations with KaTeX ($...$ for inline, $$...$$ for block math). Use clear Markdown headings and bullet points.
+"""
 
-    final_content = deterministic_content
+    messages_payload: list[dict[str, str]] = [{"role": "system", "content": system_prompt}] + conversation_messages
+    intent_tools = classify_query_intent(message)
+    tools_used: list[str] = list(intent_tools)
+    action_links: list[dict[str, str]] = []
+    final_content: str | None = None
 
-    # 5. Enhance via Hugging Face LLM (Qwen/Qwen2.5-7B-Instruct or configured model)
+    # Pre-fetch school data if intent indicates school-specific query
+    prefetched_tool_results: dict[str, Any] = {}
+    if intent_tools:
+        prefetched_tool_results["profile"] = ai_assistant_tools.tool_get_student_profile(student, db)
+        target_date_str = (dt.date.today() + dt.timedelta(days=1)).isoformat() if "tomorrow" in message.lower() else None
+
+        for t_name in intent_tools:
+            args = {}
+            if target_date_str:
+                args["target_date"] = target_date_str
+            if t_name == "evaluate_grammar":
+                clean_eval = message
+                for pfx in ("check my english grammar and sentence:", "check my english grammar:", "correct this sentence:"):
+                    if pfx in message.lower():
+                        clean_eval = message[message.lower().find(pfx) + len(pfx) :].strip()
+                        break
+                args["text"] = clean_eval
+            elif t_name == "debate_round":
+                args["student_argument"] = message
+                args["topic"] = "Renewable Energy vs Fossil Fuels" if "energy" in message.lower() else "Artificial Intelligence in Education"
+                args["stance"] = "negative" if "negative" in message.lower() else "affirmative"
+                args["current_round"] = 1
+            elif t_name == "generate_concept_map":
+                subj_top = "Photosynthesis"
+                if "newton" in message.lower():
+                    subj_top = "Newton's Laws of Motion"
+                elif "cell" in message.lower():
+                    subj_top = "Cellular Respiration"
+                args["topic"] = subj_top
+            elif t_name == "get_class_notes":
+                args["subject_name"] = "Mathematics"
+            elif t_name == "search_school_knowledge":
+                args["query"] = message
+            prefetched_tool_results[t_name] = ai_assistant_tools.execute_tool(t_name, args, student, db)
+
+        messages_payload.append({
+            "role": "system",
+            "content": f"VERIFIED SCHOOL DATABASE & OFFICIAL KNOWLEDGE RETRIEVED:\n{json.dumps(prefetched_tool_results, indent=2, default=str)}"
+        })
+
+    # 4. Attempt autonomous agentic execution via Hugging Face
     if hf_provider.is_configured():
         try:
-            student_info = f"{student.first_name} {student.last_name} (Class: {student.class_name or 'High School'} {student.section or ''})"
-            system_prompt = f"""You are the official AI Student Assistant for {student_info} at St. Joseph Academy.
-Today's Date: {dt.date.today().isoformat()} ({dt.date.today().strftime('%A')}).
-Your mission is to be an encouraging, academically empowering, factual, and supportive digital school copilot.
-
-VERIFIED SCHOOL DATABASE & OFFICIAL KNOWLEDGE RETRIEVED:
-The following authoritative school data was retrieved from the database for this authenticated student:
-{json.dumps(tool_results, indent=2, default=str)}
-
-OPERATIONAL RULES:
-1. Grounding: Answer strictly using the verified school data and official guidelines above. Never fabricate attendance rates, examination marks, fee balances, or timetable periods.
-2. If data shows no upcoming exams, zero fee dues, or a holiday, state that clearly and accurately.
-3. Tone: Warm, respectful, student-friendly, and educational. Format with clear Markdown headings, bullet points, and tables.
-4. Academics: When explaining science, math, or study concepts, provide clear step-by-step guidance with KaTeX LaTeX math ($...$) where helpful.
-5. School Policies: Accurately cite official guidelines (such as the 75% attendance rule, 14-day library loan, grading scale) from the retrieved knowledge.
-6. Scope: Note that online homework submissions and class recordings are currently disabled in this school portal.
-"""
-            messages = [{"role": "system", "content": system_prompt}]
-            # Include recent turns for conversational continuity
-            recent_turns = conv.messages[-4:]
-            for m in recent_turns:
-                role = "user" if m.sender == MessageSender.STUDENT.value else "assistant"
-                messages.append({"role": role, "content": m.content})
-            messages.append({"role": "user", "content": message})
-
-            hf_result = hf_provider.chat_completion(
-                messages=messages,
-                max_tokens=1024,
+            turn_result = hf_provider.chat_completion_with_tools(
+                messages=messages_payload,
+                tools=ai_assistant_tools.SCHOOL_TOOL_DEFINITIONS,
+                max_tokens=1500,
                 temperature=0.7,
             )
-            if hf_result:
-                final_content = hf_result.strip()
+
+            # Check if LLM requested one or more tool calls
+            tool_calls = turn_result.get("tool_calls", [])
+            if tool_calls:
+                for tc in tool_calls:
+                    t_name = tc.get("name")
+                    t_args = tc.get("arguments", {})
+                    if t_name not in tools_used:
+                        tools_used.append(t_name)
+                    tool_output = ai_assistant_tools.execute_tool(t_name, t_args, student, db)
+                    messages_payload.append({
+                        "role": "tool",
+                        "name": t_name,
+                        "content": json.dumps(tool_output, default=str),
+                    })
+
+                synth_result = hf_provider.chat_completion(
+                    messages=messages_payload,
+                    max_tokens=1500,
+                    temperature=0.7,
+                )
+                if synth_result:
+                    final_content = synth_result.strip()
+            elif turn_result.get("content"):
+                final_content = turn_result["content"].strip()
         except Exception as exc:
-            logger.info("Hugging Face LLM completion skipped or failed (%s); using verified deterministic response.", exc)
+            logger.warning("Hugging Face autonomous completion error (%s); falling back to verified offline synthesizer.", exc)
+
+    # 5. Offline Resilient Fallback Engine
+    if not final_content:
+        if intent_tools:
+            deterministic_content, action_links = synthesize_fallback_response(message, student, prefetched_tool_results)
+            final_content = deterministic_content
+        else:
+            edu_content, action_links = synthesize_educational_response(message, student)
+            final_content = edu_content
 
     # 6. Record assistant message turn
     asst_msg = AIStudentMessage(
         conversation_id=conv.id,
         sender=MessageSender.ASSISTANT.value,
         content=final_content,
-        tools_used=required_tools,
+        tools_used=tools_used,
         action_links=action_links,
     )
     db.add(asst_msg)
-
-    # Update conversation last modified timestamp
     conv.updated_at = dt.datetime.now(dt.timezone.utc)
     db.commit()
     db.refresh(asst_msg)
@@ -733,7 +1042,138 @@ OPERATIONAL RULES:
         "conversation_id": conv.id,
         "message_id": asst_msg.id,
         "content": asst_msg.content,
-        "tools_used": required_tools,
+        "tools_used": tools_used,
         "action_links": action_links,
         "created_at": asst_msg.created_at,
     }
+
+
+async def stream_assistant_chat(
+    student: Student,
+    message: str,
+    conversation_id: uuid.UUID | None,
+    db: Session,
+) -> AsyncGenerator[str, None]:
+    """Asynchronous true SSE token streaming generator for the AI Student Assistant."""
+    import asyncio
+
+    # 1. Resolve or create conversation session
+    if conversation_id:
+        conv = db.execute(
+            select(AIStudentConversation).where(
+                AIStudentConversation.id == conversation_id,
+                AIStudentConversation.student_id == student.id,
+            )
+        ).scalar_one_or_none()
+    else:
+        conv = None
+
+    if not conv:
+        words = message.strip().split()
+        title = " ".join(words[:5]) if words else "New Conversation"
+        if len(title) > 40:
+            title = title[:40] + "..."
+        conv = create_conversation(student.id, title=title, db=db)
+
+    # 2. Record student message turn
+    student_msg = AIStudentMessage(
+        conversation_id=conv.id,
+        sender=MessageSender.STUDENT.value,
+        content=message.strip(),
+    )
+    db.add(student_msg)
+    db.commit()
+
+    # Yield initial session metadata
+    yield f"event: metadata\ndata: {json.dumps({'conversation_id': str(conv.id), 'message_id': str(student_msg.id)})}\n\n"
+
+    # 3. Assemble history and prompt
+    history_records = db.execute(
+        select(AIStudentMessage)
+        .where(AIStudentMessage.conversation_id == conv.id)
+        .order_by(AIStudentMessage.created_at.asc())
+    ).scalars().all()
+
+    recent_turns = history_records[-10:] if len(history_records) > 10 else history_records
+    conversation_messages: list[dict[str, str]] = []
+    for m in recent_turns:
+        role = "user" if m.sender == MessageSender.STUDENT.value else "assistant"
+        conversation_messages.append({"role": role, "content": m.content})
+
+    student_info = f"{student.first_name} {student.last_name} (Class: {student.class_name or 'High School'} {student.section or ''})"
+    system_prompt = f"""You are the official AI Student Assistant for {student_info} at St. Joseph Academy.
+Today's Date: {dt.date.today().isoformat()} ({dt.date.today().strftime('%A')}).
+
+MISSION:
+You are a real, general-purpose educational AI assistant similar to ChatGPT, deeply connected to the school's student management system.
+You answer general knowledge, educational, writing, programming, and mathematical questions directly and comprehensively.
+When personal school data is requested (timetable, attendance, exams, fees, calendar), you call the appropriate tool.
+Format equations with KaTeX ($...$).
+"""
+
+    messages_payload: list[dict[str, str]] = [{"role": "system", "content": system_prompt}] + conversation_messages
+    tools_used: list[str] = []
+    action_links: list[dict[str, str]] = []
+    collected_tokens: list[str] = []
+
+    if hf_provider.is_configured():
+        try:
+            # Check for tool call
+            turn_result = hf_provider.chat_completion_with_tools(
+                messages=messages_payload,
+                tools=ai_assistant_tools.SCHOOL_TOOL_DEFINITIONS,
+                max_tokens=1500,
+                temperature=0.7,
+            )
+            tool_calls = turn_result.get("tool_calls", [])
+            if tool_calls:
+                for tc in tool_calls:
+                    t_name = tc.get("name")
+                    t_args = tc.get("arguments", {})
+                    tools_used.append(t_name)
+                    yield f"event: tool_start\ndata: {json.dumps({'tool': t_name})}\n\n"
+                    tool_output = ai_assistant_tools.execute_tool(t_name, t_args, student, db)
+                    messages_payload.append({
+                        "role": "tool",
+                        "name": t_name,
+                        "content": json.dumps(tool_output, default=str),
+                    })
+
+            # Stream response tokens
+            for token_chunk in hf_provider.stream_chat_completion(messages_payload, max_tokens=1500, temperature=0.7):
+                collected_tokens.append(token_chunk)
+                yield f"event: token\ndata: {json.dumps({'text': token_chunk})}\n\n"
+                await asyncio.sleep(0.005)
+        except Exception as exc:
+            logger.warning("Hugging Face streaming error: %s. Falling back to offline engine.", exc)
+
+    # If stream produced no tokens (e.g. offline or unconfigured)
+    if not collected_tokens:
+        result = process_assistant_chat(student, message, conv.id, db)
+        content = result["content"]
+        tools_used = result["tools_used"]
+        action_links = result["action_links"]
+        # Yield words in quick succession for responsive UI
+        words = content.split(" ")
+        for i, w in enumerate(words):
+            suffix = " " if i < len(words) - 1 else ""
+            yield f"event: token\ndata: {json.dumps({'text': w + suffix})}\n\n"
+            await asyncio.sleep(0.01)
+        asst_msg_id = str(result["message_id"])
+    else:
+        full_content = "".join(collected_tokens).strip()
+        asst_msg = AIStudentMessage(
+            conversation_id=conv.id,
+            sender=MessageSender.ASSISTANT.value,
+            content=full_content,
+            tools_used=tools_used,
+            action_links=action_links,
+        )
+        db.add(asst_msg)
+        conv.updated_at = dt.datetime.now(dt.timezone.utc)
+        db.commit()
+        db.refresh(asst_msg)
+        asst_msg_id = str(asst_msg.id)
+
+    # Done event
+    yield f"event: done\ndata: {json.dumps({'message_id': asst_msg_id, 'action_links': action_links, 'tools_used': tools_used})}\n\n"

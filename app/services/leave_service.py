@@ -122,7 +122,7 @@ def _resolve_student_class_context(
             select(TeacherAssignment)
             .where(
                 TeacherAssignment.section_id == section_id,
-                TeacherAssignment.is_active == True,
+                TeacherAssignment.is_active.is_(True),
                 TeacherAssignment.assignment_type == "CLASS_TEACHER",
             )
         ).scalars().first()
@@ -380,7 +380,7 @@ def _get_active_class_teacher_sections(teacher_id: uuid.UUID, db: Session) -> li
             select(TeacherAssignment.section_id)
             .where(
                 TeacherAssignment.teacher_id == teacher_id,
-                TeacherAssignment.is_active == True,
+                TeacherAssignment.is_active.is_(True),
                 TeacherAssignment.assignment_type == "CLASS_TEACHER",
             )
         ).scalars().all()
@@ -452,7 +452,7 @@ def _verify_class_teacher_authority(
             select(TeacherAssignment).where(
                 TeacherAssignment.section_id == app_entry.section_id,
                 TeacherAssignment.teacher_id == teacher.id,
-                TeacherAssignment.is_active == True,
+                TeacherAssignment.is_active.is_(True),
                 TeacherAssignment.assignment_type == "CLASS_TEACHER",
             )
         ).scalars().first()

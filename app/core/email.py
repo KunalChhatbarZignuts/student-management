@@ -131,7 +131,7 @@ If you were not expecting this invitation, you can safely ignore this email.
         get_email_backend().send_email(to_email=to_email, subject=subject, text_body=text_body, html_body=html_body)
     except Exception as e:
         logger.error("Failed to send account setup invite email to %s: %s", to_email, e)
-        print(f"\n⚠️ [EMAIL FALLBACK] Account setup invite link for {to_email}: {invite_url}\n")
+        logger.warning("[EMAIL FALLBACK] Account setup invite link for %s: %s", to_email, invite_url)
 
 
 def send_password_reset_email(to_email: str, raw_reset_token: str) -> None:
@@ -176,5 +176,5 @@ If you did not request a password reset, please ignore this email. Your account 
         get_email_backend().send_email(to_email=to_email, subject=subject, text_body=text_body, html_body=html_body)
     except Exception as e:
         logger.error("Failed to send password reset email to %s: %s", to_email, e)
-        print(f"\n⚠️ [EMAIL FALLBACK] Password reset link for {to_email}: {reset_url}\n")
+        logger.warning("[EMAIL FALLBACK] Password reset link for %s: %s", to_email, reset_url)
 

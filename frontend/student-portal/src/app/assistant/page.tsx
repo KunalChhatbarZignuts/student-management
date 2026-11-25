@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
@@ -26,7 +26,6 @@ import WelcomeCardGrid from '@/features/assistant/components/WelcomeCardGrid';
 import ChatMessageFeed from '@/features/assistant/components/ChatMessageFeed';
 import ChatInputBar from '@/features/assistant/components/ChatInputBar';
 import { MorningBriefingBanner } from '@/features/assistant/components/MorningBriefingBanner';
-import { PomodoroStudyBuddy } from '@/features/assistant/components/PomodoroStudyBuddy';
 
 export default function StudentAssistantPage() {
   const theme = useTheme();
@@ -37,6 +36,9 @@ export default function StudentAssistantPage() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [streamingText, setStreamingText] = useState<string>('');
+  const [streamingTools, setStreamingTools] = useState<string[]>([]);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Queries
   const { data: conversations = [], isLoading: loadingConversations } = useQuery({
@@ -93,19 +95,52 @@ export default function StudentAssistantPage() {
     }
   };
 
+  const handleStopGenerating = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsSending(false);
+  };
+
   const handleSendMessage = async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || isSending) return;
+
     setIsSending(true);
+    setStreamingText('');
+    setStreamingTools([]);
+
+    let targetConvId = activeConversationId;
+
     try {
-      const res = await assistantApi.sendMessage(text, activeConversationId);
-      if (!activeConversationId) {
+      const res = await assistantApi.sendMessage(trimmed, activeConversationId);
+      if (!activeConversationId && res.conversation_id) {
+        targetConvId = res.conversation_id;
         setActiveConversationId(res.conversation_id);
       }
-      queryClient.invalidateQueries({ queryKey: assistantKeys.conversations() });
-      queryClient.invalidateQueries({ queryKey: assistantKeys.conversation(res.conversation_id) });
-    } catch (err) {
+      if (targetConvId) {
+        queryClient.invalidateQueries({ queryKey: assistantKeys.conversations() });
+        queryClient.invalidateQueries({ queryKey: assistantKeys.conversation(targetConvId) });
+      }
+    } catch (err: any) {
       console.error('Failed to send assistant message:', err);
     } finally {
       setIsSending(false);
+      setStreamingText('');
+      setStreamingTools([]);
+      if (targetConvId) {
+        queryClient.invalidateQueries({ queryKey: assistantKeys.conversations() });
+        queryClient.invalidateQueries({ queryKey: assistantKeys.conversation(targetConvId) });
+      }
+    }
+  };
+
+  const handleRegenerateResponse = () => {
+    const msgs = activeDetail?.messages || [];
+    const lastUserTurn = [...msgs].reverse().find((m) => m.sender === 'STUDENT');
+    if (lastUserTurn) {
+      handleSendMessage(lastUserTurn.content);
     }
   };
 
@@ -115,16 +150,9 @@ export default function StudentAssistantPage() {
       const imgRes = await assistantApi.uploadImage(file);
       const textPrompt = `[Uploaded Image: ${imgRes.filename}] Analyze this ${imgRes.detected_subject} problem.`;
       
-      // Send as chat message to record into conversation
-      const res = await assistantApi.sendMessage(textPrompt, activeConversationId);
-      if (!activeConversationId) {
-        setActiveConversationId(res.conversation_id);
-      }
-      queryClient.invalidateQueries({ queryKey: assistantKeys.conversations() });
-      queryClient.invalidateQueries({ queryKey: assistantKeys.conversation(res.conversation_id) });
+      await handleSendMessage(textPrompt);
     } catch (err) {
       console.error('Image question upload failed:', err);
-    } finally {
       setIsSending(false);
     }
   };
@@ -135,20 +163,25 @@ export default function StudentAssistantPage() {
       const docRes = await assistantApi.uploadDocument(file);
       const textPrompt = `[Uploaded Document: ${docRes.filename}] Summarize these study notes and highlight key definitions.`;
       
-      const res = await assistantApi.sendMessage(textPrompt, activeConversationId);
-      if (!activeConversationId) {
-        setActiveConversationId(res.conversation_id);
-      }
-      queryClient.invalidateQueries({ queryKey: assistantKeys.conversations() });
-      queryClient.invalidateQueries({ queryKey: assistantKeys.conversation(res.conversation_id) });
+      await handleSendMessage(textPrompt);
     } catch (err) {
       console.error('Document upload failed:', err);
-    } finally {
       setIsSending(false);
     }
   };
 
-  const messages: ChatMessage[] = activeDetail?.messages || [];
+  // Compile active messages with any in-flight streaming chunk
+  const baseMessages: ChatMessage[] = activeDetail?.messages || [];
+  const displayMessages: ChatMessage[] = [...baseMessages];
+  if (isSending && streamingText) {
+    displayMessages.push({
+      id: 'streaming-assistant-turn',
+      sender: 'ASSISTANT',
+      content: streamingText,
+      tools_used: streamingTools,
+      created_at: new Date().toISOString(),
+    });
+  }
 
   return (
     <AppShell>
@@ -234,6 +267,7 @@ export default function StudentAssistantPage() {
                     color="inherit"
                     onClick={() => setMobileDrawerOpen(true)}
                     sx={{ mr: 0.5 }}
+                    aria-label="Conversation history"
                   >
                     <HistoryIcon />
                   </IconButton>
@@ -295,14 +329,18 @@ export default function StudentAssistantPage() {
               <Box sx={{ maxWidth: 880, mx: 'auto' }}>
                 {briefing && <MorningBriefingBanner briefing={briefing} />}
 
-                {!activeConversationId && messages.length === 0 ? (
+                {!activeConversationId && displayMessages.length === 0 ? (
                   <WelcomeCardGrid
-                    studentName={user?.first_name}
+                    studentName={user?.student?.first_name || user?.email?.split('@')[0] || 'Student'}
                     suggestions={suggestions}
                     onSelectPrompt={(prompt) => handleSendMessage(prompt)}
                   />
                 ) : (
-                  <ChatMessageFeed messages={messages} isLoading={isSending || loadingDetail} />
+                  <ChatMessageFeed
+                    messages={displayMessages}
+                    isLoading={isSending || loadingDetail}
+                    onRegenerate={handleRegenerateResponse}
+                  />
                 )}
               </Box>
             </Box>
@@ -411,6 +449,7 @@ export default function StudentAssistantPage() {
                   onSendMessage={handleSendMessage}
                   onUploadImage={handleUploadImage}
                   onUploadDocument={handleUploadDocument}
+                  onStopGenerating={handleStopGenerating}
                   isLoading={isSending}
                   disabled={loadingDetail}
                 />
@@ -418,9 +457,6 @@ export default function StudentAssistantPage() {
             </Box>
           </Box>
         </Box>
-
-        {/* Floating Pomodoro Study Buddy Widget */}
-        <PomodoroStudyBuddy />
       </AppShell>
   );
 }

@@ -16,6 +16,10 @@ import LaunchIcon from '@mui/icons-material/Launch';
 import BuildCircleOutlinedIcon from '@mui/icons-material/BuildCircleOutlined';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import CheckIcon from '@mui/icons-material/Check';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { useRouter } from 'next/navigation';
 
 import { ChatMessage } from '../types';
@@ -24,12 +28,22 @@ import FormattedMessageContent from './FormattedMessageContent';
 interface ChatMessageFeedProps {
   messages: ChatMessage[];
   isLoading?: boolean;
+  onRegenerate?: () => void;
 }
 
-export default function ChatMessageFeed({ messages, isLoading = false }: ChatMessageFeedProps) {
+export default function ChatMessageFeed({ messages, isLoading = false, onRegenerate }: ChatMessageFeedProps) {
   const router = useRouter();
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+
+  const handleCopy = (id: string, text: string) => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedMsgId(id);
+      setTimeout(() => setCopiedMsgId(null), 2000);
+    }
+  };
 
   useEffect(() => {
     if (typeof bottomRef.current?.scrollIntoView === 'function') {
@@ -74,7 +88,7 @@ export default function ChatMessageFeed({ messages, isLoading = false }: ChatMes
       aria-label="Conversation messages"
       sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, py: 2 }}
     >
-      {messages.map((msg) => {
+      {messages.map((msg, index) => {
         const isUser = msg.sender === 'STUDENT';
         const formattedTime = new Date(msg.created_at).toLocaleTimeString([], {
           hour: '2-digit',
@@ -125,20 +139,31 @@ export default function ChatMessageFeed({ messages, isLoading = false }: ChatMes
                     : '0 2px 12px rgba(0,0,0,0.04)',
                 }}
               >
-                {/* Tools Used Badge (Assistant only) */}
-                {!isUser && msg.tools_used && msg.tools_used.length > 0 && (
+                {/* Tools Used Badge or General AI Badge (Assistant only) */}
+                {!isUser && (
                   <Stack direction="row" spacing={0.8} flexWrap="wrap" gap={0.5} sx={{ mb: 1.5 }}>
-                    {msg.tools_used.map((tool) => (
+                    {msg.tools_used && msg.tools_used.length > 0 ? (
+                      msg.tools_used.map((tool) => (
+                        <Chip
+                          key={tool}
+                          icon={<BuildCircleOutlinedIcon style={{ fontSize: 13 }} />}
+                          label={`Verified via ${tool.replace('get_student_', '').replace('get_school_', '')}`}
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                          sx={{ fontSize: 11, height: 22 }}
+                        />
+                      ))
+                    ) : (
                       <Chip
-                        key={tool}
-                        icon={<BuildCircleOutlinedIcon style={{ fontSize: 13 }} />}
-                        label={`Verified via ${tool.replace('get_student_', '').replace('get_school_', '')}`}
+                        icon={<AutoAwesomeIcon style={{ fontSize: 13 }} />}
+                        label="General AI Knowledge"
                         size="small"
-                        color="primary"
+                        color="secondary"
                         variant="outlined"
                         sx={{ fontSize: 11, height: 22 }}
                       />
-                    ))}
+                    )}
                   </Stack>
                 )}
 
@@ -165,7 +190,7 @@ export default function ChatMessageFeed({ messages, isLoading = false }: ChatMes
                 )}
               </Paper>
 
-              {/* Timestamp & Voice Readout */}
+              {/* Timestamp & Actions */}
               <Stack
                 direction="row"
                 spacing={0.8}
@@ -178,24 +203,62 @@ export default function ChatMessageFeed({ messages, isLoading = false }: ChatMes
                   {formattedTime}
                 </Typography>
                 {!isUser && (
-                  <Tooltip title={speakingMsgId === msg.id ? 'Stop audio' : 'Listen with Voice Tutor'}>
-                    <IconButton
-                      size="small"
-                      aria-label="Read message aloud"
-                      onClick={() => handleSpeak(msg.id, msg.content)}
-                      sx={{
-                        p: 0.3,
-                        color: speakingMsgId === msg.id ? 'primary.main' : 'text.disabled',
-                        '&:hover': { color: 'primary.main' },
-                      }}
-                    >
-                      {speakingMsgId === msg.id ? (
-                        <VolumeOffIcon sx={{ fontSize: 15 }} />
-                      ) : (
-                        <VolumeUpIcon sx={{ fontSize: 15 }} />
-                      )}
-                    </IconButton>
-                  </Tooltip>
+                  <>
+                    <Tooltip title={speakingMsgId === msg.id ? 'Stop audio' : 'Listen with Voice Tutor'}>
+                      <IconButton
+                        size="small"
+                        aria-label="Read message aloud"
+                        onClick={() => handleSpeak(msg.id, msg.content)}
+                        sx={{
+                          p: 0.3,
+                          color: speakingMsgId === msg.id ? 'primary.main' : 'text.disabled',
+                          '&:hover': { color: 'primary.main' },
+                        }}
+                      >
+                        {speakingMsgId === msg.id ? (
+                          <VolumeOffIcon sx={{ fontSize: 15 }} />
+                        ) : (
+                          <VolumeUpIcon sx={{ fontSize: 15 }} />
+                        )}
+                      </IconButton>
+                    </Tooltip>
+
+                    <Tooltip title={copiedMsgId === msg.id ? 'Copied to clipboard!' : 'Copy response'}>
+                      <IconButton
+                        size="small"
+                        aria-label="Copy response"
+                        onClick={() => handleCopy(msg.id, msg.content)}
+                        sx={{
+                          p: 0.3,
+                          color: copiedMsgId === msg.id ? 'success.main' : 'text.disabled',
+                          '&:hover': { color: 'primary.main' },
+                        }}
+                      >
+                        {copiedMsgId === msg.id ? (
+                          <CheckIcon sx={{ fontSize: 15 }} />
+                        ) : (
+                          <ContentCopyIcon sx={{ fontSize: 15 }} />
+                        )}
+                      </IconButton>
+                    </Tooltip>
+
+                    {onRegenerate && index === messages.length - 1 && (
+                      <Tooltip title="Regenerate response">
+                        <IconButton
+                          size="small"
+                          aria-label="Regenerate response"
+                          onClick={onRegenerate}
+                          sx={{
+                            p: 0.3,
+                            color: 'text.disabled',
+                            '&:hover': { color: 'primary.main' },
+                          }}
+                        >
+                          <RefreshIcon sx={{ fontSize: 15 }} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </>
                 )}
               </Stack>
             </Box>

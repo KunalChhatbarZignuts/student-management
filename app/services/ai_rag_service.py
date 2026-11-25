@@ -20,8 +20,12 @@ from app.services.ai_hf_provider import hf_provider
 
 logger = logging.getLogger(__name__)
 
+# Constants for chunking and knowledge retrieval (Rule G25)
+DEFAULT_CHUNK_SIZE: int = 500
+DEFAULT_CHUNK_OVERLAP: int = 50
 
-def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> List[str]:
+
+def chunk_text(text: str, chunk_size: int = DEFAULT_CHUNK_SIZE, overlap: int = DEFAULT_CHUNK_OVERLAP) -> List[str]:
     """Splits text into overlapping chunks based on sentences or paragraphs."""
     paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
     chunks: List[str] = []
@@ -73,7 +77,7 @@ class AIRagService:
         existing = db.execute(
             select(SchoolKnowledgeDocument).where(
                 SchoolKnowledgeDocument.title == title,
-                SchoolKnowledgeDocument.is_active == True,
+                SchoolKnowledgeDocument.is_active.is_(True),
             )
         ).scalar_one_or_none()
 
@@ -145,7 +149,7 @@ class AIRagService:
                         SchoolKnowledgeChunk.document_id == SchoolKnowledgeDocument.id,
                     )
                     .where(
-                        SchoolKnowledgeDocument.is_active == True,
+                        SchoolKnowledgeDocument.is_active.is_(True),
                         SchoolKnowledgeChunk.embedding.isnot(None),
                     )
                 )
@@ -179,7 +183,7 @@ class AIRagService:
                 SchoolKnowledgeDocument,
                 SchoolKnowledgeChunk.document_id == SchoolKnowledgeDocument.id,
             )
-            .where(SchoolKnowledgeDocument.is_active == True)
+            .where(SchoolKnowledgeDocument.is_active.is_(True))
         )
         if category:
             stmt = stmt.where(SchoolKnowledgeDocument.category == category)

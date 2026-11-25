@@ -131,10 +131,10 @@ export default function WelcomeCardGrid({
           <SchoolIcon sx={{ fontSize: 28 }} />
         </Box>
         <Typography variant="h5" fontWeight={700} color="text.primary">
-          Hello{studentName ? `, ${studentName}` : ''}.
+          How can I help you today?
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 540, mx: 'auto', lineHeight: 1.6 }}>
-          Your digital academic assistant. Query your daily timetable, attendance records, upcoming examination schedules, report cards, tuition fees, and subject curriculum.
+          Ask about your timetable, attendance, marks, fees, or lessons.
         </Typography>
       </Stack>
 

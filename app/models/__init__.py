@@ -6,12 +6,17 @@ from app.models.ai_learning import (
     AILearningRecommendation,
     AIPracticeQuestion,
     AIPracticeSession,
+    AIStudentMistake,
+    AIStudentStudySettings,
     AIStudyPlanItem,
+    AITopicMastery,
+    AIWeeklyStudyPlan,
     ChapterTopic,
     RecommendationPriority,
     RecommendationStatus,
     StudyPlanStatus,
     SubjectChapter,
+    TopicMasteryLevel,
 )
 from app.models.ai_student_assistant import (
     AIStudentConversation,
@@ -101,6 +106,14 @@ from app.models.refresh_token import RefreshToken
 from app.models.student import Student
 from app.models.teacher import Teacher
 from app.models.user import User
+from app.models.diary import (
+    DiaryEntry,
+    DiaryEntryRecipient,
+    DiaryAcknowledgement,
+    DiaryConversation,
+    DiaryMessage,
+    DiaryNotification,
+)
 
 __all__ = [
     "AbsenceNotificationLog",
@@ -184,4 +197,10 @@ __all__ = [
     "AIPracticeQuestion",
     "AIStudentConversation",
     "AIStudentMessage",
+    "DiaryEntry",
+    "DiaryEntryRecipient",
+    "DiaryAcknowledgement",
+    "DiaryConversation",
+    "DiaryMessage",
+    "DiaryNotification",
 ]

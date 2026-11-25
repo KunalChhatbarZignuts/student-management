@@ -25,7 +25,9 @@ import ReplayIcon from '@mui/icons-material/Replay';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import TimerOutlinedIcon from '@mui/icons-material/TimerOutlined';
 
-import { PracticeSession, PracticeEvaluation, SubjectLearningDetail } from '../types';
+import { PracticeSession, PracticeEvaluation, SubjectLearningDetail, StudentMistake } from '../types';
+import { learningAssistantApi } from '../api';
+import BugReportOutlinedIcon from '@mui/icons-material/BugReportOutlined';
 
 interface PracticeQuizTabProps {
   subjects: SubjectLearningDetail[];
@@ -52,6 +54,38 @@ export default function PracticeQuizTab({
   const [studentAnswers, setStudentAnswers] = useState<Record<string, number>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  const [mistakes, setMistakes] = useState<StudentMistake[]>([]);
+  const [loadingMistakes, setLoadingMistakes] = useState(false);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+
+  const fetchMistakes = async () => {
+    try {
+      setLoadingMistakes(true);
+      const data = await learningAssistantApi.getMistakes();
+      setMistakes(data);
+    } catch {
+      // ignore
+    } finally {
+      setLoadingMistakes(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMistakes();
+  }, [evaluation]);
+
+  const handleResolveMistake = async (id: string) => {
+    try {
+      setResolvingId(id);
+      await learningAssistantApi.resolveMistake(id, true);
+      setMistakes((prev) => prev.filter((m) => m.id !== id));
+    } catch {
+      // ignore
+    } finally {
+      setResolvingId(null);
+    }
+  };
 
   useEffect(() => {
     if (!activeSession || evaluation) {
@@ -416,6 +450,94 @@ export default function PracticeQuizTab({
             {isLoading ? 'Generating Questions...' : 'Start 5-Question Quiz'}
           </Button>
         </Stack>
+      </Paper>
+
+      {/* Mistake Bank & Misconception Remediation */}
+      <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, maxWidth: 650, mx: 'auto', width: '100%' }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
+          <Stack direction="row" alignItems="center" gap={1}>
+            <BugReportOutlinedIcon color="error" />
+            <Typography variant="h6" fontWeight={700}>
+              Mistake Bank & Conceptual Remediation
+            </Typography>
+          </Stack>
+          <Chip
+            label={`${mistakes.filter((m) => !m.is_resolved).length} Unresolved`}
+            color={mistakes.filter((m) => !m.is_resolved).length > 0 ? 'error' : 'success'}
+            size="small"
+            sx={{ fontWeight: 700 }}
+          />
+        </Stack>
+        <Typography variant="body2" color="text.secondary" mb={2.5}>
+          Review questions you missed during diagnostic practice sessions. Understanding why an answer was incorrect builds lasting conceptual mastery.
+        </Typography>
+
+        {loadingMistakes ? (
+          <CircularProgress size={24} sx={{ display: 'block', mx: 'auto', my: 2 }} />
+        ) : mistakes.length === 0 ? (
+          <Box sx={{ p: 3, textAlign: 'center', bgcolor: 'action.hover', borderRadius: 2 }}>
+            <CheckCircleIcon color="success" sx={{ fontSize: 40, mb: 1 }} />
+            <Typography variant="subtitle2" fontWeight={600}>
+              No Active Mistakes Recorded!
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Keep taking diagnostic quizzes. Any missed concepts will automatically be saved here for focused review.
+            </Typography>
+          </Box>
+        ) : (
+          <Stack spacing={2}>
+            {mistakes.map((m) => (
+              <Card key={m.id} variant="outlined" sx={{ borderRadius: 2, borderColor: 'divider' }}>
+                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1} flexWrap="wrap" gap={1}>
+                    <Stack direction="row" gap={1} alignItems="center">
+                      <Chip label={m.subject_name} size="small" color="primary" variant="outlined" sx={{ fontWeight: 600 }} />
+                      <Chip label={m.topic_title} size="small" variant="filled" sx={{ fontWeight: 500 }} />
+                    </Stack>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="success"
+                      disabled={resolvingId === m.id}
+                      onClick={() => handleResolveMistake(m.id)}
+                      startIcon={resolvingId === m.id ? <CircularProgress size={12} /> : <CheckCircleIcon />}
+                      sx={{ textTransform: 'none', borderRadius: 1.5, fontSize: '0.75rem' }}
+                    >
+                      Mark Resolved
+                    </Button>
+                  </Stack>
+                  <Typography variant="body2" fontWeight={600} mb={1}>
+                    {m.question_text}
+                  </Typography>
+                  <Stack spacing={0.5} sx={{ bgcolor: 'action.hover', p: 1.5, borderRadius: 1.5, mb: 1 }}>
+                    <Stack direction="row" alignItems="center" gap={1}>
+                      <CancelIcon color="error" sx={{ fontSize: 16 }} />
+                      <Typography variant="caption" color="error.main" fontWeight={600}>
+                        Your answer: {m.student_answer}
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" alignItems="center" gap={1}>
+                      <CheckCircleIcon color="success" sx={{ fontSize: 16 }} />
+                      <Typography variant="caption" color="success.main" fontWeight={600}>
+                        Correct: {m.correct_answer}
+                      </Typography>
+                    </Stack>
+                  </Stack>
+                  {m.misconception_explanation && (
+                    <Box sx={{ bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(2, 136, 209, 0.15)' : '#e0f2fe'), p: 1.5, borderRadius: 1.5, borderLeft: '3px solid', borderLeftColor: 'info.main' }}>
+                      <Typography variant="caption" color="info.dark" fontWeight={700} display="block" mb={0.25}>
+                        Misconception & Conceptual Insight:
+                      </Typography>
+                      <Typography variant="caption" color="text.primary">
+                        {m.misconception_explanation}
+                      </Typography>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </Stack>
+        )}
       </Paper>
     </Box>
   );

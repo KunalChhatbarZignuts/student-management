@@ -75,7 +75,7 @@ export default function FloatingAssistantWidget() {
               position: 'fixed',
               bottom: 24,
               right: 24,
-              zIndex: 1200,
+              zIndex: 1050,
               boxShadow: '0 6px 20px rgba(0,0,0,0.2)',
               bgcolor: 'primary.main',
               '&:hover': {

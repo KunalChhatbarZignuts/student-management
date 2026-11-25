@@ -189,7 +189,7 @@ export default function ConversationDrawer({
                       fontSize: 11,
                       noWrap: true,
                       color: isSelected ? 'inherit' : 'text.secondary',
-                      opacity: isSelected ? 0.8 : 1,
+                      sx: { opacity: isSelected ? 0.8 : 1 },
                     }}
                   />
                   <IconButton

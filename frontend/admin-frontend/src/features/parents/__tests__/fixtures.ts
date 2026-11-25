@@ -1,7 +1,6 @@
 import { ParentWithChildren, LinkedChildDetail } from '../api';
 
 export const mockLinkedChild: LinkedChildDetail = {
-  id: 'child-101',
   relationship_id: 'link-101',
   student_id: 'stu-101',
   student_code: '2026-CS-0001',

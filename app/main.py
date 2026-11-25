@@ -19,6 +19,7 @@ from app.api.v1 import (
     audit_logs,
     auth,
     calendar,
+    diary,
     enrollments,
     examinations,
     fee_pos,
@@ -92,6 +93,7 @@ app.include_router(rollover.router, prefix="/api/v1")
 app.include_router(online_classes.router, prefix="/api/v1")
 app.include_router(ai_learning.router, prefix="/api/v1")
 app.include_router(ai_student_assistant.router, prefix="/api/v1")
+app.include_router(diary.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Root"])

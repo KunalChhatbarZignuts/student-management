@@ -385,4 +385,13 @@ class ActionExecutionRequest(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AudioTranscriptionResponse(BaseModel):
+    transcript: str
+    confidence: float = 1.0
+    source: str = "web_speech"
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+
 

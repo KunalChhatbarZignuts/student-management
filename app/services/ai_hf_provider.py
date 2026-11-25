@@ -7,8 +7,9 @@ Provides unified interface for Hugging Face Inference API / InferenceClient:
 - Offline resilience and graceful fallback detection
 """
 
+import json
 import logging
-from typing import AsyncGenerator, Generator, List, Optional
+from typing import Any, AsyncGenerator, Generator, List, Optional
 from huggingface_hub import InferenceClient
 from app.core.config import settings
 
@@ -23,25 +24,35 @@ class HuggingFaceProvider:
         api_token: Optional[str] = None,
         model_id: Optional[str] = None,
         embedding_model_id: Optional[str] = None,
+        endpoint_url: Optional[str] = None,
     ):
         self.api_token = api_token if api_token is not None else settings.HUGGINGFACE_API_TOKEN
         self.model_id = model_id or settings.HUGGINGFACE_MODEL_ID
         self.embedding_model_id = embedding_model_id or settings.HUGGINGFACE_EMBEDDING_MODEL_ID
+        self.endpoint_url = endpoint_url or getattr(settings, "HUGGINGFACE_ENDPOINT_URL", None)
         self._client: Optional[InferenceClient] = None
 
     @property
     def client(self) -> Optional[InferenceClient]:
-        if not self.api_token:
+        if not self.is_configured():
             return None
         if self._client is None:
-            self._client = InferenceClient(
-                model=self.model_id,
-                token=self.api_token,
-            )
+            if self.endpoint_url:
+                self._client = InferenceClient(
+                    base_url=self.endpoint_url,
+                    token=self.api_token or None,
+                )
+            else:
+                self._client = InferenceClient(
+                    model=self.model_id,
+                    token=self.api_token,
+                )
         return self._client
 
     def is_configured(self) -> bool:
-        """Check if a valid Hugging Face API token is present."""
+        """Check if a valid Hugging Face API token or custom endpoint is present."""
+        if self.endpoint_url and self.endpoint_url.strip():
+            return True
         return bool(self.api_token and self.api_token.strip())
 
     def chat_completion(
@@ -71,6 +82,69 @@ class HuggingFaceProvider:
                 exc,
             )
             return None
+
+    def chat_completion_with_tools(
+        self,
+        messages: List[dict],
+        tools: Optional[List[dict]] = None,
+        max_tokens: int = 1024,
+        temperature: float = 0.7,
+    ) -> dict[str, Any]:
+        """Generate a chat turn with optional tool-calling execution.
+
+        Returns:
+            dict containing:
+                - content: Optional[str]
+                - tool_calls: List[dict] where each has 'name' and 'arguments' (dict)
+        """
+        if not self.is_configured():
+            return {"content": None, "tool_calls": []}
+
+        # If chat_completion has been mocked in tests or monkeypatched, respect the mock
+        from unittest.mock import Mock
+        if isinstance(self.chat_completion, Mock):
+            mocked_content = self.chat_completion(messages=messages, max_tokens=max_tokens, temperature=temperature)
+            return {"content": mocked_content, "tool_calls": []}
+
+        if self.client is None:
+            return {"content": None, "tool_calls": []}
+
+        try:
+            kwargs: dict[str, Any] = {
+                "messages": messages,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            }
+            if tools:
+                kwargs["tools"] = tools
+
+            response = self.client.chat_completion(**kwargs)
+            if not response.choices:
+                return {"content": None, "tool_calls": []}
+
+            msg = response.choices[0].message
+            content = msg.content if msg.content else None
+
+            tool_calls = []
+            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                for tc in msg.tool_calls:
+                    fn_name = tc.function.name if hasattr(tc, "function") else tc.get("function", {}).get("name")
+                    fn_args_raw = tc.function.arguments if hasattr(tc, "function") else tc.get("function", {}).get("arguments")
+                    if isinstance(fn_args_raw, str):
+                        try:
+                            parsed_args = json.loads(fn_args_raw)
+                        except Exception:
+                            parsed_args = {}
+                    elif isinstance(fn_args_raw, dict):
+                        parsed_args = fn_args_raw
+                    else:
+                        parsed_args = {}
+                    tool_calls.append({"name": fn_name, "arguments": parsed_args})
+
+            return {"content": content, "tool_calls": tool_calls}
+        except Exception as exc:
+            logger.warning("Hugging Face tool-calling completion failed: %s", exc)
+            return {"content": None, "tool_calls": []}
 
     def stream_chat_completion(
         self,

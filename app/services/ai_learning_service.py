@@ -31,6 +31,29 @@ from app.schemas.ai_learning import (
     ChapterDetail,
     TopicDetail,
 )
+from app.services.learning.performance_engine import compute_student_exam_performance
+from app.services.learning.learning_path_service import (
+    ensure_learning_recommendations,
+    get_student_subjects_detail,
+    get_topic_mastery_matrix,
+    get_or_create_topic_mastery,
+    record_topic_practice_result,
+)
+from app.services.learning.study_planner_engine import (
+    get_or_create_daily_study_plan,
+    get_weekly_study_plan,
+    add_custom_study_plan_item,
+    reschedule_study_plan_item,
+    get_or_create_student_study_settings,
+    update_student_study_settings,
+)
+from app.services.learning.practice_quiz_service import (
+    generate_practice_session,
+    evaluate_practice_session,
+    get_student_mistakes,
+    resolve_student_mistake,
+)
+from app.services.learning.concept_tutor_service import explain_curriculum_concept
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +82,7 @@ def compute_student_exam_performance(student_id: uuid.UUID, db: Session) -> dict
         .join(Examination, ExaminationSchedule.examination_id == Examination.id)
         .where(
             StudentExamMark.student_id == student_id,
-            StudentExamMark.is_absent == False,
+            StudentExamMark.is_absent.is_(False),
             StudentExamMark.marks_obtained.isnot(None),
         )
         .order_by(Examination.start_date.asc())

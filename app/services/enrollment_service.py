@@ -476,7 +476,7 @@ def get_enrollment_dashboard_metrics(
     """Retrieve comprehensive enrollment KPI counters and grade/section distributions."""
     if not academic_year_id:
         cur_year = db.execute(
-            select(AcademicYear).where(AcademicYear.is_current == True)
+            select(AcademicYear).where(AcademicYear.is_current.is_(True))
         ).scalars().first()
         if not cur_year:
             cur_year = db.execute(
@@ -597,8 +597,8 @@ def get_enrollment_dashboard_metrics(
         ct_assign = db.execute(
             select(TeacherAssignment).where(
                 TeacherAssignment.section_id == s.id,
-                TeacherAssignment.is_class_teacher == True,
-                TeacherAssignment.is_active == True,
+                TeacherAssignment.is_class_teacher.is_(True),
+                TeacherAssignment.is_active.is_(True),
             )
         ).scalars().first()
         if ct_assign:
@@ -634,7 +634,7 @@ def get_unassigned_students(
     """Retrieve admitted active students not yet assigned to an active section."""
     if not academic_year_id:
         cur_year = db.execute(
-            select(AcademicYear).where(AcademicYear.is_current == True)
+            select(AcademicYear).where(AcademicYear.is_current.is_(True))
         ).scalars().first()
         if not cur_year:
             cur_year = db.execute(
@@ -1306,7 +1306,7 @@ def get_enhanced_student_enrollments(
             ct_assign = db.execute(
                 select(TeacherAssignment).where(
                     TeacherAssignment.section_id == sec.id,
-                    TeacherAssignment.is_class_teacher == True,
+                    TeacherAssignment.is_class_teacher.is_(True),
                 )
             ).scalars().first()
             if ct_assign:

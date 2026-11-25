@@ -1140,7 +1140,7 @@ def get_child_timetable(
         assignments = db.execute(
             select(TeacherAssignment).where(
                 TeacherAssignment.section_id == section_id,
-                TeacherAssignment.is_active == True,
+                TeacherAssignment.is_active.is_(True),
             )
         ).scalars().all()
 

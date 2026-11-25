@@ -12,7 +12,6 @@ export default defineConfig({
   timeout: 30000,
   expect: {
     toHaveScreenshot: {
-      comparator: 'pixelmatch',
       maxDiffPixelRatio: 0.005, // Allow up to 0.5% diff for sub-pixel anti-aliasing
       animations: 'disabled',   // Freeze CSS transitions and animations
       caret: 'hide',            // Hide text cursor

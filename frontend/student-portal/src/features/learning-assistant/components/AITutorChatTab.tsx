@@ -48,7 +48,7 @@ export default function AITutorChatTab({ onSendMessage, onExecuteAction }: AITut
 
   const scrollToBottom = () => {
     if (typeof messagesEndRef.current?.scrollIntoView === 'function') {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
     }
   };
 
@@ -199,7 +199,7 @@ export default function AITutorChatTab({ onSendMessage, onExecuteAction }: AITut
                     </Stack>
                   )}
                 </Paper>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, px: 1, textAlign: isUser ? 'right' : 'left' }}>
+                <Typography data-testid="chat-timestamp" variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, px: 1, textAlign: isUser ? 'right' : 'left' }}>
                   {msg.timestamp}
                 </Typography>
               </Box>

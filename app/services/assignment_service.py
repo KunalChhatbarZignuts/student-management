@@ -189,7 +189,7 @@ def delete_subject(
     active_ta = db.execute(
         select(TeacherAssignment).where(
             TeacherAssignment.subject_id == subject_id,
-            TeacherAssignment.is_active == True,
+            TeacherAssignment.is_active.is_(True),
         )
     ).scalars().all()
     for ta in active_ta:

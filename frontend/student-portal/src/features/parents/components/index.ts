@@ -6,4 +6,5 @@ export * from './ChildMarksTab';
 export * from './ChildTimetableTab';
 export * from './ChildAssignmentsTab';
 export * from './ChildFeesTab';
+export * from './ChildDiaryTab';
 

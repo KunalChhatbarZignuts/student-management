@@ -44,6 +44,80 @@ export const assistantApi = {
     return res.data;
   },
 
+  sendMessageStream: async (
+    message: string,
+    conversationId: string | null | undefined,
+    callbacks: {
+      onMetadata?: (data: { conversation_id: string; message_id: string }) => void;
+      onToolStart?: (data: { tool: string }) => void;
+      onToken?: (text: string) => void;
+      onDone?: (data: { message_id?: string; action_links?: Array<{ label: string; url: string }>; tools_used?: string[] }) => void;
+      onError?: (err: any) => void;
+    },
+    signal?: AbortSignal
+  ): Promise<void> => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    const response = await fetch(`${baseURL}/student/assistant/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        message,
+        conversation_id: conversationId || null,
+        stream: true,
+      }),
+      signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) return;
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() || '';
+
+      for (const block of parts) {
+        if (!block.trim()) continue;
+        const eventMatch = block.match(/event:\s*(\w+)/);
+        const dataPrefixIdx = block.indexOf('data:');
+        if (!eventMatch || dataPrefixIdx === -1) continue;
+
+        const eventType = eventMatch[1];
+        const rawData = block.substring(dataPrefixIdx + 5).trim();
+        try {
+          const parsed = JSON.parse(rawData);
+          if (eventType === 'metadata' && callbacks.onMetadata) {
+            callbacks.onMetadata(parsed);
+          } else if (eventType === 'tool_start' && callbacks.onToolStart) {
+            callbacks.onToolStart(parsed);
+          } else if (eventType === 'token' && callbacks.onToken) {
+            callbacks.onToken(parsed.text);
+          } else if (eventType === 'done' && callbacks.onDone) {
+            callbacks.onDone(parsed);
+          } else if (eventType === 'error' && callbacks.onError) {
+            callbacks.onError(parsed);
+          }
+        } catch (e) {
+          console.error('Failed to parse SSE event data:', e);
+        }
+      }
+    }
+  },
+
   getConversations: async (): Promise<ConversationSummary[]> => {
     const res = await apiClient.get<ConversationSummary[]>('/student/assistant/conversations');
     return res.data;
@@ -234,6 +308,19 @@ export const assistantApi = {
       '/student/assistant/insights',
       {
         params: { type: 'career-discovery', interests: interests || undefined },
+      }
+    );
+    return res.data;
+  },
+
+  transcribeAudio: async (audioBlob: Blob): Promise<{ transcript: string; confidence: number; source: string }> => {
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'voice_input.webm');
+    const res = await apiClient.post<{ transcript: string; confidence: number; source: string }>(
+      '/student/assistant/transcribe-audio',
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
       }
     );
     return res.data;

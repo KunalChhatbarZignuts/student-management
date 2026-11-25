@@ -63,6 +63,7 @@ class Settings(BaseSettings):
     HUGGINGFACE_API_TOKEN: str = ""
     HUGGINGFACE_MODEL_ID: str = "Qwen/Qwen2.5-7B-Instruct"
     HUGGINGFACE_EMBEDDING_MODEL_ID: str = "sentence-transformers/all-MiniLM-L6-v2"
+    HUGGINGFACE_ENDPOINT_URL: str | None = None
     AI_FALLBACK_DETERMINISTIC: bool = True
 
     # Seed super admin (used by seed script only)

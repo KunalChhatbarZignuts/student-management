@@ -20,6 +20,10 @@ vi.mock('../api', () => ({
     subjects: () => ['learning-assistant', 'subjects'],
     learningPath: () => ['learning-assistant', 'learning-path'],
     dailyPlan: () => ['learning-assistant', 'daily-plan'],
+    weeklyPlan: () => ['learning-assistant', 'weekly-plan'],
+    settings: () => ['learning-assistant', 'settings'],
+    mastery: () => ['learning-assistant', 'mastery'],
+    mistakes: () => ['learning-assistant', 'mistakes'],
   },
   learningAssistantApi: {
     getOverview: vi.fn(),
@@ -33,6 +37,14 @@ vi.mock('../api', () => ({
     generatePractice: vi.fn(),
     submitPractice: vi.fn(),
     sendChatMessage: vi.fn(),
+    getSettings: vi.fn().mockResolvedValue(null),
+    updateSettings: vi.fn(),
+    getWeeklyPlan: vi.fn().mockResolvedValue(null),
+    rescheduleDailyPlanItem: vi.fn(),
+    getMasteryMatrix: vi.fn().mockResolvedValue({ total_topics: 0, mastered_count: 0, in_progress_count: 0, needs_practice_count: 0, topics: [] }),
+    getMistakes: vi.fn().mockResolvedValue([]),
+    resolveMistake: vi.fn(),
+    explainConcept: vi.fn(),
   },
 }));
 
@@ -204,7 +216,7 @@ describe('AI Personal Learning Assistant Page', () => {
     renderWithProviders(<AILearningAssistantPage />);
 
     // Check title
-    expect(screen.getByText('AI Personal Learning Assistant')).toBeDefined();
+    expect(screen.getByText(/Academic Performance & Study Planner/i)).toBeDefined();
 
     // Wait for Overview data
     await waitFor(() => {
@@ -230,45 +242,29 @@ describe('AI Personal Learning Assistant Page', () => {
     });
   });
 
-  it('TC-FE-03: switches to Subject Analysis tab and displays curriculum chapters', async () => {
+  it('TC-FE-03: renders 2 focused tabs and excludes redundant tabs', async () => {
     renderWithProviders(<AILearningAssistantPage />);
 
     await waitFor(() => {
       expect(screen.getAllByText('74.5%').length).toBeGreaterThanOrEqual(1);
     });
 
-    fireEvent.click(screen.getByRole('tab', { name: /Subject Analysis/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Enrolled Subjects & Curriculum Syllabus/i)).toBeDefined();
-      expect(screen.getByText(/Number Systems & Arithmetic/i)).toBeDefined();
-      expect(screen.getByText(/Real Numbers & Rational Exponents/i)).toBeDefined();
-    });
+    expect(screen.getByRole('tab', { name: /Academic Overview/i })).toBeDefined();
+    expect(screen.getByRole('tab', { name: /Study Planner & Routine/i })).toBeDefined();
+    expect(screen.queryByRole('tab', { name: /My Learning Path/i })).toBeNull();
+    expect(screen.queryByRole('tab', { name: /Practice & Quizzes/i })).toBeNull();
+    expect(screen.queryByRole('tab', { name: /AI Tutor Chat/i })).toBeNull();
+    expect(screen.queryByRole('tab', { name: /Subject Analysis/i })).toBeNull();
   });
 
-  it('TC-FE-04: switches to My Learning Path tab and displays recommendations', async () => {
+  it('TC-FE-04: switches to Study Planner & Routine tab and displays activities checklist', async () => {
     renderWithProviders(<AILearningAssistantPage />);
 
     await waitFor(() => {
       expect(screen.getAllByText('74.5%').length).toBeGreaterThanOrEqual(1);
     });
 
-    fireEvent.click(screen.getByRole('tab', { name: /My Learning Path/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Personalized Academic Learning Path/i)).toBeDefined();
-      expect(screen.getByText(/Priority: HIGH/i)).toBeDefined();
-    });
-  });
-
-  it('TC-FE-05: switches to Today\'s Study Plan tab and displays activities checklist', async () => {
-    renderWithProviders(<AILearningAssistantPage />);
-
-    await waitFor(() => {
-      expect(screen.getAllByText('74.5%').length).toBeGreaterThanOrEqual(1);
-    });
-
-    fireEvent.click(screen.getByRole('tab', { name: /Today's Study Plan/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /Study Planner & Routine/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/Today's Personalized Study Routine/i)).toBeDefined();
@@ -276,57 +272,79 @@ describe('AI Personal Learning Assistant Page', () => {
     });
   });
 
-  it('TC-FE-06: switches to Practice & Quizzes tab and shows adaptive quiz launcher', async () => {
+  it('TC-FE-05: navigates to study plan from overview recommendation card', async () => {
     renderWithProviders(<AILearningAssistantPage />);
 
     await waitFor(() => {
       expect(screen.getAllByText('74.5%').length).toBeGreaterThanOrEqual(1);
     });
 
-    fireEvent.click(screen.getByRole('tab', { name: /Practice & Quizzes/i }));
+    const viewPlanBtn = screen.getByRole('button', { name: /View Study Plan/i });
+    fireEvent.click(viewPlanBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/Adaptive Diagnostic Practice/i)).toBeDefined();
-      expect(screen.getByText('Start 5-Question Quiz')).toBeDefined();
+      expect(screen.getByText(/Today's Personalized Study Routine/i)).toBeDefined();
     });
   });
 
-  it('TC-FE-07: switches to AI Tutor Chat tab and displays message feed', async () => {
+  it('TC-FE-06: opens study preferences modal from Study Planner', async () => {
     renderWithProviders(<AILearningAssistantPage />);
 
     await waitFor(() => {
       expect(screen.getAllByText('74.5%').length).toBeGreaterThanOrEqual(1);
     });
 
-    fireEvent.click(screen.getByRole('tab', { name: /AI Tutor Chat/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /Study Planner & Routine/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('AI Academic Coach & Tutor')).toBeDefined();
-      expect(screen.getByText(/Why is my Math score low and how do I improve\?/i)).toBeDefined();
+      expect(screen.getByRole('button', { name: /Preferences/i })).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Preferences/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Study Plan Preferences/i)).toBeDefined();
     });
   });
 
-  it('TC-FE-08: adds curriculum topic to daily study plan from Subject Analysis tab', async () => {
+  it('TC-FE-07: toggles Weekly study view on Study Planner', async () => {
     renderWithProviders(<AILearningAssistantPage />);
 
     await waitFor(() => {
       expect(screen.getAllByText('74.5%').length).toBeGreaterThanOrEqual(1);
     });
 
-    fireEvent.click(screen.getByRole('tab', { name: /Subject Analysis/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /Study Planner & Routine/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Number Systems & Arithmetic/i)).toBeDefined();
+      expect(screen.getByRole('button', { name: /Weekly/i })).toBeDefined();
     });
 
-    const addBtns = screen.getAllByRole('button', { name: /Add to Plan/i });
-    expect(addBtns.length).toBeGreaterThan(0);
-
-    fireEvent.click(addBtns[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Weekly/i }));
 
     await waitFor(() => {
-      expect(learningAssistantApi.addDailyPlanItem).toHaveBeenCalled();
-      expect(screen.getByText(/Added to Plan/i)).toBeDefined();
+      expect(screen.getByRole('button', { name: /Weekly/i })).toBeDefined();
+    });
+  });
+
+  it('TC-FE-08: marks study plan item completed', async () => {
+    renderWithProviders(<AILearningAssistantPage />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('74.5%').length).toBeGreaterThanOrEqual(1);
+    });
+
+    fireEvent.click(screen.getByRole('tab', { name: /Study Planner & Routine/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Linear Equations Review')).toBeDefined();
+    });
+
+    const markDoneBtn = screen.getByRole('button', { name: /Mark Done/i });
+    fireEvent.click(markDoneBtn);
+
+    await waitFor(() => {
+      expect(learningAssistantApi.updateDailyPlanItem).toHaveBeenCalled();
     });
   });
 });

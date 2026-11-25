@@ -19,7 +19,6 @@ import SchoolIcon from '@mui/icons-material/School';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import AutoStoriesIcon from '@mui/icons-material/AutoStories';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 
@@ -82,16 +81,8 @@ export default function LearningOverviewTab({ overview, onNavigateTab }: Learnin
                 <Button
                   variant="contained"
                   color="primary"
-                  startIcon={<PlayArrowIcon />}
-                  onClick={() => onNavigateTab(4, { subject_name: topRec.subject_name, topic_title: topRec.topic_title })}
+                  onClick={() => onNavigateTab(1)}
                   sx={{ borderRadius: 2, px: 3, textTransform: 'none', fontWeight: 600 }}
-                >
-                  Practice Quiz
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() => onNavigateTab(3)}
-                  sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
                 >
                   View Study Plan
                 </Button>

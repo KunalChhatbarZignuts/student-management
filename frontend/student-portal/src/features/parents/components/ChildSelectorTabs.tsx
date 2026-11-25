@@ -21,12 +21,14 @@ export const ChildSelectorTabs: React.FC<ChildSelectorTabsProps> = ({
   if (childrenList.length <= 1) return null;
 
   return (
-    <Paper sx={{ mb: 3, borderRadius: 2 }}>
+    <Paper sx={{ mb: 3, borderRadius: 2, maxWidth: '100%', overflow: 'hidden' }}>
       <Tabs
         value={selectedIndex}
         onChange={(_, val) => onSelectChild(val)}
         variant="scrollable"
         scrollButtons="auto"
+        allowScrollButtonsMobile
+        sx={{ maxWidth: '100%' }}
       >
         {childrenList.map((child, idx) => (
           <Tab

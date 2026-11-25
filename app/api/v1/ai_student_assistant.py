@@ -38,6 +38,7 @@ from app.schemas.ai_student_assistant import (
     DailyChallengeResponse,
     CareerDiscoveryResponse,
     ActionExecutionRequest,
+    AudioTranscriptionResponse,
 )
 from app.services import ai_assistant_service, ai_academic_service
 from app.services.ai_interactive_service import ai_interactive_service
@@ -74,36 +75,13 @@ async def chat_with_assistant(
 
     # If streaming is requested
     if payload.stream:
-        async def event_generator() -> AsyncGenerator[str, None]:
-            # Process query synchronously in service
-            result = ai_assistant_service.process_assistant_chat(
-                student=student,
-                message=payload.message,
-                conversation_id=payload.conversation_id,
-                db=db,
-            )
-
-            # Yield metadata event
-            meta_data = json.dumps({
-                "conversation_id": str(result["conversation_id"]),
-                "message_id": str(result["message_id"]),
-                "tools_used": result["tools_used"],
-            })
-            yield f"event: metadata\ndata: {meta_data}\n\n"
-
-            # Yield word tokens
-            words = result["content"].split(" ")
-            for w in words:
-                yield f"event: token\ndata: {json.dumps({'text': w + ' '})}\n\n"
-                await asyncio.sleep(0.015)
-
-            # Yield done event with action links
-            done_data = json.dumps({
-                "action_links": result["action_links"],
-            })
-            yield f"event: done\ndata: {done_data}\n\n"
-
-        return StreamingResponse(event_generator(), media_type="text/event-stream")
+        stream_gen = ai_assistant_service.stream_assistant_chat(
+            student=student,
+            message=payload.message,
+            conversation_id=payload.conversation_id,
+            db=db,
+        )
+        return StreamingResponse(stream_gen, media_type="text/event-stream")
 
     # Standard JSON response
     result = ai_assistant_service.process_assistant_chat(
@@ -691,6 +669,45 @@ def get_student_career_discovery(
         student_id=student.id,
         interests=interests,
     )
+
+
+@router.post(
+    "/transcribe-audio",
+    response_model=AudioTranscriptionResponse,
+    summary="Transcribe student voice audio recording to English text",
+)
+async def transcribe_student_audio(
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_roles(UserRole.STUDENT.value, UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value)),
+    db: Session = Depends(get_db),
+):
+    """Converts student voice audio recording to transcribed text with fallback support."""
+    _get_current_student(current_user, db)
+
+    audio_bytes = await file.read()
+    if not audio_bytes or len(audio_bytes) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded audio recording is empty (0 bytes).",
+        )
+
+    if len(audio_bytes) > 25 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Audio file size exceeds 25MB limit.",
+        )
+
+    content_type = file.content_type or "audio/webm"
+    result = ai_academic_service.transcribe_audio_speech(
+        audio_bytes=audio_bytes,
+        mime_type=content_type,
+    )
+    return AudioTranscriptionResponse(
+        transcript=result.get("transcript", ""),
+        confidence=result.get("confidence", 1.0),
+        source=result.get("source", "server_transcription"),
+    )
+
 
 
 

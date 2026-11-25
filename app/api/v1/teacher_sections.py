@@ -46,7 +46,7 @@ def get_my_section_students(
         select(TeacherAssignment).where(
             TeacherAssignment.teacher_id == teacher.id,
             TeacherAssignment.section_id == section.id,
-            TeacherAssignment.is_active == True,
+            TeacherAssignment.is_active.is_(True),
         )
     ).scalars().first()
 

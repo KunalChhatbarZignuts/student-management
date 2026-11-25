@@ -6,6 +6,18 @@ import {
   DailyStudyPlan,
   PracticeSession,
   PracticeEvaluation,
+  StudentStudySettings,
+  WeeklyStudyPlan,
+  TopicMasteryMatrix,
+  StudentMistake,
+  ConceptTutorExplainResponse,
+  StudySession,
+  CreateRoutineActivityPayload,
+  UpdateRoutineActivityPayload,
+  UpdateActivityStatusPayload,
+  DuplicateRoutinePayload,
+  StartSessionPayload,
+  FinishSessionPayload,
 } from './types';
 
 export const learningAssistantApi = {
@@ -42,6 +54,151 @@ export const learningAssistantApi = {
 
   getDailyPlan: async (): Promise<DailyStudyPlan> => {
     const res = await apiClient.get<DailyStudyPlan>('/students/me/learning-assistant/daily-plan');
+    return res.data;
+  },
+
+  getWeeklyPlan: async (weekStart?: string): Promise<WeeklyStudyPlan> => {
+    const params = weekStart ? { week_start: weekStart } : {};
+    const res = await apiClient.get<WeeklyStudyPlan>('/students/me/learning-assistant/weekly-plan', { params });
+    return res.data;
+  },
+
+  getSettings: async (): Promise<StudentStudySettings> => {
+    const res = await apiClient.get<StudentStudySettings>('/students/me/learning-assistant/settings');
+    return res.data;
+  },
+
+  updateSettings: async (payload: Partial<StudentStudySettings>): Promise<StudentStudySettings> => {
+    const res = await apiClient.put<StudentStudySettings>('/students/me/learning-assistant/settings', payload);
+    return res.data;
+  },
+
+  rescheduleDailyPlanItem: async (itemId: string, targetDate?: string): Promise<DailyStudyPlan> => {
+    const res = await apiClient.post<DailyStudyPlan>(
+      `/students/me/learning-assistant/daily-plan/items/${itemId}/reschedule`,
+      { target_date: targetDate }
+    );
+    return res.data;
+  },
+
+  getDailyRoutine: async (planDate?: string): Promise<DailyStudyPlan> => {
+    const params = planDate ? { plan_date: planDate } : {};
+    const res = await apiClient.get<DailyStudyPlan>('/students/me/learning-assistant/daily-routine', { params });
+    return res.data;
+  },
+
+  createRoutineActivity: async (payload: CreateRoutineActivityPayload): Promise<DailyStudyPlan> => {
+    const res = await apiClient.post<DailyStudyPlan>('/students/me/learning-assistant/daily-routine/activities', payload);
+    return res.data;
+  },
+
+  updateRoutineActivity: async (activityId: string, payload: UpdateRoutineActivityPayload): Promise<DailyStudyPlan> => {
+    const res = await apiClient.put<DailyStudyPlan>(
+      `/students/me/learning-assistant/daily-routine/activities/${activityId}`,
+      payload
+    );
+    return res.data;
+  },
+
+  updateActivityStatus: async (activityId: string, payload: UpdateActivityStatusPayload): Promise<DailyStudyPlan> => {
+    const res = await apiClient.patch<DailyStudyPlan>(
+      `/students/me/learning-assistant/daily-routine/activities/${activityId}/status`,
+      payload
+    );
+    return res.data;
+  },
+
+  deleteRoutineActivity: async (activityId: string): Promise<DailyStudyPlan> => {
+    const res = await apiClient.delete<DailyStudyPlan>(
+      `/students/me/learning-assistant/daily-routine/activities/${activityId}`
+    );
+    return res.data;
+  },
+
+  reorderRoutineActivities: async (itemIds: string[]): Promise<DailyStudyPlan> => {
+    const res = await apiClient.put<DailyStudyPlan>(
+      '/students/me/learning-assistant/daily-routine/activities-reorder',
+      { item_ids: itemIds }
+    );
+    return res.data;
+  },
+
+  duplicateRoutine: async (payload: DuplicateRoutinePayload): Promise<DailyStudyPlan> => {
+    const res = await apiClient.post<DailyStudyPlan>('/students/me/learning-assistant/daily-routine/duplicate', payload);
+    return res.data;
+  },
+
+  updateRoutineMetadata: async (payload: { notes?: string; is_archived?: boolean }, planDate?: string): Promise<DailyStudyPlan> => {
+    const params = planDate ? { plan_date: planDate } : {};
+    const res = await apiClient.patch<DailyStudyPlan>(
+      '/students/me/learning-assistant/daily-routine/metadata',
+      payload,
+      { params }
+    );
+    return res.data;
+  },
+
+  getActiveStudySession: async (): Promise<StudySession | null> => {
+    const res = await apiClient.get<StudySession | null>('/students/me/learning-assistant/study-sessions/active');
+    return res.data;
+  },
+
+  startStudySession: async (payload: StartSessionPayload): Promise<StudySession> => {
+    const res = await apiClient.post<StudySession>('/students/me/learning-assistant/study-sessions/start', payload);
+    return res.data;
+  },
+
+  pauseStudySession: async (sessionId: string): Promise<StudySession> => {
+    const res = await apiClient.post<StudySession>(`/students/me/learning-assistant/study-sessions/${sessionId}/pause`);
+    return res.data;
+  },
+
+  resumeStudySession: async (sessionId: string): Promise<StudySession> => {
+    const res = await apiClient.post<StudySession>(`/students/me/learning-assistant/study-sessions/${sessionId}/resume`);
+    return res.data;
+  },
+
+  finishStudySession: async (sessionId: string, payload: FinishSessionPayload): Promise<StudySession> => {
+    const res = await apiClient.post<StudySession>(
+      `/students/me/learning-assistant/study-sessions/${sessionId}/finish`,
+      payload
+    );
+    return res.data;
+  },
+
+  cancelStudySession: async (sessionId: string): Promise<StudySession> => {
+    const res = await apiClient.post<StudySession>(`/students/me/learning-assistant/study-sessions/${sessionId}/cancel`);
+    return res.data;
+  },
+
+  getMasteryMatrix: async (): Promise<TopicMasteryMatrix> => {
+    const res = await apiClient.get<TopicMasteryMatrix>('/students/me/learning-assistant/mastery');
+    return res.data;
+  },
+
+  getMistakes: async (): Promise<StudentMistake[]> => {
+    const res = await apiClient.get<StudentMistake[]>('/students/me/learning-assistant/mistakes');
+    return res.data;
+  },
+
+  resolveMistake: async (mistakeId: string, isResolved: boolean = true): Promise<StudentMistake> => {
+    const res = await apiClient.patch<StudentMistake>(
+      `/students/me/learning-assistant/mistakes/${mistakeId}/resolve`,
+      { is_resolved: isResolved }
+    );
+    return res.data;
+  },
+
+  explainConcept: async (payload: {
+    subject_name: string;
+    topic_title: string;
+    chapter_title?: string;
+    specific_question?: string;
+  }): Promise<ConceptTutorExplainResponse> => {
+    const res = await apiClient.post<ConceptTutorExplainResponse>(
+      '/students/me/learning-assistant/tutor/explain',
+      payload
+    );
     return res.data;
   },
 
@@ -109,4 +266,8 @@ export const learningAssistantKeys = {
   subjects: () => [...learningAssistantKeys.all, 'subjects'] as const,
   learningPath: () => [...learningAssistantKeys.all, 'learning-path'] as const,
   dailyPlan: () => [...learningAssistantKeys.all, 'daily-plan'] as const,
+  weeklyPlan: (weekStart?: string) => [...learningAssistantKeys.all, 'weekly-plan', weekStart || 'current'] as const,
+  settings: () => [...learningAssistantKeys.all, 'settings'] as const,
+  mastery: () => [...learningAssistantKeys.all, 'mastery'] as const,
+  mistakes: () => [...learningAssistantKeys.all, 'mistakes'] as const,
 };

@@ -587,8 +587,8 @@ def verify_class_teacher_access(teacher_user_id: uuid.UUID, section_id: uuid.UUI
         select(TeacherAssignment).where(
             TeacherAssignment.teacher_id == teacher.id,
             TeacherAssignment.section_id == section_id,
-            TeacherAssignment.is_active == True,
-            TeacherAssignment.is_class_teacher == True,
+            TeacherAssignment.is_active.is_(True),
+            TeacherAssignment.is_class_teacher.is_(True),
         )
     ).scalars().first()
 
@@ -611,8 +611,8 @@ def get_teacher_examinations(teacher_user_id: uuid.UUID, db: Session) -> list[di
     assignments = db.execute(
         select(TeacherAssignment).where(
             TeacherAssignment.teacher_id == teacher.id,
-            TeacherAssignment.is_active == True,
-            TeacherAssignment.is_class_teacher == True,
+            TeacherAssignment.is_active.is_(True),
+            TeacherAssignment.is_class_teacher.is_(True),
             TeacherAssignment.section_id.isnot(None),
         )
     ).scalars().all()
@@ -1227,8 +1227,8 @@ def get_student_published_results(
         assignment = db.execute(
             select(TeacherAssignment).where(
                 TeacherAssignment.section_id == res.section_id,
-                TeacherAssignment.is_class_teacher == True,
-                TeacherAssignment.is_active == True,
+                TeacherAssignment.is_class_teacher.is_(True),
+                TeacherAssignment.is_active.is_(True),
             )
         ).scalars().first()
         if assignment and assignment.teacher:

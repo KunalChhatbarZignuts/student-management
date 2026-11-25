@@ -223,7 +223,7 @@ def get_section_response(section: Section, db: Session) -> SectionResponse:
     active_assignment = db.execute(
         select(TeacherAssignment).where(
             TeacherAssignment.section_id == section.id,
-            TeacherAssignment.is_active == True,
+            TeacherAssignment.is_active.is_(True),
             TeacherAssignment.assignment_type == "CLASS_TEACHER",
         )
     ).scalars().first()

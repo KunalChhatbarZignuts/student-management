@@ -137,7 +137,7 @@ def delete_or_deactivate_teacher(
     active_ta = db.execute(
         select(TeacherAssignment).where(
             TeacherAssignment.teacher_id == teacher.id,
-            TeacherAssignment.is_active == True,
+            TeacherAssignment.is_active.is_(True),
         )
     ).scalars().all()
     for ta in active_ta:

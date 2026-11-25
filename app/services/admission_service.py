@@ -87,9 +87,9 @@ def process_student_admission(
     teacher_assign = db.execute(
         select(TeacherAssignment).where(
             TeacherAssignment.section_id == section.id,
-            TeacherAssignment.is_active == True,
+            TeacherAssignment.is_active.is_(True),
             or_(
-                TeacherAssignment.is_class_teacher == True,
+                TeacherAssignment.is_class_teacher.is_(True),
                 TeacherAssignment.assignment_type == "CLASS_TEACHER",
             ),
         )
@@ -438,9 +438,9 @@ def list_admissions(
         t_assign = db.execute(
             select(TeacherAssignment).where(
                 TeacherAssignment.section_id == adm.section_id,
-                TeacherAssignment.is_active == True,
+                TeacherAssignment.is_active.is_(True),
                 or_(
-                    TeacherAssignment.is_class_teacher == True,
+                    TeacherAssignment.is_class_teacher.is_(True),
                     TeacherAssignment.assignment_type == "CLASS_TEACHER",
                 ),
             )
@@ -486,9 +486,9 @@ def get_admission_by_id(admission_id: uuid.UUID, db: Session) -> AdmissionRespon
     t_assign = db.execute(
         select(TeacherAssignment).where(
             TeacherAssignment.section_id == adm.section_id,
-            TeacherAssignment.is_active == True,
+            TeacherAssignment.is_active.is_(True),
             or_(
-                TeacherAssignment.is_class_teacher == True,
+                TeacherAssignment.is_class_teacher.is_(True),
                 TeacherAssignment.assignment_type == "CLASS_TEACHER",
             ),
         )

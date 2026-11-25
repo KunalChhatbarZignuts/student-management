@@ -977,7 +977,7 @@ class OnlineClassroomService:
                 (OnlineClassParticipant.online_class_id == OnlineClass.id)
                 & (OnlineClassParticipant.student_id == student_id),
             )
-            .where(OnlineClassRecording.is_published == True)
+            .where(OnlineClassRecording.is_published.is_(True))
             .options(
                 joinedload(OnlineClassRecording.online_class).joinedload(OnlineClass.teacher)
             )
@@ -990,7 +990,7 @@ class OnlineClassroomService:
                 (OnlineClassParticipant.online_class_id == OnlineClass.id)
                 & (OnlineClassParticipant.student_id == student_id),
             )
-            .where(OnlineClassRecording.is_published == True)
+            .where(OnlineClassRecording.is_published.is_(True))
         ).scalar_one()
 
         offset = (page - 1) * size

@@ -32,7 +32,7 @@ def tool_get_student_profile(student: Student, db: Session) -> dict[str, Any]:
             StudentEnrollment.student_id == student.id,
             StudentEnrollment.status == "ACTIVE",
         ).order_by(StudentEnrollment.created_at.desc())
-    ).scalar_one_or_none()
+    ).scalars().first()
 
     cur_year = None
     cur_grade = student.class_name
@@ -223,8 +223,8 @@ def tool_get_school_calendar(student: Student, db: Session, target_date_str: str
             select(StudentEnrollment).where(
                 StudentEnrollment.student_id == student.id,
                 StudentEnrollment.status == "ACTIVE",
-            )
-        ).scalar_one_or_none()
+            ).order_by(StudentEnrollment.created_at.desc())
+        ).scalars().first()
         ay_id = enr.academic_year_id if enr and enr.academic_year_id else None
 
         if not ay_id:
@@ -599,3 +599,152 @@ def execute_tool(tool_name: str, args: dict[str, Any], student: Student, db: Ses
     except Exception as e:
         logger.error(f"Error executing tool {tool_name}: {e}")
         return {"error": f"Failed to execute tool '{tool_name}': {str(e)}"}
+
+
+# Standard JSON Schemas for LLM Tool/Function Calling
+SCHOOL_TOOL_DEFINITIONS: list[dict[str, Any]] = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_student_timetable",
+            "description": "Retrieve the authenticated student's official class timetable, periods, subjects, and teachers for today, tomorrow, or a specific day/date.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "target_date": {
+                        "type": "string",
+                        "description": "Target date keyword (e.g. 'today', 'tomorrow') or ISO date 'YYYY-MM-DD'.",
+                    }
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_student_attendance",
+            "description": "Retrieve the authenticated student's overall attendance rate (percentage), total working days, total days present, total days absent, and attendance eligibility.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_student_examinations",
+            "description": "Retrieve upcoming examinations, exam dates, syllabus subjects, timings, and schedules for the student's enrolled grade.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_student_results",
+            "description": "Retrieve official published examination results, report card marks obtained, grade rankings, and performance summaries.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_student_fees",
+            "description": "Retrieve the student's fee invoice history, pending fee balance, due dates, and payment status.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_school_calendar",
+            "description": "Retrieve official school holidays, vacation schedules, Sunday holidays, and academic calendar dates.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "target_date": {
+                        "type": "string",
+                        "description": "Optional specific date string or month to check for holidays or events.",
+                    }
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_student_online_classes",
+            "description": "Retrieve scheduled live online classroom sessions and video lecture meetings for the student.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_student_leaves",
+            "description": "Retrieve the student's submitted leave applications, approvals, and leave balance.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_subject_curriculum",
+            "description": "Retrieve curriculum syllabus, chapter lists, and topics for the student's grade or a specific subject.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "subject_name": {
+                        "type": "string",
+                        "description": "Name of the subject (e.g. Mathematics, Science, English, Physics).",
+                    }
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_school_knowledge",
+            "description": "Search official school policies, rules, student handbook, grading scales, dress code, library rules, and code of conduct using semantic search.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search query about school rules, handbook, or guidelines.",
+                    },
+                    "category": {
+                        "type": "string",
+                        "description": "Optional category filter (e.g. ACADEMIC_RULES, FEES_POLICY, CODE_OF_CONDUCT, GENERAL).",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+    },
+]

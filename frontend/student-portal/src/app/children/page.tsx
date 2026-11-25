@@ -15,6 +15,7 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import BadgeIcon from '@mui/icons-material/Badge';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 
 import AppShell from '@/components/layout/AppShell';
 import RequireRole from '@/components/guards/RequireRole';
@@ -38,6 +39,7 @@ import {
   ChildTimetableTab,
   ChildAssignmentsTab,
   ChildFeesTab,
+  ChildDiaryTab,
 } from '@/features/parents/components';
 
 export default function ChildrenPage() {
@@ -58,7 +60,7 @@ export default function ChildrenPage() {
   return (
     <RequireRole roles={[ROLES.PARENT]}>
       <AppShell>
-        <Box sx={{ maxWidth: 1100, mx: 'auto', pb: 6 }}>
+        <Box sx={{ maxWidth: 1100, width: '100%', mx: 'auto', pb: 6, overflowX: 'hidden' }}>
           <PageHeader
             title="My Children"
             subtitle="Comprehensive academic monitoring, attendance tracking, and performance records for your linked students."
@@ -94,13 +96,14 @@ export default function ChildrenPage() {
                   <ChildOverviewHeaderCard child={activeChild} />
 
                   {/* Navigation Sub-Tabs */}
-                  <Paper sx={{ mb: 3, borderRadius: 2 }}>
+                  <Paper sx={{ mb: 3, borderRadius: 2, maxWidth: '100%', overflow: 'hidden' }}>
                     <Tabs
                       value={activeTab}
                       onChange={(_, val) => setActiveTab(val)}
                       variant="scrollable"
                       scrollButtons="auto"
-                      sx={{ borderBottom: 1, borderColor: 'divider' }}
+                      allowScrollButtonsMobile
+                      sx={{ borderBottom: 1, borderColor: 'divider', maxWidth: '100%' }}
                     >
                       <Tab icon={<BadgeIcon />} iconPosition="start" label="Profile & Bio" />
                       <Tab icon={<EventAvailableIcon />} iconPosition="start" label="Attendance" />
@@ -108,6 +111,7 @@ export default function ChildrenPage() {
                       <Tab icon={<CalendarMonthIcon />} iconPosition="start" label="Timetable" />
                       <Tab icon={<AssignmentIcon />} iconPosition="start" label="Assignments" />
                       <Tab icon={<ReceiptLongIcon />} iconPosition="start" label="Fees & Invoices" />
+                      <Tab icon={<MenuBookIcon />} iconPosition="start" label="Digital Diary" />
                     </Tabs>
                   </Paper>
 
@@ -136,6 +140,9 @@ export default function ChildrenPage() {
                   )}
                   {activeTab === 5 && (
                     <ChildFeesTab fees={fees} isLoading={loadingFees} />
+                  )}
+                  {activeTab === 6 && (
+                    <ChildDiaryTab childId={childId} />
                   )}
                 </>
               )}

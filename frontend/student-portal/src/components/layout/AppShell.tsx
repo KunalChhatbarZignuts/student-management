@@ -39,6 +39,7 @@ import SchoolIcon from '@mui/icons-material/School';
 import VideoCameraFrontIcon from '@mui/icons-material/VideoCameraFront';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 
 import { useAuth } from '@/features/auth/hooks';
 import { useUiStore } from '@/store/uiStore';
@@ -73,7 +74,13 @@ const navItems: NavItem[] = [
     roles: [ROLES.PARENT],
   },
   {
-    label: 'AI Learning Assistant',
+    label: 'Digital Diary',
+    href: '/diary',
+    icon: <MenuBookIcon />,
+    roles: [ROLES.STUDENT, ROLES.PARENT],
+  },
+  {
+    label: 'Learning Assistant',
     href: '/learning-assistant',
     icon: <PsychologyIcon />,
     roles: [ROLES.STUDENT, ROLES.PARENT],
@@ -245,7 +252,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default', maxWidth: '100vw', overflowX: 'hidden' }}>
       <AppBar
         position="fixed"
         sx={{
@@ -377,6 +384,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         component="main"
         sx={{
           flexGrow: 1,
+          minWidth: 0,
+          maxWidth: '100%',
           p: { xs: 2, sm: 3 },
           width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
           mt: 8,

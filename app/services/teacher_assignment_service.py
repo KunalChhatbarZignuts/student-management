@@ -62,7 +62,7 @@ def assign_class_teacher(
     current_active = db.execute(
         select(TeacherAssignment).where(
             TeacherAssignment.section_id == section.id,
-            TeacherAssignment.is_active == True,
+            TeacherAssignment.is_active.is_(True),
             TeacherAssignment.assignment_type == "CLASS_TEACHER",
         )
     ).scalars().first()
@@ -123,7 +123,7 @@ def remove_class_teacher(
     current_active = db.execute(
         select(TeacherAssignment).where(
             TeacherAssignment.section_id == section.id,
-            TeacherAssignment.is_active == True,
+            TeacherAssignment.is_active.is_(True),
             TeacherAssignment.assignment_type == "CLASS_TEACHER",
         )
     ).scalars().first()
@@ -155,7 +155,7 @@ def get_section_teacher(section_id: uuid.UUID, db: Session) -> TeacherAssignment
     active_assignment = db.execute(
         select(TeacherAssignment).where(
             TeacherAssignment.section_id == section_id,
-            TeacherAssignment.is_active == True,
+            TeacherAssignment.is_active.is_(True),
             TeacherAssignment.assignment_type == "CLASS_TEACHER",
         )
     ).scalars().first()
@@ -175,7 +175,7 @@ def get_teacher_assigned_sections(teacher_id: uuid.UUID, db: Session) -> Teacher
     class_teacher_assignments = db.execute(
         select(TeacherAssignment).where(
             TeacherAssignment.teacher_id == teacher.id,
-            TeacherAssignment.is_active == True,
+            TeacherAssignment.is_active.is_(True),
             TeacherAssignment.section_id.isnot(None),
         )
     ).scalars().all()

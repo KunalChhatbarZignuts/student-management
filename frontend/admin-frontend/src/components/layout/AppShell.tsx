@@ -48,6 +48,7 @@ import PublishedWithChangesIcon from '@mui/icons-material/PublishedWithChanges';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import VideoCameraFrontIcon from '@mui/icons-material/VideoCameraFront';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 
 import { useAuth } from '@/features/auth/hooks';
 import { useUiStore } from '@/store/uiStore';
@@ -169,6 +170,12 @@ const navItems: NavItem[] = [
     label: 'Online Classroom',
     href: '/online-classroom',
     icon: <VideoCameraFrontIcon />,
+    roles: [ROLES.TEACHER],
+  },
+  {
+    label: 'Digital Diary',
+    href: '/diary',
+    icon: <MenuBookIcon />,
     roles: [ROLES.TEACHER],
   },
   {
