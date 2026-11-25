@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     Numeric,
     String,
     Text,
@@ -294,6 +295,9 @@ class PaymentTransaction(TimestampMixin, Base):
     error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
     error_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    webhook_payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    webhook_event_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    webhook_event_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Relationships
     installment: Mapped["FeeInstallment"] = relationship("FeeInstallment", back_populates="transactions")
@@ -360,10 +364,10 @@ class FeePayment(TimestampMixin, Base):
 
 
 class PaymentWebhookEvent(TimestampMixin, Base):
-    __tablename__ = "payment_webhook_events"
+    __tablename__ = "v_payment_webhook_events"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    event_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    event_id: Mapped[str] = mapped_column(String(100), nullable=False)
     gateway_provider: Mapped[str] = mapped_column(String(50), nullable=False, default="razorpay")
     event_type: Mapped[str] = mapped_column(String(100), nullable=False)
     raw_payload: Mapped[str] = mapped_column(Text, nullable=False)
@@ -373,12 +377,6 @@ class PaymentWebhookEvent(TimestampMixin, Base):
     failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     processed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
-    __table_args__ = (
-        Index("ix_payment_webhook_events_event_id", "event_id"),
-        Index("ix_payment_webhook_events_status", "processing_status"),
-        Index("ix_payment_webhook_events_type", "event_type"),
-    )
 
     def __repr__(self) -> str:
         return f"<PaymentWebhookEvent {self.event_id} ({self.event_type}) status={self.processing_status}>"

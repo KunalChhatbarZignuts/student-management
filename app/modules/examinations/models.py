@@ -196,7 +196,7 @@ class StudentExamMark(TimestampMixin, Base):
 
 
 class StudentExamResult(TimestampMixin, Base):
-    __tablename__ = "student_exam_results"
+    __tablename__ = "v_student_exam_results"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     examination_id: Mapped[uuid.UUID] = mapped_column(
@@ -219,24 +219,12 @@ class StudentExamResult(TimestampMixin, Base):
     teacher_remarks: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(30), nullable=False, default=MarksStatus.DRAFT.value)
     published_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    published_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
-    )
 
     # Relationships
     examination: Mapped["Examination"] = relationship("Examination", back_populates="results")
     student: Mapped["Student"] = relationship("Student")
     grade: Mapped["Grade"] = relationship("Grade")
     section: Mapped["Section"] = relationship("Section")
-    published_by: Mapped["User | None"] = relationship("User")
-
-    __table_args__ = (
-        UniqueConstraint("examination_id", "student_id", name="uq_student_exam_result_student"),
-        Index("ix_student_exam_results_exam", "examination_id"),
-        Index("ix_student_exam_results_student", "student_id"),
-        Index("ix_student_exam_results_section", "section_id"),
-        Index("ix_student_exam_results_status", "status"),
-    )
 
     def __repr__(self) -> str:
         return f"<StudentExamResult exam={self.examination_id} student={self.student_id} pct={self.percentage}% grade={self.overall_grade}>"

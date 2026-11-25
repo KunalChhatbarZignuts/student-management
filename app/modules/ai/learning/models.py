@@ -363,14 +363,14 @@ class AIStudentStudySettings(TimestampMixin, Base):
 
 
 class AITopicMastery(TimestampMixin, Base):
-    __tablename__ = "ai_topic_masteries"
+    __tablename__ = "v_ai_topic_masteries"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     student_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True
+        Uuid, ForeignKey("students.id", ondelete="CASCADE"), nullable=False
     )
     topic_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("chapter_topics.id", ondelete="CASCADE"), nullable=False, index=True
+        Uuid, ForeignKey("chapter_topics.id", ondelete="CASCADE"), nullable=False
     )
     mastery_level: Mapped[str] = mapped_column(
         String(30), nullable=False, default=TopicMasteryLevel.NOT_STARTED.value
@@ -384,24 +384,19 @@ class AITopicMastery(TimestampMixin, Base):
     student: Mapped["Student"] = relationship("Student")
     topic: Mapped["ChapterTopic"] = relationship("ChapterTopic")
 
-    __table_args__ = (
-        UniqueConstraint("student_id", "topic_id", name="uq_student_topic_mastery"),
-        Index("ix_ai_topic_masteries_student_level", "student_id", "mastery_level"),
-    )
-
     def __repr__(self) -> str:
         return f"<AITopicMastery student={self.student_id} topic={self.topic_id} level={self.mastery_level}>"
 
 
 class AIStudentMistake(TimestampMixin, Base):
-    __tablename__ = "ai_student_mistakes"
+    __tablename__ = "v_ai_student_mistakes"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     student_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True
+        Uuid, ForeignKey("students.id", ondelete="CASCADE"), nullable=False
     )
     topic_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey("chapter_topics.id", ondelete="SET NULL"), nullable=True, index=True
+        Uuid, ForeignKey("chapter_topics.id", ondelete="SET NULL"), nullable=True
     )
     subject_name: Mapped[str] = mapped_column(String(100), nullable=False)
     topic_title: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -415,10 +410,6 @@ class AIStudentMistake(TimestampMixin, Base):
     # Relationships
     student: Mapped["Student"] = relationship("Student")
     topic: Mapped["ChapterTopic | None"] = relationship("ChapterTopic")
-
-    __table_args__ = (
-        Index("ix_ai_student_mistakes_student_status", "student_id", "is_resolved"),
-    )
 
     def __repr__(self) -> str:
         return f"<AIStudentMistake student={self.student_id} resolved={self.is_resolved}>"

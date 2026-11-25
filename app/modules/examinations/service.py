@@ -823,13 +823,7 @@ def _recalculate_section_results(
     db: Session,
     is_submit: bool = True,
 ) -> None:
-    """Consolidate student marks across all subjects in the exam into student_exam_results."""
-    exam = db.get(Examination, examination_id)
-    if not exam:
-        return
-    scale_name = exam.grading_scale_name or DEFAULT_SCALE_NAME
-
-    # Get all schedules for this examination and section
+    """Updates remarks and marks status across all subjects in the exam."""
     schedules = db.execute(
         select(ExaminationSchedule).where(
             ExaminationSchedule.examination_id == examination_id,
@@ -855,9 +849,6 @@ def _recalculate_section_results(
         )
     ).scalars().all()
 
-    # Calculate total max marks across all schedules in this section
-    total_exam_max_marks = sum(s.max_marks for s in schedules)
-
     for std in students:
         marks = db.execute(
             select(StudentExamMark).where(
@@ -866,67 +857,11 @@ def _recalculate_section_results(
             )
         ).scalars().all()
 
-        total_obtained = 0.0
-        has_fail = False
-        has_absent = False
-
-        sched_map = {s.id: s for s in schedules}
         for m in marks:
-            sch = sched_map.get(m.schedule_id)
-            if not sch:
-                continue
-            if m.is_absent:
-                has_absent = True
-                has_fail = True
-            elif m.marks_obtained is not None:
-                total_obtained += m.marks_obtained
-                if not m.is_passed:
-                    has_fail = True
-
-        total_max = total_exam_max_marks
-        pct = (total_obtained / total_max * 100.0) if total_max > 0 else 0.0
-        grade_letter, _ = calculate_grade(pct, scale_name, db)
-
-        if has_absent and total_obtained == 0.0:
-            result_label = ResultStatus.ABSENT.value
-        elif has_fail or len(marks) < len(schedules):
-            result_label = ResultStatus.FAIL.value
-        else:
-            result_label = ResultStatus.PASS.value
-
-        existing_res = db.execute(
-            select(StudentExamResult).where(
-                StudentExamResult.examination_id == examination_id,
-                StudentExamResult.student_id == std.id,
-            )
-        ).scalars().first()
-
-        if not existing_res:
-            res_obj = StudentExamResult(
-                examination_id=examination_id,
-                student_id=std.id,
-                grade_id=sched_map[schedule_ids[0]].grade_id,
-                section_id=section_id,
-                total_max_marks=total_max,
-                total_obtained_marks=total_obtained,
-                percentage=round(pct, 2),
-                overall_grade=grade_letter,
-                overall_result=result_label,
-                teacher_remarks=teacher_remarks,
-                status=MarksStatus.SUBMITTED.value if is_submit else MarksStatus.DRAFT.value,
-            )
-            db.add(res_obj)
-        else:
-            if existing_res.status != MarksStatus.PUBLISHED.value:
-                existing_res.total_max_marks = total_max
-                existing_res.total_obtained_marks = total_obtained
-                existing_res.percentage = round(pct, 2)
-                existing_res.overall_grade = grade_letter
-                existing_res.overall_result = result_label
-                if teacher_remarks:
-                    existing_res.teacher_remarks = teacher_remarks
-                if is_submit:
-                    existing_res.status = MarksStatus.SUBMITTED.value
+            if teacher_remarks and not m.remarks:
+                m.remarks = teacher_remarks
+            if is_submit and m.status != MarksStatus.PUBLISHED.value:
+                m.status = MarksStatus.SUBMITTED.value
 
     db.commit()
 
@@ -945,51 +880,23 @@ def publish_results(
     if not exam:
         raise HTTPException(status_code=404, detail="Examination not found")
 
-    query = select(StudentExamResult).where(StudentExamResult.examination_id == examination_id)
+    sched_query = select(ExaminationSchedule.id).where(ExaminationSchedule.examination_id == examination_id)
     if section_id:
-        query = query.where(StudentExamResult.section_id == section_id)
+        sched_query = sched_query.where(ExaminationSchedule.section_id == section_id)
+    target_sched_ids = db.execute(sched_query).scalars().all()
 
-    results = db.execute(query).scalars().all()
-    if not results:
-        # Generate them if submitted
-        schedules = db.execute(
-            select(ExaminationSchedule).where(ExaminationSchedule.examination_id == examination_id)
-        ).scalars().all()
-        sec_ids = {s.section_id for s in schedules}
-        for sec in sec_ids:
-            if section_id is None or sec == section_id:
-                _recalculate_section_results(examination_id, sec, None, db)
-        results = db.execute(query).scalars().all()
-
-    now = dt.datetime.now(dt.timezone.utc)
     count = 0
-    for res in results:
-        res.status = MarksStatus.PUBLISHED.value
-        res.published_at = now
-        res.published_by_user_id = admin_user_id
-        count += 1
-
-        # Also publish marks
-        sched_ids = db.execute(
-            select(ExaminationSchedule.id).where(
-                ExaminationSchedule.examination_id == examination_id,
-                ExaminationSchedule.section_id == res.section_id,
+    if target_sched_ids:
+        marks = db.execute(
+            select(StudentExamMark).where(
+                StudentExamMark.schedule_id.in_(target_sched_ids)
             )
         ).scalars().all()
-        if sched_ids:
-            marks = db.execute(
-                select(StudentExamMark).where(
-                    StudentExamMark.schedule_id.in_(sched_ids),
-                    StudentExamMark.student_id == res.student_id,
-                )
-            ).scalars().all()
-            for m in marks:
-                m.status = MarksStatus.PUBLISHED.value
+        for m in marks:
+            m.status = MarksStatus.PUBLISHED.value
+            count += 1
 
-        # Status updated to PUBLISHED
-        pass
-
-    # Check if ALL sections and schedules for this exam have been published before setting COMPLETED
+    # Update exam status if all marks are published
     all_schedules = db.execute(
         select(ExaminationSchedule).where(ExaminationSchedule.examination_id == examination_id)
     ).scalars().all()
@@ -1002,14 +909,8 @@ def publish_results(
                 StudentExamMark.status != MarksStatus.PUBLISHED.value,
             )
         ).scalar() or 0
-        unpub_results = db.execute(
-            select(func.count(StudentExamResult.id)).where(
-                StudentExamResult.examination_id == examination_id,
-                StudentExamResult.status != MarksStatus.PUBLISHED.value,
-            )
-        ).scalar() or 0
 
-        if unpub_marks == 0 and unpub_results == 0:
+        if unpub_marks == 0:
             exam.status = ExamStatus.COMPLETED.value
 
     db.commit()
@@ -1025,37 +926,22 @@ def unpublish_results(
     if not exam:
         raise HTTPException(status_code=404, detail="Examination not found")
 
-    query = select(StudentExamResult).where(
-        StudentExamResult.examination_id == examination_id,
-        StudentExamResult.status == MarksStatus.PUBLISHED.value,
-    )
+    sched_query = select(ExaminationSchedule.id).where(ExaminationSchedule.examination_id == examination_id)
     if section_id:
-        query = query.where(StudentExamResult.section_id == section_id)
+        sched_query = sched_query.where(ExaminationSchedule.section_id == section_id)
+    target_sched_ids = db.execute(sched_query).scalars().all()
 
-    results = db.execute(query).scalars().all()
     count = 0
-    for res in results:
-        res.status = MarksStatus.SUBMITTED.value
-        res.published_at = None
-        count += 1
-
-        # Revert marks status to SUBMITTED so Class Teacher can edit/resubmit
-        sched_ids = db.execute(
-            select(ExaminationSchedule.id).where(
-                ExaminationSchedule.examination_id == examination_id,
-                ExaminationSchedule.section_id == res.section_id,
+    if target_sched_ids:
+        marks = db.execute(
+            select(StudentExamMark).where(
+                StudentExamMark.schedule_id.in_(target_sched_ids),
+                StudentExamMark.status == MarksStatus.PUBLISHED.value,
             )
         ).scalars().all()
-        if sched_ids:
-            marks = db.execute(
-                select(StudentExamMark).where(
-                    StudentExamMark.schedule_id.in_(sched_ids),
-                    StudentExamMark.student_id == res.student_id,
-                    StudentExamMark.status == MarksStatus.PUBLISHED.value,
-                )
-            ).scalars().all()
-            for m in marks:
-                m.status = MarksStatus.SUBMITTED.value
+        for m in marks:
+            m.status = MarksStatus.SUBMITTED.value
+            count += 1
 
     # Revert examination status back from COMPLETED if it was completed
     if exam.status == ExamStatus.COMPLETED.value:
