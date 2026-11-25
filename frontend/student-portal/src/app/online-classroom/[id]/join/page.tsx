@@ -23,6 +23,8 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import BlockIcon from '@mui/icons-material/Block';
 import { useQuery } from '@tanstack/react-query';
 import AppShell from '@/components/layout/AppShell';
+import RequireRole from '@/components/guards/RequireRole';
+import { ROLES } from '@/lib/constants';
 import { studentOnlineClassApi, studentOnlineClassKeys } from '@/features/online-classroom/api';
 
 export default function PreJoinClassroomPage() {
@@ -126,7 +128,8 @@ export default function PreJoinClassroomPage() {
 
   // Stream-ready Green Room
   return (
-    <AppShell>
+    <RequireRole roles={[ROLES.STUDENT]}>
+      <AppShell>
       <Box sx={{ minHeight: 'calc(100vh - 120px)', bgcolor: '#0f172a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', p: { xs: 2, md: 4 }, borderRadius: 3 }}>
         <Box sx={{ maxWidth: 860, width: '100%' }}>
         <Button
@@ -302,5 +305,6 @@ export default function PreJoinClassroomPage() {
       </Box>
     </Box>
   </AppShell>
+  </RequireRole>
   );
 }

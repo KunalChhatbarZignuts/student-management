@@ -109,8 +109,6 @@ export default function ChildrenPage() {
                       <Tab icon={<EventAvailableIcon />} iconPosition="start" label="Attendance" />
                       <Tab icon={<GradeIcon />} iconPosition="start" label="Marks & Grades" />
                       <Tab icon={<CalendarMonthIcon />} iconPosition="start" label="Timetable" />
-                      <Tab icon={<AssignmentIcon />} iconPosition="start" label="Assignments" />
-                      <Tab icon={<ReceiptLongIcon />} iconPosition="start" label="Fees & Invoices" />
                       <Tab icon={<MenuBookIcon />} iconPosition="start" label="Digital Diary" />
                     </Tabs>
                   </Paper>

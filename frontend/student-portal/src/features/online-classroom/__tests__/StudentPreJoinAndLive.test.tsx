@@ -6,6 +6,10 @@ import StudentLiveClassroomPage from '@/app/online-classroom/[id]/live/page';
 import { renderWithProviders } from '@/tests/test-utils';
 import { studentOnlineClassApi } from '../api';
 
+vi.mock('@/components/guards/RequireRole', () => ({
+  default: ({ children }: any) => <>{children}</>,
+}));
+
 const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({

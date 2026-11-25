@@ -41,6 +41,8 @@ import LinearProgress from '@mui/material/LinearProgress';
 import CircularProgress from '@mui/material/CircularProgress';
 import WhiteboardCanvas, { DrawStroke } from '@/features/online-classroom/components/WhiteboardCanvas';
 import AppShell from '@/components/layout/AppShell';
+import RequireRole from '@/components/guards/RequireRole';
+import { ROLES } from '@/lib/constants';
 import { useQuery } from '@tanstack/react-query';
 import { studentOnlineClassApi, studentOnlineClassKeys } from '@/features/online-classroom/api';
 import { useAuth } from '@/features/auth/hooks';
@@ -1819,14 +1821,16 @@ export default function StudentLiveClassroomPage() {
   );
 
   if (isFullscreen) {
-    return meetingView;
+    return <RequireRole roles={[ROLES.STUDENT]}>{meetingView}</RequireRole>;
   }
 
   return (
-    <AppShell>
-      <Box sx={{ p: { xs: 1, sm: 2 } }}>
-        {meetingView}
-      </Box>
-    </AppShell>
+    <RequireRole roles={[ROLES.STUDENT]}>
+      <AppShell>
+        <Box sx={{ p: { xs: 1, sm: 2 } }}>
+          {meetingView}
+        </Box>
+      </AppShell>
+    </RequireRole>
   );
 }

@@ -25,6 +25,8 @@ import ClearIcon from '@mui/icons-material/Clear';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import AppShell from '@/components/layout/AppShell';
+import RequireRole from '@/components/guards/RequireRole';
+import { ROLES } from '@/lib/constants';
 import { studentOnlineClassApi, studentOnlineClassKeys } from '@/features/online-classroom/api';
 import { useOnlineClassroomFeed } from '@/features/online-classroom/useOnlineClassroomFeed';
 import StudentClassCard from '@/features/online-classroom/components/StudentClassCard';
@@ -74,7 +76,8 @@ export default function StudentOnlineClassroomPage() {
   );
 
   return (
-    <AppShell>
+    <RequireRole roles={[ROLES.STUDENT]}>
+      <AppShell>
       <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 1280, mx: 'auto' }}>
         {/* Header */}
         <Box sx={{ mb: 4 }}>
@@ -386,5 +389,6 @@ export default function StudentOnlineClassroomPage() {
         )}
       </Box>
     </AppShell>
-  );
+  </RequireRole>
+);
 }

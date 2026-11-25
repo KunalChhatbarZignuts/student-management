@@ -120,6 +120,7 @@ const navItems: NavItem[] = [
     label: 'Online Classroom',
     href: '/online-classroom',
     icon: <VideoCameraFrontIcon />,
+    roles: [ROLES.STUDENT],
   },
   {
     label: 'Fee Details',
