@@ -62,6 +62,7 @@ interface NavItem {
   href: string;
   icon: React.ReactNode;
   roles?: string[];
+  permission?: string;
 }
 
 const navItems: NavItem[] = [
@@ -75,60 +76,70 @@ const navItems: NavItem[] = [
     href: '/admissions/create',
     icon: <HowToRegIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+    permission: 'admissions',
   },
   {
     label: 'Students',
     href: '/students',
     icon: <SchoolIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+    permission: 'students',
   },
   {
     label: 'Teachers',
     href: '/teachers',
     icon: <PeopleIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+    permission: 'teachers',
   },
   {
     label: 'Grades & Sections',
     href: '/grades',
     icon: <ClassIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+    permission: 'academics',
   },
   {
     label: 'Academic Enrollments',
     href: '/enrollments',
     icon: <HistoryEduIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+    permission: 'academics',
   },
   {
     label: 'Academic Rollover',
     href: '/enrollments/rollover',
     icon: <PublishedWithChangesIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+    permission: 'academics',
   },
   {
     label: 'Fee Counter POS',
     href: '/fees/pos',
     icon: <PointOfSaleIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+    permission: 'fees',
   },
   {
     label: 'Fee Management',
     href: '/fees',
     icon: <AccountBalanceWalletIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+    permission: 'fees',
   },
   {
     label: 'Teacher Substitutions',
     href: '/timetable/substitutions',
     icon: <SwapHorizIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+    permission: 'academics',
   },
   {
     label: 'Timetables',
     href: '/timetable',
     icon: <ScheduleIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+    permission: 'academics',
   },
   // {
   //   label: 'Absence Notifications',
@@ -141,6 +152,7 @@ const navItems: NavItem[] = [
     href: '/examinations',
     icon: <AssignmentIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+    permission: 'examinations',
   },
   {
     label: 'User Accounts',
@@ -153,12 +165,14 @@ const navItems: NavItem[] = [
     href: '/parents',
     icon: <FamilyRestroomIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+    permission: 'students',
   },
   {
     label: 'Leave Monitoring',
     href: '/leave-monitoring',
     icon: <AssignmentTurnedInIcon />,
     roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+    permission: 'attendance',
   },
   {
     label: 'Classroom Monitoring',
@@ -263,7 +277,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const filteredNavItems = navItems.filter((item) => {
     if (!item.roles) return true;
-    return role ? item.roles.includes(role) : false;
+    const hasRole = role ? item.roles.includes(role) : false;
+    if (!hasRole) return false;
+
+    // Granular admin permission check
+    if (role === ROLES.ADMIN && item.permission) {
+      const perms = user?.admin_permissions || [];
+      if (!perms.includes('*') && !perms.includes(item.permission)) {
+        return false;
+      }
+    }
+    return true;
   });
 
   const drawerContent = (

@@ -63,9 +63,20 @@ export default function UsersManagementPage() {
   });
 
   const createAdminMutation = useMutation({
-    mutationFn: (payload: CreateAdminFormData) => adminUserApi.createAdmin(payload),
-    onSuccess: () => {
-      showSnackbar('Administrator account created and invitation dispatched!', 'success');
+    mutationFn: (payload: {
+      email: string;
+      first_name?: string;
+      last_name?: string;
+      permissions?: string[];
+      password?: string;
+    }) => adminUserApi.createAdmin(payload),
+    onSuccess: (_, vars) => {
+      showSnackbar(
+        vars.password
+          ? 'Administrator account created with direct password!'
+          : 'Administrator account created and invitation dispatched!',
+        'success'
+      );
       queryClient.invalidateQueries({ queryKey: userKeys.all });
       setOpenCreateDialog(false);
     },

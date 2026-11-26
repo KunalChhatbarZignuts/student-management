@@ -8,7 +8,12 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.config import settings
 from app.core.deps import get_client_ip, get_db, require_roles
 from app.core.email import send_invite_email, send_password_reset_email
-from app.core.security import generate_secure_token, hash_token
+from app.core.security import (
+    generate_secure_token,
+    hash_password,
+    hash_token,
+    validate_password_strength,
+)
 from app.modules.auth.invite_models import Invite
 from app.modules.auth.password_reset_models import PasswordReset
 from app.modules.students.parent_models import Parent
@@ -16,9 +21,12 @@ from app.modules.students.models import Student
 from app.modules.teachers.models import Teacher
 from app.modules.auth.models import User, UserRole, UserStatus
 from app.modules.auth.admin_schemas import (
+    CreateAdminRequest,
     PaginatedUsersResponse,
     ResendInviteResponse,
+    SystemOverviewResponse,
     TriggerPasswordResetResponse,
+    UpdateAdminPermissionsRequest,
     UserStatusUpdateResponse,
 )
 from app.modules.auth.user_schemas import UserRead
@@ -26,6 +34,151 @@ from app.modules.audit.service import log_action
 from app.modules.auth.service import revoke_all_user_tokens
 
 router = APIRouter(prefix="/admin/users", tags=["Admin - User Management"])
+
+
+@router.get("/system-overview", response_model=SystemOverviewResponse)
+def get_system_overview(
+    current_user: User = Depends(require_roles(UserRole.SUPER_ADMIN.value)),
+    db: Session = Depends(get_db),
+):
+    """Super-Admin only: System-wide user statistics and platform status."""
+    total_admins = db.scalar(select(func.count(User.id)).where(User.role == UserRole.ADMIN.value)) or 0
+    active_admins = db.scalar(select(func.count(User.id)).where(User.role == UserRole.ADMIN.value, User.status == UserStatus.ACTIVE.value)) or 0
+    invited_admins = db.scalar(select(func.count(User.id)).where(User.role == UserRole.ADMIN.value, User.status == UserStatus.INVITED.value)) or 0
+    total_teachers = db.scalar(select(func.count(User.id)).where(User.role == UserRole.TEACHER.value)) or 0
+    total_students = db.scalar(select(func.count(User.id)).where(User.role == UserRole.STUDENT.value)) or 0
+    total_parents = db.scalar(select(func.count(User.id)).where(User.role == UserRole.PARENT.value)) or 0
+    total_users = db.scalar(select(func.count(User.id))) or 0
+
+    return SystemOverviewResponse(
+        total_admins=total_admins,
+        active_admins=active_admins,
+        invited_admins=invited_admins,
+        total_teachers=total_teachers,
+        total_students=total_students,
+        total_parents=total_parents,
+        total_users=total_users,
+        system_status="healthy",
+    )
+
+
+@router.post("/create-admin", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+def create_admin(
+    payload: CreateAdminRequest,
+    request: Request,
+    current_user: User = Depends(require_roles(UserRole.SUPER_ADMIN.value)),
+    db: Session = Depends(get_db),
+):
+    """Super-Admin only: Provision a new school Administrator and send an invitation."""
+    email_clean = payload.email.strip().lower()
+
+    existing = db.execute(select(User).where(func.lower(User.email) == email_clean)).scalar_one_or_none()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A user with email '{payload.email}' already exists in the system.",
+        )
+
+    # Create new administrator account with granular permissions
+    now = datetime.now(timezone.utc)
+    
+    password_hash = None
+    admin_status = UserStatus.INVITED.value
+    if payload.password:
+        validate_password_strength(payload.password)
+        password_hash = hash_password(payload.password)
+        admin_status = UserStatus.ACTIVE.value
+
+    new_admin = User(
+        id=uuid.uuid4(),
+        email=email_clean,
+        password_hash=password_hash,
+        role=UserRole.ADMIN.value,
+        status=admin_status,
+        admin_permissions=payload.permissions or [],
+        must_change_password=True,
+        failed_login_count=0,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(new_admin)
+    db.flush()
+
+    raw_token = None
+    if not payload.password:
+        # Generate secure 48-hour invitation token if no direct password was set
+        raw_token = generate_secure_token()
+        invite = Invite(
+            user_id=new_admin.id,
+            token_hash=hash_token(raw_token),
+            expires_at=now + timedelta(hours=settings.INVITE_EXPIRE_HOURS),
+        )
+        db.add(invite)
+
+    # Audit log
+    ip = get_client_ip(request)
+    log_action(
+        db,
+        actor_user_id=current_user.id,
+        action="admin_provisioned",
+        entity_type="user",
+        entity_id=str(new_admin.id),
+        metadata={
+            "admin_email": email_clean,
+            "first_name": payload.first_name,
+            "last_name": payload.last_name,
+            "permissions": payload.permissions or [],
+            "direct_password_set": bool(payload.password),
+        },
+        ip=ip,
+    )
+    db.commit()
+    db.refresh(new_admin)
+
+    # Dispatch invite email only if token was generated
+    if raw_token:
+        try:
+            send_invite_email(new_admin.email, raw_token)
+        except Exception:
+            # Non-blocking for email delivery failure in offline dev environments
+            pass
+
+    return UserRead.model_validate(new_admin)
+
+
+@router.patch("/{user_id}/permissions", response_model=UserRead)
+def update_admin_permissions(
+    user_id: uuid.UUID,
+    payload: UpdateAdminPermissionsRequest,
+    request: Request,
+    current_user: User = Depends(require_roles(UserRole.SUPER_ADMIN.value)),
+    db: Session = Depends(get_db),
+):
+    """Super-Admin only: Update an Administrator's allowed module access permissions."""
+    admin_user = db.get(User, user_id)
+    if not admin_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if admin_user.role != UserRole.ADMIN.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Granular module permissions can only be configured for Administrator accounts.",
+        )
+
+    admin_user.admin_permissions = payload.permissions
+    ip = get_client_ip(request)
+    log_action(
+        db,
+        actor_user_id=current_user.id,
+        action="admin_permissions_updated",
+        entity_type="user",
+        entity_id=str(admin_user.id),
+        metadata={"permissions": payload.permissions},
+        ip=ip,
+    )
+    db.commit()
+    db.refresh(admin_user)
+    return UserRead.model_validate(admin_user)
 
 
 @router.get("", response_model=PaginatedUsersResponse)
@@ -107,8 +260,13 @@ def suspend_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if user.role == UserRole.SUPER_ADMIN.value and current_user.role != UserRole.SUPER_ADMIN.value:
-        raise HTTPException(status_code=403, detail="Cannot suspend a super admin")
+    # Super Admin protection: Cannot suspend a Super Admin
+    if user.role == UserRole.SUPER_ADMIN.value:
+        raise HTTPException(status_code=403, detail="Super-admin account cannot be suspended")
+
+    # Regular Admin protection: Only Super Admin can suspend Admin accounts
+    if user.role == UserRole.ADMIN.value and current_user.role != UserRole.SUPER_ADMIN.value:
+        raise HTTPException(status_code=403, detail="Only Super-Admin can suspend an Administrator account")
 
     user.status = UserStatus.SUSPENDED.value
     revoke_all_user_tokens(db, user.id)
@@ -144,6 +302,10 @@ def activate_user(
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Regular Admin protection: Only Super Admin can activate Admin accounts
+    if user.role == UserRole.ADMIN.value and current_user.role != UserRole.SUPER_ADMIN.value:
+        raise HTTPException(status_code=403, detail="Only Super-Admin can activate an Administrator account")
 
     user.status = UserStatus.ACTIVE.value
     user.failed_login_count = 0
@@ -183,6 +345,10 @@ def deactivate_user(
 
     if user.role == UserRole.SUPER_ADMIN.value:
         raise HTTPException(status_code=403, detail="Super-admin account cannot be deactivated")
+
+    # Regular Admin protection: Only Super Admin can deactivate Admin accounts
+    if user.role == UserRole.ADMIN.value and current_user.role != UserRole.SUPER_ADMIN.value:
+        raise HTTPException(status_code=403, detail="Only Super-Admin can deactivate an Administrator account")
 
     user.status = UserStatus.DEACTIVATED.value
     revoke_all_user_tokens(db, user.id)

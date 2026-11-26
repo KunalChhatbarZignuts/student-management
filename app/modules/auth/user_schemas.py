@@ -47,6 +47,7 @@ class UserRead(BaseModel):
     email: str
     role: str
     status: str
+    admin_permissions: list[str] = []
     must_change_password: bool
     last_login_at: datetime | None = None
     created_at: datetime

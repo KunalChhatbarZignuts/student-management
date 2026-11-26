@@ -1,3 +1,4 @@
+import datetime as dt
 import uuid
 from typing import Any
 
@@ -24,6 +25,7 @@ def log_action(
         entity_id=str(entity_id) if entity_id else None,
         metadata_=metadata or {},
         ip=ip,
+        created_at=dt.datetime.now(dt.timezone.utc),
     )
     db.add(audit_entry)
     db.commit()

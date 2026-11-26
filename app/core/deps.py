@@ -169,6 +169,46 @@ def require_roles(*allowed_roles: str) -> Callable[[User], User]:
     return role_checker
 
 
+def require_admin_permission(permission_key: str) -> Callable[[User], User]:
+    """
+    Dependency factory enforcing granular module access on Admin users.
+    Super Admins always bypass.
+    Admins must have '*' or specific permission in admin_permissions list.
+    """
+    perm_key_clean = permission_key.strip().lower()
+
+    def permission_checker(request: Request, current_user: User = Depends(get_current_user)) -> User:
+        user_role_str = str(current_user.role).lower()
+        if user_role_str == UserRole.SUPER_ADMIN.value:
+            return current_user
+
+        if user_role_str == UserRole.ADMIN.value:
+            perms = [str(p).lower() for p in (current_user.admin_permissions or [])]
+            if "*" in perms or perm_key_clean in perms:
+                return current_user
+
+            logger.warning(
+                "Access forbidden: admin permission missing",
+                extra={
+                    "user_id": str(current_user.id),
+                    "required_permission": perm_key_clean,
+                    "granted_permissions": perms,
+                    "path": request.url.path,
+                },
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied: Account lacks '{perm_key_clean}' administrative access.",
+            )
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operation requires administrative privileges.",
+        )
+
+    return permission_checker
+
+
 def get_current_teacher(
     current_user: User = Depends(require_roles(UserRole.TEACHER.value)),
     db: Session = Depends(get_db),

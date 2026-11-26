@@ -43,6 +43,29 @@ class AuditLogRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CreateAdminRequest(BaseModel):
+    email: EmailStr
+    first_name: str | None = None
+    last_name: str | None = None
+    permissions: list[str] = []
+    password: str | None = None
+
+
+class UpdateAdminPermissionsRequest(BaseModel):
+    permissions: list[str]
+
+
+class SystemOverviewResponse(BaseModel):
+    total_admins: int
+    active_admins: int
+    invited_admins: int
+    total_teachers: int
+    total_students: int
+    total_parents: int
+    total_users: int
+    system_status: str = "healthy"
+
+
 class AuditLogListResponse(BaseModel):
     items: list[AuditLogRead]
     total: int

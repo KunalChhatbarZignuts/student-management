@@ -37,6 +37,7 @@ export interface User {
   email: string;
   role: UserRole;
   status: string;
+  admin_permissions?: string[];
   must_change_password: boolean;
   last_login_at?: string | null;
   created_at: string;

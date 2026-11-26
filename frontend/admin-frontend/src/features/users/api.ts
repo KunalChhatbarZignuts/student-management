@@ -18,8 +18,19 @@ export const adminUserApi = {
     return res.data;
   },
 
-  createAdmin: async (payload: { email: string; first_name?: string; last_name?: string }) => {
+  createAdmin: async (payload: {
+    email: string;
+    first_name?: string;
+    last_name?: string;
+    permissions?: string[];
+    password?: string;
+  }) => {
     const res = await apiClient.post('/admin/users/create-admin', payload);
+    return res.data;
+  },
+
+  updatePermissions: async (userId: string, permissions: string[]) => {
+    const res = await apiClient.patch(`/admin/users/${userId}/permissions`, { permissions });
     return res.data;
   },
 };
