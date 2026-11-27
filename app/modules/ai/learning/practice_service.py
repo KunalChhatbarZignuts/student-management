@@ -12,7 +12,6 @@ from app.modules.ai.learning.models import (
     ChapterTopic,
     AIPracticeSession,
     AIPracticeQuestion,
-    AILearningRecommendation,
     RecommendationStatus,
 )
 from app.modules.academics.classroom_models import Subject
@@ -366,23 +365,11 @@ def evaluate_practice_session(
     session.score_percentage = pct
     session.completed_at = dt.datetime.now(dt.timezone.utc)
 
-    # Update associated recommendation if one exists
-    rec = db.execute(
-        select(AILearningRecommendation).where(
-            AILearningRecommendation.student_id == student_id,
-            AILearningRecommendation.chapter_id == session.chapter_id,
-            AILearningRecommendation.status != RecommendationStatus.COMPLETED.value,
-        )
-    ).scalars().first()
-
-    if rec:
-        if pct >= 75.0:
-            rec.status = RecommendationStatus.COMPLETED.value
-            impact_msg = f"Awesome work! Scored {pct}%. Recommendation for {rec.topic_title} marked as COMPLETED."
-        else:
-            rec.status = RecommendationStatus.NEED_PRACTICE.value
-            impact_msg = f"Diagnostic score: {pct}%. Additional concept revision recommended before re-attempting."
+    # Dynamic learning recommendation feedback
+    if pct >= 75.0:
+        impact_msg = f"Awesome work! Scored {pct}%. Recommended topic mastery verified."
     else:
+        impact_msg = f"Diagnostic score: {pct}%. Additional concept revision recommended before re-attempting."
         impact_msg = f"Diagnostic session completed with {pct}% accuracy. Progress recorded in your learning journey."
 
     db.commit()

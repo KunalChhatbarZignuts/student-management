@@ -1,13 +1,9 @@
 """Unified model registry for SQLAlchemy and Alembic migration discovery."""
 
 from app.modules.ai.learning.models import (
-    AIDailyStudyPlan,
-    AILearningRecommendation,
     AIPracticeQuestion,
     AIPracticeSession,
     AIStudentMistake,
-    AIStudentStudySettings,
-    AIStudyPlanItem,
     AITopicMastery,
     ChapterTopic,
     RecommendationPriority,
@@ -20,10 +16,6 @@ from app.modules.ai.assistant.models import (
     AIStudentConversation,
     AIStudentMessage,
     MessageSender,
-)
-from app.modules.ai.assistant.knowledge_models import (
-    SchoolKnowledgeDocument,
-    SchoolKnowledgeChunk,
 )
 from app.modules.students.admission_models import Admission
 from app.modules.examinations.models import (
@@ -172,9 +164,6 @@ __all__ = [
     "User",
     "SubjectChapter",
     "ChapterTopic",
-    "AILearningRecommendation",
-    "AIDailyStudyPlan",
-    "AIStudyPlanItem",
     "AIPracticeSession",
     "AIPracticeQuestion",
     "AIStudentConversation",

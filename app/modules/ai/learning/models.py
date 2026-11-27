@@ -21,6 +21,13 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
+from app.modules.ai.learning.dtos import (
+    LearningRecommendationDTO as AILearningRecommendation,
+    DailyStudyPlanDTO as AIDailyStudyPlan,
+    StudyPlanItemDTO as AIStudyPlanItem,
+    StudentStudySettingsDTO as AIStudentStudySettings,
+)
+from app.modules.ai.learning.schemas import StudySessionResponse as AIStudySession
 
 if TYPE_CHECKING:
     from app.modules.academics.structure_models import AcademicYear, Grade
@@ -153,140 +160,6 @@ class ChapterTopic(TimestampMixin, Base):
         return f"<ChapterTopic {self.title}>"
 
 
-class AILearningRecommendation(TimestampMixin, Base):
-    __tablename__ = "ai_learning_recommendations"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    student_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    chapter_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey("subject_chapters.id", ondelete="SET NULL"), nullable=True
-    )
-    topic_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey("chapter_topics.id", ondelete="SET NULL"), nullable=True
-    )
-    subject_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    topic_title: Mapped[str] = mapped_column(String(200), nullable=False)
-    reason: Mapped[str] = mapped_column(Text, nullable=False)
-    priority: Mapped[str] = mapped_column(String(20), nullable=False, default=RecommendationPriority.MEDIUM.value)
-    estimated_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
-    status: Mapped[str] = mapped_column(String(30), nullable=False, default=RecommendationStatus.NOT_STARTED.value)
-    order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-
-    # Relationships
-    student: Mapped["Student"] = relationship("Student")
-    chapter: Mapped["SubjectChapter | None"] = relationship("SubjectChapter")
-    topic: Mapped["ChapterTopic | None"] = relationship("ChapterTopic")
-
-    __table_args__ = (
-        Index("ix_ai_recs_student_status", "student_id", "status"),
-        Index("ix_ai_recs_priority", "priority"),
-    )
-
-    def __repr__(self) -> str:
-        return f"<AILearningRecommendation {self.subject_name} - {self.topic_title} ({self.priority})>"
-
-
-class AIDailyStudyPlan(TimestampMixin, Base):
-    __tablename__ = "ai_daily_study_plans"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    student_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    plan_date: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
-    total_planned_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=45)
-    completed_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    status: Mapped[str] = mapped_column(String(30), nullable=False, default=StudyPlanStatus.PLANNED.value)
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-
-    # Relationships
-    student: Mapped["Student"] = relationship("Student")
-    items: Mapped[list["AIStudyPlanItem"]] = relationship(
-        "AIStudyPlanItem", back_populates="plan", cascade="all, delete-orphan", order_by="AIStudyPlanItem.order_index"
-    )
-
-    __table_args__ = (
-        UniqueConstraint("student_id", "plan_date", name="uq_student_daily_plan_date"),
-        Index("ix_ai_study_plans_student_date", "student_id", "plan_date"),
-    )
-
-    def __repr__(self) -> str:
-        return f"<AIDailyStudyPlan student={self.student_id} date={self.plan_date}>"
-
-
-class AIStudyPlanItem(TimestampMixin, Base):
-    __tablename__ = "ai_study_plan_items"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    plan_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("ai_daily_study_plans.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    subject_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    topic_title: Mapped[str] = mapped_column(String(200), nullable=False)
-    title: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    activity_type: Mapped[str] = mapped_column(String(50), nullable=False, default=RoutineActivityType.CONCEPT_LEARNING.value)
-    priority: Mapped[str] = mapped_column(String(20), nullable=False, default=RoutineActivityPriority.MEDIUM.value)
-    status: Mapped[str] = mapped_column(String(30), nullable=False, default=RoutineActivityStatus.PENDING.value)
-    duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=15)
-    is_completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    is_custom: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    time_spent_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    start_time: Mapped[str | None] = mapped_column(String(10), nullable=True)
-    end_time: Mapped[str | None] = mapped_column(String(10), nullable=True)
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    recommended_resource_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    exam_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey("examinations.id", ondelete="SET NULL"), nullable=True, index=True
-    )
-    is_rescheduled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-
-    # Relationships
-    plan: Mapped["AIDailyStudyPlan"] = relationship("AIDailyStudyPlan", back_populates="items")
-    examination: Mapped["Examination | None"] = relationship("Examination")
-    sessions: Mapped[list["AIStudySession"]] = relationship(
-        "AIStudySession", back_populates="plan_item", cascade="all, delete-orphan"
-    )
-
-    def __repr__(self) -> str:
-        return f"<AIStudyPlanItem {self.subject_name}: {self.topic_title}>"
-
-
-class AIStudySession(TimestampMixin, Base):
-    __tablename__ = "ai_study_sessions"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    student_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    plan_item_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("ai_study_plan_items.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    status: Mapped[str] = mapped_column(String(30), nullable=False, default=StudySessionStatus.ACTIVE.value)
-    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    end_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    accumulated_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    target_duration_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=1500)
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-
-    # Relationships
-    student: Mapped["Student"] = relationship("Student")
-    plan_item: Mapped["AIStudyPlanItem"] = relationship("AIStudyPlanItem", back_populates="sessions")
-
-    __table_args__ = (
-        Index("ix_ai_study_sessions_student_status", "student_id", "status"),
-    )
-
-    def __repr__(self) -> str:
-        return f"<AIStudySession {self.id} student={self.student_id} status={self.status}>"
-
-
 class AIPracticeSession(TimestampMixin, Base):
     __tablename__ = "ai_practice_sessions"
 
@@ -340,26 +213,6 @@ class AIPracticeQuestion(TimestampMixin, Base):
 
     def __repr__(self) -> str:
         return f"<AIPracticeQuestion session={self.session_id}>"
-
-
-class AIStudentStudySettings(TimestampMixin, Base):
-    __tablename__ = "ai_student_study_settings"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    student_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("students.id", ondelete="CASCADE"), unique=True, nullable=False, index=True
-    )
-    weekday_daily_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=45)
-    weekend_daily_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=90)
-    preferred_study_time: Mapped[str] = mapped_column(String(30), nullable=False, default="EVENING")
-    break_interval_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
-    notifications_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-
-    # Relationships
-    student: Mapped["Student"] = relationship("Student")
-
-    def __repr__(self) -> str:
-        return f"<AIStudentStudySettings student={self.student_id}>"
 
 
 class AITopicMastery(TimestampMixin, Base):

@@ -232,6 +232,7 @@ class DuplicateRoutineRequest(AppBaseModel):
     source_date: dt.date
     target_date: dt.date
     include_completed: bool = False
+    activity_ids: list[uuid.UUID] | None = None
 
 
 class UpdateDailyRoutineMetadataRequest(AppBaseModel):
@@ -254,8 +255,11 @@ class FinishStudySessionRequest(AppBaseModel):
 class GeneratePracticeRequest(AppBaseModel):
     chapter_id: uuid.UUID | None = None
     subject_id: uuid.UUID | None = None
+    subject_name: str | None = None
+    chapter_title: str | None = None
     difficulty: str = "MEDIUM"
     num_questions: int = 5
+    question_count: int = 5
 
 
 class PracticeQuestionPublic(AppBaseModel):
